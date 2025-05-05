@@ -10,8 +10,8 @@ import signal
 import fcntl
 import struct
 
-def start_pty():
-    """Sets up a PTY and handles forwarding input/output."""
+def spawn_shell(shell_path="/bin/bash"):
+    """Spawn a shell in a PTY and connect it to the current terminal."""
     stdin_fd = sys.stdin.fileno()
     stdout_fd = sys.stdout.fileno()
     stderr_fd = sys.stderr.fileno()
@@ -36,7 +36,8 @@ def start_pty():
 
         if child_pid == 0:
             # In child process: replace with shell
-            os.execvp("/bin/bash", ["/bin/bash"])  # Hardcoded shell for now
+            os.execvp(shell_path, [shell_path])
+
         else:
             # Parent process: forward input and output
             sigwinch_handler(None, None)  # set initial window size
