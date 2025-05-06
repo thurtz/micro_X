@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+#Name=micro_X
+Comment=Launch micro_X AI Shell inside tmux
+Exec=bash -c 'cd "$(dirname "%k")" && ./micro_X.sh'
+Terminal=true
+Categories=Utility;System;
+Name[en_US]=micro_X
