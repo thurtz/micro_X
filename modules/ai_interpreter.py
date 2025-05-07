@@ -7,7 +7,7 @@ def interpret_human_input(human_input, master_fd, stdout_fd):
     """Sends human input to Ollama for Linux command translation and executes it."""
     try:
         response = ollama.chat(
-            model='llama3.2',  # Or another model you have pulled
+            model='llama3.2:1b',  # Or another model you have pulled
             messages=[
                 {
                     'role': 'user',

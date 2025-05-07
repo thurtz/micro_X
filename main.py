@@ -76,6 +76,9 @@ if __name__ == "__main__":
                         output_data = os.read(master_fd, 1024)
                         if not output_data:
                             break
+                        # Filter out extra newline characters (might be too aggressive)
+                        #cleaned_output = output_data.replace(b'\n\n', b'\n')
+                        #os.write(stdout_fd, cleaned_output)
                         os.write(stdout_fd, output_data)
             except OSError as e:
                 if e.errno != 5:
