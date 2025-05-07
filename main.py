@@ -64,17 +64,21 @@ if __name__ == "__main__":
                                                     # Process the buffer
                                                     if command_buffer.startswith('/ai '):
                                                         human_query = command_buffer[4:].strip()
-                                                        linux_command = ai_interpreter.interpret_human_input(human_query)
-                                                        os.write(master_fd, linux_command.encode())
+                                                        ai_interpreter.interpret_human_input(human_query, master_fd, stdout_fd)
+                                                        print(f"DEBUG: Sent command for: {human_query}") # Keep this for now
                                                     command_buffer = "" # Clear buffer
                                             else:
                                                 os.write(master_fd, char_bytes) # Echo normal commands via PTY
                                                 if char == '\r':
                                                     command_buffer = "" # Clear buffer on Enter for normal commands
+
                     if master_fd in rlist:
                         output_data = os.read(master_fd, 1024)
                         if not output_data:
                             break
+                        # Filter out extra newline characters (might be too aggressive)
+                        #cleaned_output = output_data.replace(b'\n\n', b'\n')
+                        #os.write(stdout_fd, cleaned_output)
                         os.write(stdout_fd, output_data)
             except OSError as e:
                 if e.errno != 5:
