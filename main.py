@@ -60,16 +60,18 @@ if __name__ == "__main__":
                                                 command_buffer += char
                                                 sys.stdout.write(char)  # Explicitly echo typed characters
                                                 sys.stdout.flush()
-                                            if char == '\r': # Enter key
+                                                if char == '\r': # Enter key
                                                     # Process the buffer
                                                     if command_buffer.startswith('/ai '):
                                                         human_query = command_buffer[4:].strip()
                                                         ai_interpreter.interpret_human_input(human_query, master_fd, stdout_fd)
+                                                        print(f"DEBUG: Sent command for: {human_query}") # Keep this for now
                                                     command_buffer = "" # Clear buffer
                                             else:
                                                 os.write(master_fd, char_bytes) # Echo normal commands via PTY
                                                 if char == '\r':
                                                     command_buffer = "" # Clear buffer on Enter for normal commands
+
                     if master_fd in rlist:
                         output_data = os.read(master_fd, 1024)
                         if not output_data:

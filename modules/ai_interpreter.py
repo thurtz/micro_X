@@ -18,5 +18,8 @@ def interpret_human_input(human_input, master_fd, stdout_fd):
         linux_command = response['message']['content'].strip() + '\n'
         os.write(master_fd, linux_command.encode())
     except ollama.OllamaAPIError as e:
-        error_message = f"Error communicating with Ollama: {e}\n"
+        error_message = f"Error communicating with Ollama (API Error): {e}\n"
+        os.write(stdout_fd, error_message.encode())
+    except Exception as e:
+        error_message = f"Error during Ollama interaction: {e}\n"
         os.write(stdout_fd, error_message.encode())
