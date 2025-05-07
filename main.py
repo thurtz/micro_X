@@ -60,12 +60,11 @@ if __name__ == "__main__":
                                                 command_buffer += char
                                                 sys.stdout.write(char)  # Explicitly echo typed characters
                                                 sys.stdout.flush()
-                                                if char == '\r': # Enter key
+                                            if char == '\r': # Enter key
                                                     # Process the buffer
                                                     if command_buffer.startswith('/ai '):
                                                         human_query = command_buffer[4:].strip()
-                                                        linux_command = ai_interpreter.interpret_human_input(human_query)
-                                                        os.write(master_fd, linux_command.encode())
+                                                        ai_interpreter.interpret_human_input(human_query, master_fd, stdout_fd)
                                                     command_buffer = "" # Clear buffer
                                             else:
                                                 os.write(master_fd, char_bytes) # Echo normal commands via PTY
