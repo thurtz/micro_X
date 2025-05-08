@@ -17,7 +17,7 @@ import ollama  #  Import ollama here
 import logging  # Import the logging module
 from prompt_toolkit.application import get_app
 import json # Import json
-
+import time # Import time module
 # Set up logging
 LOG_DIR = "logs"
 LOG_FILE = os.path.join(LOG_DIR, "micro_x.log")
@@ -172,7 +172,7 @@ def handle_input(user_input):
         return  # Ignore empty input
 
     if user_input in {"exit", "quit", "/exit", "/quit"}:
-        append_output("Exiting micro_X Shell")
+        append_output("Exiting micro_X Shell 🚪")
         logger.info("Exiting micro_X")
         get_app().exit()
         return
@@ -181,15 +181,15 @@ def handle_input(user_input):
         human_query = user_input[4:].strip()
         linux_command = interpret_human_input(human_query) # Call the AI interpreter
         if linux_command:
-            append_output(f"AI: {linux_command}")
+            append_output(f">> {user_input}") # Added to show user_input
             category = classify_command(linux_command)
             logger.info(f"Command Category: {category}")
             if category == "simple":
-                execute_shell_command(linux_command)
+                execute_shell_command(linux_command, f"{linux_command}")  # Pass AI command and display it
             else:
-                execute_command_in_tmux(linux_command) # Execute the AI's command in tmux
+                execute_command_in_tmux(linux_command, f"{linux_command}")  # Pass AI command and display it
         else:
-            append_output("AI could not process the request.")
+            append_output("AI could not process the request. 🤔")
         return
 
     # Handle 'cd' command directly
@@ -209,9 +209,9 @@ def handle_input(user_input):
         category = classify_command(command)
         logger.info(f"Command Category: {category}")
         if category == "simple":
-            execute_shell_command(command)
+            execute_shell_command(command, user_input) # Pass user_input
         else:
-            execute_command_in_tmux(command) # Execute all commands in tmux
+            execute_command_in_tmux(command, user_input) # Pass user_input
     else:
         append_output(f"⚠️  Command blocked: {user_input}") # Or this
 
@@ -234,16 +234,52 @@ def sanitize_and_validate(command):
             return None  # Return None for blocked commands
     return command
     
-def execute_command_in_tmux(command):
+def execute_command_in_tmux(command, user_input=""):
     """Execute a command in a new tmux window."""
     try:
         unique_id = str(uuid.uuid4())[:8]
         window_name = f"micro_x_{unique_id}"  # Unique window name
-        tmux_command = ["tmux", "new-window", "-n", window_name, command]
-        logger.info(f"Executing in tmux: {tmux_command}")
-        subprocess.run(tmux_command)
+        log_path = f"/tmp/micro_x_output_{unique_id}.log"  # Temporary log file
+
+        category = classify_command(command) # Classify the command
+
+        if category == "semi_interactive":
+            #  Wrap the command to redirect output to a file and keep the tmux window open.
+            wrapped_command = f"bash -c '{command} |& tee {log_path}; sleep 1'"
+            tmux_command = ["tmux", "new-window", "-n", window_name, wrapped_command]
+            logger.info(f"Executing semi_interactive in tmux: {tmux_command}")
+            subprocess.run(tmux_command)
+
+            # Monitor the tmux window and capture output when it closes
+            append_output(f"⏳ Launching semi-interactive command in tmux, window name: {window_name}.  Waiting for it to complete...")
+
+            while True:
+                result = subprocess.run(["tmux", "list-windows"], stdout=subprocess.PIPE)
+                if window_name.encode() not in result.stdout:
+                    break  # Exit loop when window is closed
+                time.sleep(0.5)  # Check every half second
+
+            #  Retrieve and display the output
+            if os.path.exists(log_path):
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    output = f.read().strip()
+                if output:
+                    append_output(f"> {user_input}\n{output}") #  Added user_input here
+                os.remove(log_path)  # Clean up the log file
+        elif category == "interactive_tui":
+            append_output(f"> {user_input}")
+            tmux_command = ["tmux", "new-window", "-n", window_name, command]
+            logger.info(f"Executing interactive_tui in tmux: {tmux_command}")
+            subprocess.run(tmux_command)
+        else:
+            #  For other commands (like simple), use the original logic
+            tmux_command = ["tmux", "new-window", "-n", window_name, command]
+            logger.info(f"Executing in tmux: {tmux_command}")
+            subprocess.run(tmux_command)
+
+
     except FileNotFoundError:
-        append_output("Error: tmux not found. Please ensure tmux is installed.")
+        append_output("Error: tmux not found. Please ensure tmux is installed. ❌")
         logger.error("tmux not found")
     except Exception as e:
         append_output(f"❌ Error launching command in tmux: {e}")
@@ -251,7 +287,7 @@ def execute_command_in_tmux(command):
 
 
 
-def execute_shell_command(command):
+def execute_shell_command(command, user_input=""):
     """Execute a shell command and display the output."""
     try:
         parts = shlex.split(command)
@@ -265,7 +301,7 @@ def execute_shell_command(command):
         stdout, stderr = process.communicate()
 
         if stdout:
-            append_output(stdout)
+            append_output(f"> {user_input}\n{stdout}") # Added user_input here
         if stderr:
             append_output(f"❌ Error:\n{stderr}")
     except FileNotFoundError:
@@ -347,7 +383,7 @@ def run_shell(on_input, history=None, completer=None):
     try:
         app.run()
     except (EOFError, KeyboardInterrupt):
-        print("\nExiting.")
+        print("\nExiting. 🚪")
         logger.info("Exiting micro_X due to KeyboardInterrupt or EOFError")
 
 def interpret_human_input(human_input):
@@ -373,7 +409,7 @@ def interpret_human_input(human_input):
     except Exception as e:
         error_message = f"Error during Ollama interaction: {e}"
         print(error_message)
-        logger.exception(error_message)
+        logger.exception(e)
         return None  # Important: Return None on error
 
 
