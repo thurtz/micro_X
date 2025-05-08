@@ -1,6 +1,9 @@
 {
     "simple": [
       "ls",
+      "ls -lA",
+      "ls -l",
+      "ls -la",
       "pwd",
       "cd",
       "echo",
@@ -10,6 +13,7 @@
       "less",
       "more",
       "tail",
+      "tail micro_X.sh",
       "grep"
     ],
     "interactive_tui": [
@@ -17,7 +21,8 @@
       "vim",
       "top",
       "htop",
-      "ollama"
+      "ollama",
+      "tail -f logs/micro_x.log"
     ]
   }
   
