@@ -4,7 +4,8 @@
 cd "$(dirname "$0")" || exit
 
 # Activate the virtual environment
-source venv/bin/activate
+source .venv/bin/activate
 
 # Start or attach to the tmux session running micro_X
 tmux -f config/.tmux.conf new-session -A -s micro_X
+#tmux new-window -t micro_X "tail -f logs/micro_x.log"

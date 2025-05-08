@@ -1,0 +1,28 @@
+{
+    "simple": [
+      "ls",
+      "ls -lA",
+      "ls -l",
+      "ls -la",
+      "pwd",
+      "cd",
+      "echo",
+      "date"
+    ],
+    "semi_interactive": [
+      "less",
+      "more",
+      "tail",
+      "tail micro_X.sh",
+      "grep"
+    ],
+    "interactive_tui": [
+      "nano",
+      "vim",
+      "top",
+      "htop",
+      "ollama",
+      "tail -f logs/micro_x.log"
+    ]
+  }
+  
