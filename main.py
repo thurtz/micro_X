@@ -184,7 +184,9 @@ def handle_input(user_input):
             append_output(f">> {user_input}") # Added to show user_input
             category = classify_command(linux_command)
             logger.info(f"Command Category: {category}")
-            if category == "simple":
+            if linux_command.startswith("cd "):  # Handle cd command from AI
+                handle_cd_command(linux_command)
+            elif category == "simple":
                 execute_shell_command(linux_command,  linux_command)  # Pass AI command 
             else:
                 execute_command_in_tmux(linux_command,  linux_command)  # Pass AI command
@@ -194,14 +196,8 @@ def handle_input(user_input):
 
     # Handle 'cd' command directly
     if user_input.startswith("cd "):
-        new_dir = os.path.abspath(os.path.join(current_directory, user_input.split("cd ", 1)[1].strip()))
-        if os.path.isdir(new_dir):
-            current_directory = new_dir
-            append_output(f"📂 Changed directory to: {current_directory}")
-            return
-        else:
-            append_output(f"❌ Error: Directory '{new_dir}' does not exist.")
-            return
+        handle_cd_command(user_input)
+        return
 
     # Sanitize and validate the command (you can expand this)
     command = sanitize_and_validate(user_input)  # Use the function
@@ -214,6 +210,16 @@ def handle_input(user_input):
             execute_command_in_tmux(command, user_input) # Pass user_input
     else:
         append_output(f"⚠️  Command blocked: {user_input}") # Or this
+
+def handle_cd_command(user_input):
+    """Handle the cd command and update the current directory."""
+    global current_directory
+    new_dir = os.path.abspath(os.path.join(current_directory, user_input.split("cd ", 1)[1].strip()))
+    if os.path.isdir(new_dir):
+        current_directory = new_dir
+        append_output(f"📂 Changed directory to: {current_directory}")
+    else:
+        append_output(f"❌ Error: Directory '{new_dir}' does not exist.")
 
 def sanitize_and_validate(command):
     """Sanitize and validate the command before execution."""
@@ -434,3 +440,4 @@ if __name__ == "__main__":
         append_output(f"Received: {user_input}")
 
     run_shell(handle_user_input)
+
