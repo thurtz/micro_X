@@ -22,7 +22,8 @@
       "top",
       "htop",
       "ollama",
-      "tail -f logs/micro_x.log"
+      "tail -f logs/micro_x.log",
+      "ollama serve"
     ]
   }
   
