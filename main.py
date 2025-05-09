@@ -402,7 +402,8 @@ def interpret_human_input(human_input):
         ai_response = response['message']['content'].strip()
         logger.debug(f"Raw AI response: {ai_response}")  # Log the raw response
 
-        match = re.search(r"(<bash>\s*([\s\S]*?)\s*</bash>)|(```(?:bash)?\s*([\s\S]*?)\s*```)", ai_response, re.IGNORECASE)
+        #match = re.search(r"(<bash>\s*([\s\S]*?)\s*</bash>)|(```(?:bash)?\s*([\s\S]*?)\s*```)", ai_response, re.IGNORECASE)
+        match = re.search(r"(<bash>\s*'(.*?)'\s*</bash>)|(<bash>\s*(.*?)\s*</bash>)|(```(?:bash)?\s*([\s\S]*?)\s*```)", ai_response, re.IGNORECASE)
         if match:
             if match.group(2):
                 linux_command = match.group(2).strip()
