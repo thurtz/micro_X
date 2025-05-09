@@ -184,24 +184,20 @@ def handle_input(user_input):
             append_output(f">> {user_input}") # Added to show user_input
             category = classify_command(linux_command)
             logger.info(f"Command Category: {category}")
-            if category == "simple":
-                execute_shell_command(linux_command, f"{linux_command}")  # Pass AI command and display it
+            if linux_command.startswith("cd "):  # Handle cd command from AI
+                handle_cd_command(linux_command)
+            elif category == "simple":
+                execute_shell_command(linux_command,  linux_command)  # Pass AI command 
             else:
-                execute_command_in_tmux(linux_command, f"{linux_command}")  # Pass AI command and display it
+                execute_command_in_tmux(linux_command,  linux_command)  # Pass AI command
         else:
             append_output("AI could not process the request. 🤔")
         return
 
     # Handle 'cd' command directly
     if user_input.startswith("cd "):
-        new_dir = os.path.abspath(os.path.join(current_directory, user_input.split("cd ", 1)[1].strip()))
-        if os.path.isdir(new_dir):
-            current_directory = new_dir
-            append_output(f"📂 Changed directory to: {current_directory}")
-            return
-        else:
-            append_output(f"❌ Error: Directory '{new_dir}' does not exist.")
-            return
+        handle_cd_command(user_input)
+        return
 
     # Sanitize and validate the command (you can expand this)
     command = sanitize_and_validate(user_input)  # Use the function
@@ -214,6 +210,16 @@ def handle_input(user_input):
             execute_command_in_tmux(command, user_input) # Pass user_input
     else:
         append_output(f"⚠️  Command blocked: {user_input}") # Or this
+
+def handle_cd_command(user_input):
+    """Handle the cd command and update the current directory."""
+    global current_directory
+    new_dir = os.path.abspath(os.path.join(current_directory, user_input.split("cd ", 1)[1].strip()))
+    if os.path.isdir(new_dir):
+        current_directory = new_dir
+        append_output(f"📂 Changed directory to: {current_directory}")
+    else:
+        append_output(f"❌ Error: Directory '{new_dir}' does not exist.")
 
 def sanitize_and_validate(command):
     """Sanitize and validate the command before execution."""
@@ -266,13 +272,8 @@ def execute_command_in_tmux(command, user_input=""):
                 if output:
                     append_output(f"> {user_input}\n{output}") #  Added user_input here
                 os.remove(log_path)  # Clean up the log file
-        elif category == "interactive_tui":
-            append_output(f"> {user_input}")
-            tmux_command = ["tmux", "new-window", "-n", window_name, command]
-            logger.info(f"Executing interactive_tui in tmux: {tmux_command}")
-            subprocess.run(tmux_command)
         else:
-            #  For other commands (like simple), use the original logic
+            #  For other commands (like interactive_tui), use the original logic
             tmux_command = ["tmux", "new-window", "-n", window_name, command]
             logger.info(f"Executing in tmux: {tmux_command}")
             subprocess.run(tmux_command)
@@ -390,17 +391,35 @@ def interpret_human_input(human_input):
     """Sends human input to Ollama for Linux command translation."""
     try:
         response = ollama.chat(
-            model='llama3.2',  # Or another model you have available in Ollama
+            model='herawen/lisa',  # Or another model you have available in Ollama
             messages=[
                 {
                     'role': 'user',
-                    'content': f'You are a Linux command interpreter. Translate this human input to a single best matching Linux command: "{human_input}". Only respond with the Linux command.'
+                    'content': f'Translate this human input to a single best matching Linux command and enclose it within <bash></bash> tags without adding any extra characters: "{human_input}".'
                 }
             ]
         )
-        linux_command = response['message']['content'].strip()
-        logger.debug(f"AI interpreted '{human_input}' as: '{linux_command}'")
-        return linux_command
+        ai_response = response['message']['content'].strip()
+        logger.debug(f"Raw AI response: {ai_response}")  # Log the raw response
+
+        match = re.search(r"(<bash>\s*([\s\S]*?)\s*</bash>)|(```(?:bash)?\s*([\s\S]*?)\s*```)", ai_response, re.IGNORECASE)
+        if match:
+            if match.group(2):
+                linux_command = match.group(2).strip()
+            else:
+                linux_command = match.group(4).strip()
+            logger.debug(f"AI interpreted '{human_input}' as: '{linux_command}'")
+            return linux_command
+        else:
+            match = re.search(r"<unsafe>\s*([\s\S]*?)\s*</unsafe>", ai_response, re.IGNORECASE)
+            if match:
+                linux_command = match.group(1).strip()
+                logger.warning(f"AI suggested an unsafe command: {linux_command}")
+                return None
+            else:
+                logger.error(f"AI response did not contain command tags: {ai_response}")
+                return None
+
     except ollama.OllamaAPIError as e:
         error_message = f"Error communicating with Ollama: {e}"
         print(error_message)
@@ -421,3 +440,4 @@ if __name__ == "__main__":
         append_output(f"Received: {user_input}")
 
     run_shell(handle_user_input)
+
