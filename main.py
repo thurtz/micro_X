@@ -194,6 +194,10 @@ def handle_input(user_input):
             append_output("AI could not process the request. 🤔")
         return
 
+    if user_input.startswith("/command"):
+        handle_command_input(user_input)
+        return
+
     # Handle 'cd' command directly
     if user_input.startswith("cd "):
         handle_cd_command(user_input)
@@ -448,6 +452,8 @@ def interpret_human_input(human_input):
                  linux_command = match.group(26).strip()
             elif match.group(28):
                 linux_command = match.group(28).strip()
+            elif match.group(30):
+                linux_command = match.group(30).strip()
             logger.debug(f"AI interpreted '{human_input}' as: '{linux_command}'")
             return linux_command
         else:
@@ -471,6 +477,141 @@ def interpret_human_input(human_input):
         logger.exception(e)
         return None  # Important: Return None on error
 
+# The following functions are added to main.py
+def load_command_categories():
+    """Load command categories from a JSON file."""
+    if os.path.exists(CATEGORY_PATH):
+        try:
+            with open(CATEGORY_PATH, "r") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            logger.error("Error decoding command_categories.json.  Returning default categories.")
+            return {
+                "interactive_tui": [],
+                "semi_interactive": [],
+                "simple": []
+            }
+    else:
+        logger.info("command_categories.json not found.  Returning default categories.")
+        return {
+            "interactive_tui": [],
+            "semi_interactive": [],
+            "simple": []
+        }
+
+def save_command_categories(data):
+    """Save command categories to a JSON file."""
+    os.makedirs(os.path.dirname(CATEGORY_PATH), exist_ok=True)
+    with open(CATEGORY_PATH, "w") as f:
+        json.dump(data, f, indent=2)
+
+def classify_command(cmd):
+    """Classify a command into a category."""
+    known = load_command_categories()
+    for category, commands in known.items():
+        if cmd in commands:
+            return category
+    return "simple"  # Default category if not found
+
+def add_command(cmd, category_input):
+    """Add a command to a category."""
+    known = load_command_categories()
+    category = CATEGORY_MAP.get(category_input.lower())
+    
+    if not category:
+        append_output(f"❌ Invalid category '{category_input}'. Use 1, 2, 3 or category names.")
+        return
+
+    if cmd in known[category]:
+        append_output(f"⚠️ Command '{cmd}' is already classified as '{category}'.")
+        return
+
+    known[category].append(cmd)
+    save_command_categories(known)
+    append_output(f"✅ Command '{cmd}' added to category '{category}'.")
+
+def remove_command(cmd):
+    """Remove a command from its category."""
+    known = load_command_categories()
+    found = False
+
+    for category, commands in known.items():
+        if cmd in commands:
+            known[category].remove(cmd)
+            save_command_categories(known)
+            append_output(f"🗑️ Command '{cmd}' removed from category '{category}'.")
+            found = True
+            break
+
+    if not found:
+        append_output(f"⚠️ Command '{cmd}' not found in any category.")
+
+def list_commands():
+    """List all commands and their categories."""
+    known = load_command_categories()
+    output = ["📄 Current command categories:"]
+    for category, commands in known.items():
+        output.append(f"\n🔹 {category}:")
+        if commands:
+            output.extend([f"  - {cmd}" for cmd in sorted(commands)])
+        else:
+            output.append("  (none)")
+    append_output("\n".join(output))
+
+def move_command(cmd, new_category_input):
+    """Move a command to a different category."""
+    known = load_command_categories()
+    new_category = CATEGORY_MAP.get(new_category_input.lower())
+
+    if not new_category:
+        append_output(f"❌ Invalid category '{new_category_input}'. Use 1, 2, 3 or category names.")
+        return
+
+    found = False
+    for category, commands in known.items():
+        if cmd in commands:
+            if category == new_category:
+                append_output(f"⚠️ Command '{cmd}' is already in category '{category}'.")
+                return
+            commands.remove(cmd)
+            known[new_category].append(cmd)
+            save_command_categories(known)
+            append_output(f"🔄 Command '{cmd}' moved from '{category}' to '{new_category}'.")
+            found = True
+            break
+
+    if not found:
+        append_output(f"⚠️ Command '{cmd}' not found in any category.")
+
+def handle_command_input(input_str):
+    """Handle /command input."""
+    parts = input_str.strip().split()
+
+    if len(parts) >= 2 and parts[0] == "/command":
+        subcommand = parts[1].lower()
+        if subcommand == "add" and len(parts) == 4:
+            _, _, cmd, category_input = parts
+            add_command(cmd, category_input)
+        elif subcommand == "remove" and len(parts) == 3:
+            _, _, cmd = parts
+            remove_command(cmd)
+        elif subcommand == "list" and len(parts) == 2:
+            list_commands()
+        elif subcommand == "move" and len(parts) == 4:
+            _, _, cmd, new_category_input = parts
+            move_command(cmd, new_category_input)
+        else:
+            append_output("❌ Invalid /command syntax.  Try:\n"
+                          "  /command add <command> <category>\n"
+                          "  /command remove <command>\n"
+                          "  /command list\n"
+                          "  /command move <command> <new_category>")
+    else:
+        append_output("❌ Invalid /command syntax.  Try:\n"
+                      "  /command add <command> <category>\n"
+                      "  /command remove <command>\n"
+                      "  /command list\n"
+                      "  /command move <command> <new_category>")
 
 
 if __name__ == "__main__":
