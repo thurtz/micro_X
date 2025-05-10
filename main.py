@@ -395,15 +395,29 @@ def interpret_human_input(human_input):
             messages=[
                 {
                     'role': 'user',
-                    'content': f'Translate this human input to a single best matching Linux command and enclose it within <bash></bash> tags without adding any extra characters: "{human_input}".'
+                    'content': f'Translate this human input to a single best matching Linux command and strictly enclose it within <bash></bash> tags without adding any extra characters: "{human_input}".'
                 }
             ]
         )
         ai_response = response['message']['content'].strip()
         logger.debug(f"Raw AI response: {ai_response}")  # Log the raw response
 
-        #match = re.search(r"(<bash>\s*([\s\S]*?)\s*</bash>)|(```(?:bash)?\s*([\s\S]*?)\s*```)", ai_response, re.IGNORECASE)
-        match = re.search(r"(<bash>\s*'(.*?)'\s*</bash>)|(<bash>\s*(.*?)\s*</bash>)|(```(?:bash)?\s*([\s\S]*?)\s*```)", ai_response, re.IGNORECASE)
+        match = re.search(
+            r"(<bash>\s*'(.*?)'\s*</bash>)"  # 1-2: <bash> 'code' </bash>
+            r"|(<bash>\s*(.*?)\s*</bash>)"   # 3-4: <bash> code </bash>
+            r"|(<code>\s*'(.*?)'\s*</code>)" # 5-6: <code> 'code' </code>
+            r"|(<code>\s*(.*?)\s*</code>)"   # 7-8: <code> code </code>
+            r"|(<pre>\s*'(.*?)'\s*</pre>)"   # 9-10: <pre> 'code' </pre>
+            r"|(<pre>\s*(.*?)\s*</pre>)"     # 11-12: <pre> code </pre>
+            r"|(<command>\s*'(.*?)'\s*</command>)"  # 13-14: <command> 'code' </command>
+            r"|(<command>\s*(.*?)\s*</command>)"    # 15-16: <command> code </command>
+            r"|(<cmd>\s*'(.*?)'\s*</cmd>)"   # 17-18: <cmd> 'code' </cmd>
+            r"|(<cmd>\s*(.*?)\s*</cmd>)"     # 19-20: <cmd> code </cmd>
+            r"|(<bash>\s*`(.*?)`\s*</bash>)" # 21-22: <bash> `code` </bash>
+            r"|(```bash\s*\n([\s\S]*?)\n```)"  # 23-24: ```bash\n...\n```
+            r"|(```\s*<bash>([\s\S]*?)</bash>\s*```)"  # 25-26: ```<bash>...</bash>```
+            r"|(```\s*([\s\S]*?)\s*```)",     # 27-28: fallback for any ```...```
+            ai_response, re.IGNORECASE)
         if match:
             if match.group(2):
                 linux_command = match.group(2).strip()
