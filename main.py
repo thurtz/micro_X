@@ -393,89 +393,111 @@ def run_shell(on_input, history=None, completer=None):
 
 def interpret_human_input(human_input):
     """Sends human input to Ollama for Linux command translation."""
-    try:
-        response = ollama.chat(
-            model='herawen/lisa',  # Or another model you have available in Ollama
-            messages=[
-                {
-                    'role': 'user',
-                    'content': f'Translate this human input into a single Linux command and strictly enclose it within <bash></bash> tags without adding any extra characters: "{human_input}".'
-                }
-            ]
-        )
-        ai_response = response['message']['content'].strip()
-        logger.debug(f"Raw AI response: {ai_response}")  # Log the raw response
+    retries = 3  # Number of retries
+    for attempt in range(retries + 1):
+        try:
+            response = ollama.chat(
+                model='herawen/lisa',  # Or another model you have available in Ollama
+                messages=[
+                    {
+                        'role': 'user',
+                        'content': f'Translate this human input into a single Linux command and strictly enclose it within <bash></bash> tags without adding any extra characters: "{human_input}".'
+                    }
+                ]
+            )
+            ai_response = response['message']['content'].strip()
+            logger.debug(f"Raw AI response: {ai_response}")  # Log the raw response
 
-        match = re.search(
-            r"(<bash>\s*'(.*?)'\s*</bash>)"  # 1-2: <bash> 'code' </bash>
-            r"|(<bash>\s*(.*?)\s*</bash>)"   # 3-4: <bash> code </bash>
-            r"|(<code>\s*'(.*?)'\s*</code>)" # 5-6: <code> 'code' </code>
-            r"|(<code>\s*(.*?)\s*</code>)"   # 7-8: <code> code </code>
-            r"|(<pre>\s*'(.*?)'\s*</pre>)"   # 9-10: <pre> 'code' </pre>
-            r"|(<pre>\s*(.*?)\s*</pre>)"     # 11-12: <pre> code </pre>
-            r"|(<command>\s*'(.*?)'\s*</command>)"  # 13-14: <command> 'code' </command>
-            r"|(<command>\s*(.*?)\s*</command>)"    # 15-16: <command> code </command>
-            r"|(<cmd>\s*'(.*?)'\s*</cmd>)"   # 17-18: <cmd> 'code' </cmd>
-            r"|(<cmd>\s*(.*?)\s*</cmd>)"     # 19-20: <cmd> code </cmd>
-            r"|(<bash>\s*`(.*?)`\s*</bash>)" # 21-22: <bash> `code` </bash>
-            r"|(<bash>\s*`(.*?)</bash>\s*</bash>)"  # 23-24: <bash>`code</bash></bash>
-            r"|(```bash\s*\n([\s\S]*?)\n```)"  # 25-26: ```bash\n...\n```
-            r"|(```\s*<bash>([\s\S]*?)</bash>\s*```)"  # 27-28: ```<bash>...</bash>```
-            r"|(```\s*([\s\S]*?)\s*```)",     # 29-30: fallback for any ```...```
-            ai_response, re.IGNORECASE)
-        if match:
-            if match.group(2):
-                linux_command = match.group(2).strip()
-            elif match.group(4):
-                linux_command = match.group(4).strip()
-            elif match.group(6):
-                linux_command = match.group(6).strip()
-            elif match.group(8):
-                linux_command = match.group(8).strip()
-            elif match.group(10):
-                linux_command = match.group(10).strip()
-            elif match.group(12):
-                linux_command = match.group(12).strip()
-            elif match.group(14):
-                linux_command = match.group(14).strip()
-            elif match.group(16):
-                linux_command = match.group(16).strip()
-            elif match.group(18):
-                linux_command = match.group(18).strip()
-            elif match.group(20):
-                linux_command = match.group(20).strip()
-            elif match.group(22):
-                linux_command = match.group(22).strip()
-            elif match.group(24):
-                linux_command = match.group(24).strip()
-            elif match.group(26):
-                 linux_command = match.group(26).strip()
-            elif match.group(28):
-                linux_command = match.group(28).strip()
-            elif match.group(30):
-                linux_command = match.group(30).strip()
-            logger.debug(f"AI interpreted '{human_input}' as: '{linux_command}'")
-            return linux_command
-        else:
-            match = re.search(r"<unsafe>\s*([\s\S]*?)\s*</unsafe>", ai_response, re.IGNORECASE)
+            match = re.search(
+                r"(<bash>\s*'(.*?)'\s*</bash>)"  # 1-2: <bash> 'code' </bash>
+                r"|(<bash>\s*(.*?)\s*</bash>)"   # 3-4: <bash> code </bash>
+                r"|(<code>\s*'(.*?)'\s*</code>)" # 5-6: <code> 'code' </code>
+                r"|(<code>\s*(.*?)\s*</code>)"   # 7-8: <code> code </code>
+                r"|(<pre>\s*'(.*?)'\s*</pre>)"   # 9-10: <pre> 'code' </pre>
+                r"|(<pre>\s*(.*?)\s*</pre>)"     # 11-12: <pre> code </pre>
+                r"|(<command>\s*'(.*?)'\s*</command>)"  # 13-14: <command> 'code' </command>
+                r"|(<command>\s*(.*?)\s*</command>)"    # 15-16: <command> code </command>
+                r"|(<cmd>\s*'(.*?)'\s*</cmd>)"   # 17-18: <cmd> 'code' </cmd>
+                r"|(<cmd>\s*(.*?)\s*</cmd>)"     # 19-20: <cmd> code </cmd>
+                r"|(<bash>\s*`(.*?)`\s*</bash>)" # 21-22: <bash> `code` </bash>
+                r"|(<bash>\s*`(.*?)</bash>\s*</bash>)"  # 23-24: <bash>`code</bash></bash>
+                r"|(<bash>\s*(.*?)</bash>)" # 25-26: <bash>code</bash>
+                r"|(```bash\s*\n([\s\S]*?)\n```)"  # 27-28: ```bash\n...\n```
+                r"|(```\s*<bash>([\s\S]*?)</bash>\s*```)"  # 29-30: ```<bash>...</bash>```
+                r"|(```\s*([\s\S]*?)\s*```)",     # 31-32: fallback for any ```...```
+                ai_response, re.IGNORECASE)
             if match:
-                linux_command = match.group(1).strip()
-                logger.warning(f"AI suggested an unsafe command: {linux_command}")
-                return None
+                if match.group(2):
+                    linux_command = match.group(2).strip()
+                elif match.group(4):
+                    linux_command = match.group(4).strip()
+                elif match.group(6):
+                    linux_command = match.group(6).strip()
+                elif match.group(8):
+                    linux_command = match.group(8).strip()
+                elif match.group(10):
+                    linux_command = match.group(10).strip()
+                elif match.group(12):
+                    linux_command = match.group(12).strip()
+                elif match.group(14):
+                    linux_command = match.group(14).strip()
+                elif match.group(16):
+                    linux_command = match.group(16).strip()
+                elif match.group(18):
+                    linux_command = match.group(18).strip()
+                elif match.group(20):
+                    linux_command = match.group(20).strip()
+                elif match.group(22):
+                    linux_command = match.group(22).strip()
+                elif match.group(24):
+                    linux_command = match.group(24).strip()
+                elif match.group(26):
+                     linux_command = match.group(26).strip()
+                elif match.group(28):
+                    linux_command = match.group(28).strip()
+                elif match.group(30):
+                    linux_command = match.group(30).strip()
+                elif match.group(32):
+                    linux_command = match.group(32).strip()
+                logger.debug(f"AI interpreted '{human_input}' as: '{linux_command}'")
+                return linux_command
             else:
-                logger.error(f"AI response did not contain command tags: {ai_response}")
-                return None
+                match = re.search(r"<unsafe>\s*([\s\S]*?)\s*</unsafe>", ai_response, re.IGNORECASE)
+                if match:
+                    linux_command = match.group(1).strip()
+                    logger.warning(f"AI suggested an unsafe command: {linux_command}")
+                    return None
+                else:
+                    logger.error(f"AI response did not contain command tags: {ai_response}")
+                    if attempt < retries:
+                        logger.info(f"Retrying Ollama request (attempt {attempt + 1}/{retries + 1})")
+                        time.sleep(1)  # Add a delay before retrying
+                        continue  # Retry the loop
+                    else:
+                        return None # Return None after the final attempt
+        except ollama.OllamaAPIError as e:
+            error_message = f"Error communicating with Ollama: {e}"
+            print(error_message)
+            logger.error(error_message)
+            if attempt < retries:
+                logger.info(f"Retrying Ollama request (attempt {attempt + 1}/{retries + 1})")
+                time.sleep(1)
+                continue
+            else:
+                return None  # Important: Return None on error
+        except Exception as e:
+            error_message = f"Error during Ollama interaction: {e}"
+            print(error_message)
+            logger.exception(e)
+            if attempt < retries:
+                logger.info(f"Retrying Ollama request (attempt {attempt + 1}/{retries + 1})")
+                time.sleep(1)
+                continue
+            else:
+                return None  # Important: Return None on error
+    return None # Return None if all attempts fail
 
-    except ollama.OllamaAPIError as e:
-        error_message = f"Error communicating with Ollama: {e}"
-        print(error_message)
-        logger.error(error_message)
-        return None  # Important: Return None on error
-    except Exception as e:
-        error_message = f"Error during Ollama interaction: {e}"
-        print(error_message)
-        logger.exception(e)
-        return None  # Important: Return None on error
+
 
 # The following functions are added to main.py
 def load_command_categories():
