@@ -414,9 +414,10 @@ def interpret_human_input(human_input):
             r"|(<cmd>\s*'(.*?)'\s*</cmd>)"   # 17-18: <cmd> 'code' </cmd>
             r"|(<cmd>\s*(.*?)\s*</cmd>)"     # 19-20: <cmd> code </cmd>
             r"|(<bash>\s*`(.*?)`\s*</bash>)" # 21-22: <bash> `code` </bash>
-            r"|(```bash\s*\n([\s\S]*?)\n```)"  # 23-24: ```bash\n...\n```
-            r"|(```\s*<bash>([\s\S]*?)</bash>\s*```)"  # 25-26: ```<bash>...</bash>```
-            r"|(```\s*([\s\S]*?)\s*```)",     # 27-28: fallback for any ```...```
+            r"|(<bash>\s*`(.*?)</bash>\s*</bash>)"  # 23-24: <bash>`code</bash></bash>
+            r"|(```bash\s*\n([\s\S]*?)\n```)"  # 25-26: ```bash\n...\n```
+            r"|(```\s*<bash>([\s\S]*?)</bash>\s*```)"  # 27-28: ```<bash>...</bash>```
+            r"|(```\s*([\s\S]*?)\s*```)",     # 29-30: fallback for any ```...```
             ai_response, re.IGNORECASE)
         if match:
             if match.group(2):
