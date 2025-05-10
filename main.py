@@ -395,7 +395,7 @@ def interpret_human_input(human_input):
             messages=[
                 {
                     'role': 'user',
-                    'content': f'Translate this human input to a single best matching Linux command and strictly enclose it within <bash></bash> tags without adding any extra characters: "{human_input}".'
+                    'content': f'Translate this human input into a single Linux command and strictly enclose it within <bash></bash> tags without adding any extra characters: "{human_input}".'
                 }
             ]
         )
@@ -422,8 +422,32 @@ def interpret_human_input(human_input):
         if match:
             if match.group(2):
                 linux_command = match.group(2).strip()
-            else:
+            elif match.group(4):
                 linux_command = match.group(4).strip()
+            elif match.group(6):
+                linux_command = match.group(6).strip()
+            elif match.group(8):
+                linux_command = match.group(8).strip()
+            elif match.group(10):
+                linux_command = match.group(10).strip()
+            elif match.group(12):
+                linux_command = match.group(12).strip()
+            elif match.group(14):
+                linux_command = match.group(14).strip()
+            elif match.group(16):
+                linux_command = match.group(16).strip()
+            elif match.group(18):
+                linux_command = match.group(18).strip()
+            elif match.group(20):
+                linux_command = match.group(20).strip()
+            elif match.group(22):
+                linux_command = match.group(22).strip()
+            elif match.group(24):
+                linux_command = match.group(24).strip()
+            elif match.group(26):
+                 linux_command = match.group(26).strip()
+            elif match.group(28):
+                linux_command = match.group(28).strip()
             logger.debug(f"AI interpreted '{human_input}' as: '{linux_command}'")
             return linux_command
         else:
