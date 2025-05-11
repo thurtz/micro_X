@@ -21,6 +21,7 @@ import ollama
 import logging
 import json
 import time
+import shutil # Added for shutil.which
 
 # --- Configuration Constants ---
 LOG_DIR = "logs"
@@ -112,13 +113,13 @@ def _(event):
 def _(event):
     if output_field and output_field.window.render_info:
         output_field.window._scroll_up()
-        event.app.invalidate() # Explicitly invalidate after scroll
+        event.app.invalidate() 
 
 @kb.add('pagedown')
 def _(event):
     if output_field and output_field.window.render_info:
         output_field.window._scroll_down()
-        event.app.invalidate() # Explicitly invalidate after scroll
+        event.app.invalidate() 
 
 @kb.add('c-up')
 def _(event):
@@ -503,8 +504,10 @@ def sanitize_and_validate(command: str, original_input_for_log: str):
 def execute_command_in_tmux(command_to_execute: str, original_user_input_display: str, category: str):
     try:
         unique_id = str(uuid.uuid4())[:8]; window_name = f"micro_x_{unique_id}"
-        if subprocess.call(["which", "tmux"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
-            append_output("Error: tmux not found. ❌"); logger.error("tmux not found."); return
+        # Use shutil.which to check for tmux
+        if shutil.which("tmux") is None:
+            append_output("Error: tmux not found. Please ensure tmux is installed. ❌"); logger.error("tmux not found."); return
+        
         if category == "semi_interactive":
             log_path = f"/tmp/micro_x_output_{unique_id}.log" 
             wrapped_command = f"bash -c '{command_to_execute} |& tee {log_path}; sleep {TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS}'"
@@ -537,7 +540,7 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
                 subprocess.run(tmux_cmd_list, check=True) 
                 append_output(f"✅ Interactive tmux for '{original_user_input_display}' ended.")
             except subprocess.CalledProcessError as e: append_output(f"❌ Error in tmux session '{window_name}': {e}"); logger.error(f"Error for tmux cmd '{command_to_execute}': {e}")
-            except FileNotFoundError: append_output("Error: tmux not found. ❌"); logger.error("tmux not found for interactive_tui.")
+            except FileNotFoundError: append_output("Error: tmux not found. ❌"); logger.error("tmux not found for interactive_tui.") # Should be caught by shutil.which
     except subprocess.CalledProcessError as e: append_output(f"❌ Error setting up tmux for '{command_to_execute}': {e}"); logger.exception(f"Error for tmux: {e}")
     except Exception as e: append_output(f"❌ Unexpected error with tmux: {e}"); logger.exception(f"Unexpected error with tmux: {e}")
 
@@ -595,10 +598,10 @@ def interpret_human_input(human_input: str) -> tuple[str | None, str | None]:
     cleaned_linux_command = None
     retries, retry_delay_seconds = 2, 2
     
-    last_exception = None # Store the last exception if all retries fail
+    last_exception_in_loop = None 
 
     for attempt in range(retries + 1):
-        current_exception = None # Reset for current attempt
+        current_attempt_exception = None # Exception for *this specific* attempt
         try:
             logger.info(f"To Ollama (model: {OLLAMA_MODEL}, attempt {attempt + 1}): '{human_input}'")
             response = ollama.chat(model=OLLAMA_MODEL, messages=[
@@ -666,47 +669,43 @@ def interpret_human_input(human_input: str) -> tuple[str | None, str | None]:
                         if cleaned_linux_command and not cleaned_linux_command.lower().startswith(("sorry", "i cannot", "unable to", "cannot translate")):
                             logger.info(f"AI interpreted '{human_input}' as: '{cleaned_linux_command}' (group {group_index}, after all stripping)")
                             return cleaned_linux_command, raw_candidate_from_regex 
-                logger.warning(f"AI response matched but no valid cmd extracted. Response: {ai_response}") # Fall through to retry if no command found
+                logger.warning(f"AI response matched but no valid cmd extracted. Response: {ai_response}") 
             else: 
-                logger.error(f"AI response no match: {ai_response}") # Fall through to retry
+                logger.error(f"AI response no match: {ai_response}") 
             
-            # If we reach here, parsing failed or no match, but no exception was raised in this attempt's try block
+            # If parsing/match failed without raising an exception in the try block
             if attempt < retries:
                 logger.info(f"Retrying Ollama due to parsing/match failure (attempt {attempt + 2}/{retries + 1}) for '{human_input}'."); time.sleep(retry_delay_seconds)
-                continue # Explicitly continue to next attempt
-            else: # All retries exhausted for parsing/match failures
+                continue 
+            else: 
                 append_output("AI failed to provide usable command after parsing/match retries."); 
                 logger.error(f"Ollama parsing/match failed for '{human_input}'. Last AI: {ai_response}"); 
-                return None, raw_candidate_from_regex # Return after all retries
+                return None, raw_candidate_from_regex 
         
         except ollama.ResponseError as e_resp: 
-            current_exception = e_resp
+            current_attempt_exception = e_resp # Store exception for this attempt
             append_output(f"❌ Ollama API Error: {e_resp}"); logger.error(f"Ollama API Error: {e_resp}", exc_info=True); 
             return None, raw_candidate_from_regex # Non-retryable
         except ollama.RequestError as e_req: 
-            current_exception = e_req
+            current_attempt_exception = e_req
             append_output(f"❌ Ollama Connection Error: {e_req}"); logger.error(f"Ollama Connection Error: {e_req}", exc_info=True)
-            # This will fall through to the retry logic below
         except Exception as e_gen: 
-            current_exception = e_gen
+            current_attempt_exception = e_gen
             append_output(f"❌ AI Processing Error: {e_gen}"); logger.exception(f"Unexpected error in interpret_human_input for '{human_input}'") 
-            # This will fall through to the retry logic below
         
-        # Retry logic based on exceptions
-        if current_exception:
-            last_exception = current_exception # Store the most recent exception
-            if attempt < retries and not isinstance(current_exception, ollama.ResponseError): 
-                logger.info(f"Retrying after error '{type(current_exception).__name__}' (attempt {attempt + 2}/{retries + 1}) for '{human_input}'."); time.sleep(retry_delay_seconds)
-                # Loop continues to next attempt
+        # Common retry logic for exceptions
+        if current_attempt_exception:
+            last_exception_in_loop = current_attempt_exception
+            if attempt < retries and not isinstance(current_attempt_exception, ollama.ResponseError): 
+                logger.info(f"Retrying after error '{type(current_attempt_exception).__name__}' (attempt {attempt + 2}/{retries + 1}) for '{human_input}'."); time.sleep(retry_delay_seconds)
             else: # All retries for this exception type, or it's a non-retryable ResponseError
-                if isinstance(current_exception, ollama.RequestError) : append_output("AI connection failed after multiple attempts.")
-                elif not isinstance(current_exception, ollama.ResponseError): append_output("AI processing failed after multiple attempts due to error.")
-                logger.error(f"All Ollama attempts failed for '{human_input}'. Last error: {current_exception}")
+                if isinstance(current_attempt_exception, ollama.RequestError) : append_output("AI connection failed after multiple attempts.")
+                elif not isinstance(current_attempt_exception, ollama.ResponseError): append_output("AI processing failed after multiple attempts due to error.")
+                logger.error(f"All Ollama attempts failed for '{human_input}'. Last error: {current_attempt_exception}")
                 return None, raw_candidate_from_regex
-        # If no exception, but parsing failed, the loop continues if retries remain (handled above)
-
-    # If loop finishes without returning (e.g. all retries exhausted for parsing/match failures)
-    logger.error(f"interpret_human_input exhausted all retries for '{human_input}'. Last exception (if any): {last_exception}")
+        # If no exception was raised in the try block, but parsing failed, the continue above handles retry.
+            
+    logger.error(f"interpret_human_input exhausted all retries for '{human_input}'. Last exception (if any): {last_exception_in_loop}")
     return None, raw_candidate_from_regex
 
 
