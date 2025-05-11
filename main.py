@@ -21,14 +21,15 @@ import ollama
 import logging
 import json
 import time
-import shutil # Added for shutil.which
+import shutil 
 
 # --- Configuration Constants ---
 LOG_DIR = "logs"
 CONFIG_DIR = "config"
 CATEGORY_FILENAME = "command_categories.json"
 HISTORY_FILENAME = ".micro_x_history" 
-OLLAMA_MODEL = 'herawen/lisa' 
+OLLAMA_MODEL = 'herawen/lisa' # Main model for translation
+OLLAMA_VALIDATOR_MODEL = 'herawen/lisa' # Can be the same or a faster/simpler model
 TMUX_POLL_TIMEOUT_SECONDS = 300 
 TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS = 1 
 INPUT_FIELD_HEIGHT = 3 
@@ -213,6 +214,39 @@ def restore_normal_input_handler():
         input_field.buffer.accept_handler = normal_input_accept_handler
         input_field.multiline = True
 
+# --- AI Command Validation ---
+async def is_valid_linux_command_according_to_ai(command_text: str) -> bool | None:
+    """
+    Asks AI if the given text is a valid Linux command.
+    Returns True if AI says "yes", False if "no", None on error or unclear response.
+    """
+    # Prevent extremely short or long strings from being sent to the validator AI
+    if not command_text or len(command_text) < 2 or len(command_text) > 200:
+        logger.debug(f"Skipping AI validation for command_text of length {len(command_text)}: '{command_text}'")
+        return None # Or False, depending on desired behavior for edge cases
+
+    prompt = f"Is the following string a valid Linux command or a path to an executable? Answer with only the single word 'yes' or 'no'. Do not provide any explanation or other text. String: '{command_text}'"
+    logger.info(f"To Validator AI (model: {OLLAMA_VALIDATOR_MODEL}): '{command_text}'")
+    
+    try:
+        response = await asyncio.to_thread(
+            ollama.chat,
+            model=OLLAMA_VALIDATOR_MODEL,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        ai_answer = response['message']['content'].strip().lower()
+        logger.debug(f"Validator AI response for '{command_text}': '{ai_answer}'")
+        if ai_answer == "yes":
+            return True
+        elif ai_answer == "no":
+            return False
+        else:
+            logger.warning(f"Validator AI gave unclear answer for '{command_text}': '{ai_answer}'")
+            return None # Unclear answer
+    except Exception as e:
+        logger.error(f"Error calling Validator AI for '{command_text}': {e}", exc_info=True)
+        return None # Error during AI call
+
 # --- Command Handling Logic ---
 async def handle_input_async(user_input: str): 
     global current_directory, categorization_flow_active
@@ -227,14 +261,12 @@ async def handle_input_async(user_input: str):
         append_output("Exiting micro_X Shell 🚪"); logger.info("Exit command received.");
         if get_app().is_running: get_app().exit(); return
 
-    if user_input.startswith("/ai "):
+    if user_input.startswith("/ai "): # Explicit AI translation request
         human_query = user_input[len("/ai "):].strip()
         if not human_query: append_output("⚠️ AI query is empty."); return
         append_output(f"🤖 AI Query: {human_query}\n🧠 Thinking..."); 
         if get_app().is_running: get_app().invalidate() 
-        
         linux_command, ai_raw_candidate = interpret_human_input(human_query) 
-        
         if linux_command:
             append_output(f"🤖 AI Suggests: {linux_command}")
             await process_command(linux_command, 
@@ -243,9 +275,45 @@ async def handle_input_async(user_input: str):
         else: append_output("🤔 AI could not process the request.")
         return
 
-    if user_input.startswith("/command"):
+    if user_input.startswith("/command"): # Internal command system
         handle_command_subsystem_input(user_input); return
-    await process_command(user_input, original_user_input=user_input, ai_raw_candidate=None)
+
+    # For direct input, first check if it's a known command
+    category = classify_command(user_input) 
+
+    if category != UNKNOWN_CATEGORY_SENTINEL:
+        # Known command, proceed directly to process_command
+        logger.debug(f"Direct input '{user_input}' is a known command in category '{category}'.")
+        await process_command(user_input, original_user_input=user_input, ai_raw_candidate=None)
+    else:
+        # Unknown command. Ask Validator AI if it's a command.
+        logger.debug(f"Direct input '{user_input}' is unknown. Querying Validator AI.")
+        append_output(f"🔎 Validating '{user_input}' with AI...")
+        if get_app().is_running: get_app().invalidate()
+
+        is_cmd_ai_says = await is_valid_linux_command_according_to_ai(user_input)
+
+        if is_cmd_ai_says is True: # AI thinks it's a command
+            append_output(f"✅ AI believes '{user_input}' is a direct command.")
+            logger.info(f"Validator AI confirmed '{user_input}' as a command.")
+            await process_command(user_input, original_user_input=user_input, ai_raw_candidate=None) # Will prompt for categorization
+        elif is_cmd_ai_says is False: # AI thinks it's NOT a direct command
+            append_output(f"❌ AI suggests '{user_input}' is not a direct command. Attempting as natural language query...")
+            logger.info(f"Validator AI suggests '{user_input}' is not a command. Treating as natural language.")
+            if get_app().is_running: get_app().invalidate()
+            linux_command, ai_raw_candidate = interpret_human_input(user_input) 
+            if linux_command:
+                append_output(f"🤖 AI Translated to: {linux_command}")
+                await process_command(linux_command,
+                                      original_user_input=f"'{user_input}' -> {linux_command}",
+                                      ai_raw_candidate=ai_raw_candidate)
+            else:
+                append_output(f"🤔 AI could not translate '{user_input}' into a command. Try '/ai {user_input}' or rephrase.")
+        else: # Validator AI error or unclear response
+            append_output(f"⚠️ AI validation for '{user_input}' was inconclusive. Proceeding as direct command.")
+            logger.warning(f"Validator AI response for '{user_input}' inconclusive. Treating as direct command.")
+            await process_command(user_input, original_user_input=user_input, ai_raw_candidate=None)
+
 
 async def process_command(command_str_original: str, original_user_input: str, ai_raw_candidate: str | None = None):
     global current_directory
@@ -504,8 +572,7 @@ def sanitize_and_validate(command: str, original_input_for_log: str):
 def execute_command_in_tmux(command_to_execute: str, original_user_input_display: str, category: str):
     try:
         unique_id = str(uuid.uuid4())[:8]; window_name = f"micro_x_{unique_id}"
-        # Use shutil.which to check for tmux
-        if shutil.which("tmux") is None:
+        if shutil.which("tmux") is None: # Use shutil.which
             append_output("Error: tmux not found. Please ensure tmux is installed. ❌"); logger.error("tmux not found."); return
         
         if category == "semi_interactive":
@@ -540,7 +607,7 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
                 subprocess.run(tmux_cmd_list, check=True) 
                 append_output(f"✅ Interactive tmux for '{original_user_input_display}' ended.")
             except subprocess.CalledProcessError as e: append_output(f"❌ Error in tmux session '{window_name}': {e}"); logger.error(f"Error for tmux cmd '{command_to_execute}': {e}")
-            except FileNotFoundError: append_output("Error: tmux not found. ❌"); logger.error("tmux not found for interactive_tui.") # Should be caught by shutil.which
+            except FileNotFoundError: append_output("Error: tmux not found. ❌"); logger.error("tmux not found for interactive_tui.") 
     except subprocess.CalledProcessError as e: append_output(f"❌ Error setting up tmux for '{command_to_execute}': {e}"); logger.exception(f"Error for tmux: {e}")
     except Exception as e: append_output(f"❌ Unexpected error with tmux: {e}"); logger.exception(f"Unexpected error with tmux: {e}")
 
@@ -601,7 +668,7 @@ def interpret_human_input(human_input: str) -> tuple[str | None, str | None]:
     last_exception_in_loop = None 
 
     for attempt in range(retries + 1):
-        current_attempt_exception = None # Exception for *this specific* attempt
+        current_attempt_exception = None 
         try:
             logger.info(f"To Ollama (model: {OLLAMA_MODEL}, attempt {attempt + 1}): '{human_input}'")
             response = ollama.chat(model=OLLAMA_MODEL, messages=[
@@ -673,7 +740,6 @@ def interpret_human_input(human_input: str) -> tuple[str | None, str | None]:
             else: 
                 logger.error(f"AI response no match: {ai_response}") 
             
-            # If parsing/match failed without raising an exception in the try block
             if attempt < retries:
                 logger.info(f"Retrying Ollama due to parsing/match failure (attempt {attempt + 2}/{retries + 1}) for '{human_input}'."); time.sleep(retry_delay_seconds)
                 continue 
@@ -683,9 +749,9 @@ def interpret_human_input(human_input: str) -> tuple[str | None, str | None]:
                 return None, raw_candidate_from_regex 
         
         except ollama.ResponseError as e_resp: 
-            current_attempt_exception = e_resp # Store exception for this attempt
+            current_attempt_exception = e_resp 
             append_output(f"❌ Ollama API Error: {e_resp}"); logger.error(f"Ollama API Error: {e_resp}", exc_info=True); 
-            return None, raw_candidate_from_regex # Non-retryable
+            return None, raw_candidate_from_regex 
         except ollama.RequestError as e_req: 
             current_attempt_exception = e_req
             append_output(f"❌ Ollama Connection Error: {e_req}"); logger.error(f"Ollama Connection Error: {e_req}", exc_info=True)
@@ -693,17 +759,15 @@ def interpret_human_input(human_input: str) -> tuple[str | None, str | None]:
             current_attempt_exception = e_gen
             append_output(f"❌ AI Processing Error: {e_gen}"); logger.exception(f"Unexpected error in interpret_human_input for '{human_input}'") 
         
-        # Common retry logic for exceptions
         if current_attempt_exception:
             last_exception_in_loop = current_attempt_exception
             if attempt < retries and not isinstance(current_attempt_exception, ollama.ResponseError): 
                 logger.info(f"Retrying after error '{type(current_attempt_exception).__name__}' (attempt {attempt + 2}/{retries + 1}) for '{human_input}'."); time.sleep(retry_delay_seconds)
-            else: # All retries for this exception type, or it's a non-retryable ResponseError
+            else: 
                 if isinstance(current_attempt_exception, ollama.RequestError) : append_output("AI connection failed after multiple attempts.")
                 elif not isinstance(current_attempt_exception, ollama.ResponseError): append_output("AI processing failed after multiple attempts due to error.")
                 logger.error(f"All Ollama attempts failed for '{human_input}'. Last error: {current_attempt_exception}")
                 return None, raw_candidate_from_regex
-        # If no exception was raised in the try block, but parsing failed, the continue above handles retry.
             
     logger.error(f"interpret_human_input exhausted all retries for '{human_input}'. Last exception (if any): {last_exception_in_loop}")
     return None, raw_candidate_from_regex

@@ -12,7 +12,9 @@
     "echo $PWD",
     "tail -n 10 main.py",
     "uname -m",
-    "clear"
+    "clear",
+    "which",
+    "which tmux"
   ],
   "semi_interactive": [
     "less",
