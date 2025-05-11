@@ -7,7 +7,12 @@
     "pwd",
     "cd",
     "echo",
-    "date"
+    "date",
+    "echo $SHELL",
+    "echo $PWD",
+    "tail -n 10 main.py",
+    "uname -m",
+    "clear"
   ],
   "semi_interactive": [
     "less",
@@ -15,7 +20,9 @@
     "tail",
     "tail micro_X.sh",
     "grep",
-    "nmap"
+    "nmap",
+    "timedatectl list-timezones",
+    "cat /proc/cpuinfo | grep 'model name'"
   ],
   "interactive_tui": [
     "nano",
