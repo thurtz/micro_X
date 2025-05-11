@@ -22,7 +22,8 @@
     "grep",
     "nmap",
     "timedatectl list-timezones",
-    "cat /proc/cpuinfo | grep 'model name'"
+    "cat /proc/cpuinfo | grep 'model name'",
+    "ifconfig"
   ],
   "interactive_tui": [
     "nano",
