@@ -28,8 +28,8 @@ LOG_DIR = "logs"
 CONFIG_DIR = "config"
 CATEGORY_FILENAME = "command_categories.json"
 HISTORY_FILENAME = ".micro_x_history" 
-OLLAMA_MODEL = 'llama3.2:3b' # Main model for translation
-OLLAMA_VALIDATOR_MODEL = 'llama3.2:3b' # Can be the same or a faster/simpler model
+OLLAMA_MODEL = 'herawen/lisa' # Main model for translation
+OLLAMA_VALIDATOR_MODEL = 'herawen/lisa' # Can be the same or a faster/simpler model
 TMUX_POLL_TIMEOUT_SECONDS = 300 
 TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS = 1 
 INPUT_FIELD_HEIGHT = 3 
@@ -222,7 +222,7 @@ async def is_valid_linux_command_according_to_ai(command_text: str) -> bool | No
         logger.debug(f"Skipping AI validation for command_text of length {len(command_text)}: '{command_text}'")
         return None 
 
-    prompt = f"Critically assess if the following string, *exactly as written*, is a complete, directly executable Linux command or an absolute/relative path to an executable. Natural language phrases, questions, or incomplete commands are NOT valid. If there is any doubt, answer 'no'. Answer only with the single word 'yes' or the single word 'no'. String: '{command_text}'"
+    prompt = f"Answer the following question strictly with a yes or no: Is the following string likely to be a valid Linux command: '{command_text}'"
     
     responses = []
     for i in range(VALIDATOR_AI_ATTEMPTS):
@@ -291,15 +291,18 @@ async def handle_input_async(user_input: str):
     if user_input_stripped.startswith("/command"): 
         handle_command_subsystem_input(user_input_stripped); return
 
+    # For direct input that is not /ai or /command:
     category = classify_command(user_input_stripped) 
 
     if category != UNKNOWN_CATEGORY_SENTINEL:
+        # Known command, proceed directly
         logger.debug(f"Direct input '{user_input_stripped}' is a known command in category '{category}'.")
         await process_command(user_input_stripped, 
                               original_user_input_for_display=user_input_stripped, 
                               ai_raw_candidate=None,
                               original_direct_input_if_different=None) 
     else:
+        # Input is not a known categorized command. Query Validator AI first.
         logger.debug(f"Direct input '{user_input_stripped}' is unknown. Querying Validator AI.")
         append_output(f"🔎 Validating '{user_input_stripped}' with AI...")
         if get_app().is_running: get_app().invalidate()
@@ -367,12 +370,14 @@ async def handle_input_async(user_input: str):
                                       ai_raw_candidate=ai_raw_candidate,
                                       original_direct_input_if_different=original_direct_for_prompt)
             else:
+                # If get_validated_ai_command fails, it means translation or its validation failed.
+                # Fallback to categorizing the original input as a last resort.
                 append_output(f"🤔 AI could not produce a validated command for '{user_input_stripped}'. Treating original input as a potential direct command.")
                 logger.info(f"Validated AI translation failed for '{user_input_stripped}'. Proceeding to categorize original input directly.")
                 await process_command(user_input_stripped, 
                                       original_user_input_for_display=user_input_stripped, 
-                                      ai_raw_candidate=ai_raw_candidate, 
-                                      original_direct_input_if_different=None)
+                                      ai_raw_candidate=ai_raw_candidate, # Pass the last raw candidate from get_validated_ai_command
+                                      original_direct_input_if_different=None) # Original is what we're categorizing
 
 
 async def process_command(command_str_original: str, original_user_input_for_display: str, 
@@ -667,7 +672,7 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
             wrapped_command = f"bash -c '{command_to_execute} |& tee {log_path}; sleep {TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS}'"
             tmux_cmd_list = ["tmux", "new-window", "-n", window_name, wrapped_command] # No -d, starts in foreground
             logger.info(f"Executing semi_interactive tmux: {tmux_cmd_list}")
-            subprocess.Popen(tmux_cmd_list) 
+            subprocess.Popen(tmux_cmd_list) # Launch and don't wait for Popen to complete
             append_output(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for completion (max {TMUX_POLL_TIMEOUT_SECONDS}s)...")
             start_time = time.time(); output_captured, window_closed = False, False
             while time.time() - start_time < TMUX_POLL_TIMEOUT_SECONDS:
@@ -793,7 +798,7 @@ async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, 
                                 else: logger.debug(f"Retained '{processed_candidate[:prefix_len]}<cmd>' structure: '{processed_candidate}'")
                         if len(processed_candidate) >= 2 and processed_candidate.startswith("<") and processed_candidate.endswith(">"):
                             inner_content = processed_candidate[1:-1].strip()
-                            if not any(c in inner_cmd_content for c in '<>|&;'): 
+                            if not any(c in inner_content for c in '<>|&;'): 
                                 logger.debug(f"Stripped general angle brackets: '{processed_candidate}' -> '{inner_content}'"); processed_candidate = inner_content
                             else: logger.debug(f"Retained general angle brackets: '{processed_candidate}'")
                         cleaned_linux_command = processed_candidate.strip() 
@@ -851,9 +856,9 @@ async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | 
         if get_app().is_running : get_app().invalidate()
 
         cleaned_command, raw_candidate = await _interpret_and_clean_ai_output(human_query)
-        if raw_candidate and last_raw_candidate is None: 
+        if raw_candidate and last_raw_candidate is None: # Store first raw candidate
             last_raw_candidate = raw_candidate
-        if cleaned_command: 
+        if cleaned_command: # Store last cleaned command attempt
             last_cleaned_command_attempt = cleaned_command
 
         if cleaned_command:
@@ -878,12 +883,14 @@ async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | 
         if i < TRANSLATION_VALIDATION_CYCLES - 1:
             append_output(f"Retrying translation & validation cycle for '{human_query}'...")
             await asyncio.sleep(1) 
-        else:
+        else: # All cycles exhausted
             logger.error(f"All {TRANSLATION_VALIDATION_CYCLES} translation & validation cycles failed for '{human_query}'.")
             append_output(f"❌ AI failed to produce a validated command for '{human_query}' after {TRANSLATION_VALIDATION_CYCLES} cycles.")
+            # Return the last cleaned command attempt (even if not validated) and the first raw candidate
             return last_cleaned_command_attempt, last_raw_candidate 
 
-    return None, last_raw_candidate 
+    return None, last_raw_candidate # Fallback if loop finishes unexpectedly
+
 
 # --- Command Categorization Subsystem (Now uses full command strings) ---
 def load_command_categories() -> dict:

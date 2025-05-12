@@ -28,8 +28,8 @@ LOG_DIR = "logs"
 CONFIG_DIR = "config"
 CATEGORY_FILENAME = "command_categories.json"
 HISTORY_FILENAME = ".micro_x_history" 
-OLLAMA_MODEL = 'llama3.2:3b' # Main model for translation
-OLLAMA_VALIDATOR_MODEL = 'llama3.2:3b' # Can be the same or a faster/simpler model
+OLLAMA_MODEL = 'herawen/lisa' # Main model for translation
+OLLAMA_VALIDATOR_MODEL = 'herawen/lisa' # Can be the same or a faster/simpler model
 TMUX_POLL_TIMEOUT_SECONDS = 300 
 TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS = 1 
 INPUT_FIELD_HEIGHT = 3 
@@ -222,7 +222,7 @@ async def is_valid_linux_command_according_to_ai(command_text: str) -> bool | No
         logger.debug(f"Skipping AI validation for command_text of length {len(command_text)}: '{command_text}'")
         return None 
 
-    prompt = f"Critically assess if the following string, *exactly as written*, is a complete, directly executable Linux command or an absolute/relative path to an executable. Natural language phrases, questions, or incomplete commands are NOT valid. If there is any doubt, answer 'no'. Answer only with the single word 'yes' or the single word 'no'. String: '{command_text}'"
+    prompt = f"Answer the following question strictly with a yes or no: Is the following string likely to be a valid Linux command: '{command_text}'"
     
     responses = []
     for i in range(VALIDATOR_AI_ATTEMPTS):
@@ -291,50 +291,58 @@ async def handle_input_async(user_input: str):
     if user_input_stripped.startswith("/command"): 
         handle_command_subsystem_input(user_input_stripped); return
 
+    # For direct input that is not /ai or /command:
     category = classify_command(user_input_stripped) 
 
     if category != UNKNOWN_CATEGORY_SENTINEL:
+        # Known command, proceed directly
         logger.debug(f"Direct input '{user_input_stripped}' is a known command in category '{category}'.")
         await process_command(user_input_stripped, 
                               original_user_input_for_display=user_input_stripped, 
                               ai_raw_candidate=None,
                               original_direct_input_if_different=None) 
     else:
+        # Input is not a known categorized command. Query Validator AI first.
         logger.debug(f"Direct input '{user_input_stripped}' is unknown. Querying Validator AI.")
         append_output(f"🔎 Validating '{user_input_stripped}' with AI...")
         if get_app().is_running: get_app().invalidate()
 
         is_cmd_ai_says = await is_valid_linux_command_according_to_ai(user_input_stripped)
         
+        # Refined heuristic for "phrase-like"
         has_space = ' ' in user_input_stripped
         is_path_indicator = user_input_stripped.startswith(('/', './', '../'))
         has_double_hyphen = '--' in user_input_stripped
         has_single_hyphen_option = bool(re.search(r'(?:^|\s)-\w', user_input_stripped))
+        
         is_problematic_leading_dollar = False
         if user_input_stripped.startswith('$'):
-            if len(user_input_stripped) == 1: 
+            if len(user_input_stripped) == 1: # Just "$"
                 is_problematic_leading_dollar = True
+            # Check if $ is followed by a letter/number directly (not ${ or $() )
             elif len(user_input_stripped) > 1 and user_input_stripped[1].isalnum() and user_input_stripped[1] != '{':
                  is_problematic_leading_dollar = True
         
+        # An input is NOT phrase-like if it has command indicators OR if it doesn't have spaces (e.g. "pwd")
+        # A problematic leading dollar makes it behave like a phrase (forces translation).
         is_command_syntax_present = is_path_indicator or \
                                     has_double_hyphen or \
                                     has_single_hyphen_option or \
                                     ('$' in user_input_stripped and not is_problematic_leading_dollar)
 
-        user_input_looks_like_phrase = False
         if is_problematic_leading_dollar:
-            user_input_looks_like_phrase = True 
-        elif not has_space: 
-            user_input_looks_like_phrase = False 
-        elif is_command_syntax_present: 
+            user_input_looks_like_phrase = True # Force translation for problematic leading $
+        elif not has_space: # Single word, not a path, no options -> could be command or natural language
+            user_input_looks_like_phrase = False # Let Validator AI decide primarily
+        elif is_command_syntax_present: # Has spaces, but also command syntax -> not a phrase
             user_input_looks_like_phrase = False
-        else: 
+        else: # Has spaces, and no strong command syntax indicators -> likely a phrase
             user_input_looks_like_phrase = True
         
         logger.debug(f"Input: '{user_input_stripped}', Validator AI: {is_cmd_ai_says}, Looks like phrase (heuristic): {user_input_looks_like_phrase}")
 
         if is_cmd_ai_says is True and not user_input_looks_like_phrase:
+            # Validator AI says "yes" AND it doesn't look like a phrase. Trust it.
             append_output(f"✅ AI believes '{user_input_stripped}' is a direct command. Proceeding to categorize.")
             logger.info(f"Validator AI confirmed '{user_input_stripped}' as a command (and it doesn't look like a phrase).")
             await process_command(user_input_stripped, 
@@ -343,6 +351,8 @@ async def handle_input_async(user_input: str):
                                   original_direct_input_if_different=None)
         
         else: 
+            # Validator AI says "no", OR "yes" but it looks like a phrase", OR was inconclusive.
+            # In all these cases, default to treating as natural language for translation (with validation).
             if is_cmd_ai_says is False:
                 log_msg = f"Validator AI suggests '{user_input_stripped}' is not a command."
                 ui_msg = f"💬 AI suggests '{user_input_stripped}' is not a direct command. Attempting as natural language query..."
@@ -371,7 +381,7 @@ async def handle_input_async(user_input: str):
                 logger.info(f"Validated AI translation failed for '{user_input_stripped}'. Proceeding to categorize original input directly.")
                 await process_command(user_input_stripped, 
                                       original_user_input_for_display=user_input_stripped, 
-                                      ai_raw_candidate=ai_raw_candidate, 
+                                      ai_raw_candidate=None, 
                                       original_direct_input_if_different=None)
 
 
@@ -665,10 +675,10 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
         if category == "semi_interactive":
             log_path = f"/tmp/micro_x_output_{unique_id}.log" 
             wrapped_command = f"bash -c '{command_to_execute} |& tee {log_path}; sleep {TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS}'"
-            tmux_cmd_list = ["tmux", "new-window", "-n", window_name, wrapped_command] # No -d, starts in foreground
+            tmux_cmd_list = ["tmux", "new-window", "-d", "-n", window_name, wrapped_command] 
             logger.info(f"Executing semi_interactive tmux: {tmux_cmd_list}")
-            subprocess.Popen(tmux_cmd_list) 
-            append_output(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for completion (max {TMUX_POLL_TIMEOUT_SECONDS}s)...")
+            subprocess.run(tmux_cmd_list, check=True) 
+            append_output(f"⏳ Launched semi-interactive in tmux (window: {window_name}). Waiting (max {TMUX_POLL_TIMEOUT_SECONDS}s)...")
             start_time = time.time(); output_captured, window_closed = False, False
             while time.time() - start_time < TMUX_POLL_TIMEOUT_SECONDS:
                 if window_name not in subprocess.run(["tmux", "list-windows", "-F", "#{window_name}"], stdout=subprocess.PIPE, text=True, errors="ignore").stdout:
@@ -689,7 +699,7 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
         else: # "interactive_tui"
             tmux_cmd_list = ["tmux", "new-window", "-n", window_name, command_to_execute]
             logger.info(f"Executing interactive_tui tmux: {tmux_cmd_list}")
-            append_output(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will pause.")
+            append_output(f"⚡ Launching interactive in tmux (window: {window_name}). micro_X will pause.")
             try:
                 subprocess.run(tmux_cmd_list, check=True) 
                 append_output(f"✅ Interactive tmux for '{original_user_input_display}' ended.")
@@ -793,7 +803,7 @@ async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, 
                                 else: logger.debug(f"Retained '{processed_candidate[:prefix_len]}<cmd>' structure: '{processed_candidate}'")
                         if len(processed_candidate) >= 2 and processed_candidate.startswith("<") and processed_candidate.endswith(">"):
                             inner_content = processed_candidate[1:-1].strip()
-                            if not any(c in inner_cmd_content for c in '<>|&;'): 
+                            if not any(c in inner_content for c in '<>|&;'): 
                                 logger.debug(f"Stripped general angle brackets: '{processed_candidate}' -> '{inner_content}'"); processed_candidate = inner_content
                             else: logger.debug(f"Retained general angle brackets: '{processed_candidate}'")
                         cleaned_linux_command = processed_candidate.strip() 
@@ -844,24 +854,15 @@ async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, 
 async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | None]:
     logger.info(f"Attempting validated translation for: '{human_query}'")
     last_raw_candidate = None 
-    last_cleaned_command_attempt = None
-
     for i in range(TRANSLATION_VALIDATION_CYCLES):
         append_output(f"🧠 AI translation & validation cycle {i+1}/{TRANSLATION_VALIDATION_CYCLES} for: '{human_query}'")
         if get_app().is_running : get_app().invalidate()
-
         cleaned_command, raw_candidate = await _interpret_and_clean_ai_output(human_query)
-        if raw_candidate and last_raw_candidate is None: 
-            last_raw_candidate = raw_candidate
-        if cleaned_command: 
-            last_cleaned_command_attempt = cleaned_command
-
+        if raw_candidate and last_raw_candidate is None: last_raw_candidate = raw_candidate
         if cleaned_command:
             append_output(f"🤖 AI translated to: '{cleaned_command}'. Validating with AI Validator...")
             if get_app().is_running : get_app().invalidate()
-            
             is_valid_by_validator = await is_valid_linux_command_according_to_ai(cleaned_command)
-
             if is_valid_by_validator is True:
                 logger.info(f"Validator AI confirmed translated command: '{cleaned_command}'")
                 append_output(f"✅ AI Validator confirmed: '{cleaned_command}'")
@@ -874,15 +875,13 @@ async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | 
                 append_output(f"⚠️ AI Validator inconclusive for: '{cleaned_command}'.")
         else: 
             logger.warning(f"Main AI translation (cycle {i+1}) failed to produce a command for '{human_query}'.")
-        
         if i < TRANSLATION_VALIDATION_CYCLES - 1:
             append_output(f"Retrying translation & validation cycle for '{human_query}'...")
             await asyncio.sleep(1) 
         else:
             logger.error(f"All {TRANSLATION_VALIDATION_CYCLES} translation & validation cycles failed for '{human_query}'.")
             append_output(f"❌ AI failed to produce a validated command for '{human_query}' after {TRANSLATION_VALIDATION_CYCLES} cycles.")
-            return last_cleaned_command_attempt, last_raw_candidate 
-
+            return None, last_raw_candidate 
     return None, last_raw_candidate 
 
 # --- Command Categorization Subsystem (Now uses full command strings) ---

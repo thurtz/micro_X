@@ -28,8 +28,8 @@ LOG_DIR = "logs"
 CONFIG_DIR = "config"
 CATEGORY_FILENAME = "command_categories.json"
 HISTORY_FILENAME = ".micro_x_history" 
-OLLAMA_MODEL = 'llama3.2:3b' # Main model for translation
-OLLAMA_VALIDATOR_MODEL = 'llama3.2:3b' # Can be the same or a faster/simpler model
+OLLAMA_MODEL = 'herawen/lisa' # Main model for translation
+OLLAMA_VALIDATOR_MODEL = 'herawen/lisa' # Can be the same or a faster/simpler model
 TMUX_POLL_TIMEOUT_SECONDS = 300 
 TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS = 1 
 INPUT_FIELD_HEIGHT = 3 
@@ -222,7 +222,7 @@ async def is_valid_linux_command_according_to_ai(command_text: str) -> bool | No
         logger.debug(f"Skipping AI validation for command_text of length {len(command_text)}: '{command_text}'")
         return None 
 
-    prompt = f"Critically assess if the following string, *exactly as written*, is a complete, directly executable Linux command or an absolute/relative path to an executable. Natural language phrases, questions, or incomplete commands are NOT valid. If there is any doubt, answer 'no'. Answer only with the single word 'yes' or the single word 'no'. String: '{command_text}'"
+    prompt = f"Strictly evaluate if the following string, *exactly as written*, is a well-formed Linux command or a direct path to an executable. Do not attempt to interpret its meaning or translate it. Answer only with the single word 'yes' or the single word 'no'. String: '{command_text}'"
     
     responses = []
     for i in range(VALIDATOR_AI_ATTEMPTS):
@@ -371,7 +371,7 @@ async def handle_input_async(user_input: str):
                 logger.info(f"Validated AI translation failed for '{user_input_stripped}'. Proceeding to categorize original input directly.")
                 await process_command(user_input_stripped, 
                                       original_user_input_for_display=user_input_stripped, 
-                                      ai_raw_candidate=ai_raw_candidate, 
+                                      ai_raw_candidate=None, 
                                       original_direct_input_if_different=None)
 
 
@@ -665,7 +665,7 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
         if category == "semi_interactive":
             log_path = f"/tmp/micro_x_output_{unique_id}.log" 
             wrapped_command = f"bash -c '{command_to_execute} |& tee {log_path}; sleep {TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS}'"
-            tmux_cmd_list = ["tmux", "new-window", "-n", window_name, wrapped_command] # No -d, starts in foreground
+            tmux_cmd_list = ["tmux", "new-window", "-n", window_name, wrapped_command] # Keep it in foreground
             logger.info(f"Executing semi_interactive tmux: {tmux_cmd_list}")
             subprocess.Popen(tmux_cmd_list) 
             append_output(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for completion (max {TMUX_POLL_TIMEOUT_SECONDS}s)...")
@@ -844,24 +844,15 @@ async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, 
 async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | None]:
     logger.info(f"Attempting validated translation for: '{human_query}'")
     last_raw_candidate = None 
-    last_cleaned_command_attempt = None
-
     for i in range(TRANSLATION_VALIDATION_CYCLES):
         append_output(f"🧠 AI translation & validation cycle {i+1}/{TRANSLATION_VALIDATION_CYCLES} for: '{human_query}'")
         if get_app().is_running : get_app().invalidate()
-
         cleaned_command, raw_candidate = await _interpret_and_clean_ai_output(human_query)
-        if raw_candidate and last_raw_candidate is None: 
-            last_raw_candidate = raw_candidate
-        if cleaned_command: 
-            last_cleaned_command_attempt = cleaned_command
-
+        if raw_candidate and last_raw_candidate is None: last_raw_candidate = raw_candidate
         if cleaned_command:
             append_output(f"🤖 AI translated to: '{cleaned_command}'. Validating with AI Validator...")
             if get_app().is_running : get_app().invalidate()
-            
             is_valid_by_validator = await is_valid_linux_command_according_to_ai(cleaned_command)
-
             if is_valid_by_validator is True:
                 logger.info(f"Validator AI confirmed translated command: '{cleaned_command}'")
                 append_output(f"✅ AI Validator confirmed: '{cleaned_command}'")
@@ -874,15 +865,13 @@ async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | 
                 append_output(f"⚠️ AI Validator inconclusive for: '{cleaned_command}'.")
         else: 
             logger.warning(f"Main AI translation (cycle {i+1}) failed to produce a command for '{human_query}'.")
-        
         if i < TRANSLATION_VALIDATION_CYCLES - 1:
             append_output(f"Retrying translation & validation cycle for '{human_query}'...")
             await asyncio.sleep(1) 
         else:
             logger.error(f"All {TRANSLATION_VALIDATION_CYCLES} translation & validation cycles failed for '{human_query}'.")
             append_output(f"❌ AI failed to produce a validated command for '{human_query}' after {TRANSLATION_VALIDATION_CYCLES} cycles.")
-            return last_cleaned_command_attempt, last_raw_candidate 
-
+            return None, last_raw_candidate 
     return None, last_raw_candidate 
 
 # --- Command Categorization Subsystem (Now uses full command strings) ---

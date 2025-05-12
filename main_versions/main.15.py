@@ -28,8 +28,8 @@ LOG_DIR = "logs"
 CONFIG_DIR = "config"
 CATEGORY_FILENAME = "command_categories.json"
 HISTORY_FILENAME = ".micro_x_history" 
-OLLAMA_MODEL = 'llama3.2:3b' # Main model for translation
-OLLAMA_VALIDATOR_MODEL = 'llama3.2:3b' # Can be the same or a faster/simpler model
+OLLAMA_MODEL = 'herawen/lisa' # Main model for translation
+OLLAMA_VALIDATOR_MODEL = 'herawen/lisa' # Can be the same or a faster/simpler model
 TMUX_POLL_TIMEOUT_SECONDS = 300 
 TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS = 1 
 INPUT_FIELD_HEIGHT = 3 
@@ -222,7 +222,7 @@ async def is_valid_linux_command_according_to_ai(command_text: str) -> bool | No
         logger.debug(f"Skipping AI validation for command_text of length {len(command_text)}: '{command_text}'")
         return None 
 
-    prompt = f"Critically assess if the following string, *exactly as written*, is a complete, directly executable Linux command or an absolute/relative path to an executable. Natural language phrases, questions, or incomplete commands are NOT valid. If there is any doubt, answer 'no'. Answer only with the single word 'yes' or the single word 'no'. String: '{command_text}'"
+    prompt = f"Answer the following question strictly with a yes or no: Is the following string likely to be a valid Linux command: '{command_text}'"
     
     responses = []
     for i in range(VALIDATOR_AI_ATTEMPTS):
@@ -291,50 +291,43 @@ async def handle_input_async(user_input: str):
     if user_input_stripped.startswith("/command"): 
         handle_command_subsystem_input(user_input_stripped); return
 
+    # For direct input that is not /ai or /command:
     category = classify_command(user_input_stripped) 
 
     if category != UNKNOWN_CATEGORY_SENTINEL:
+        # Known command, proceed directly
         logger.debug(f"Direct input '{user_input_stripped}' is a known command in category '{category}'.")
         await process_command(user_input_stripped, 
                               original_user_input_for_display=user_input_stripped, 
                               ai_raw_candidate=None,
                               original_direct_input_if_different=None) 
     else:
+        # Input is not a known categorized command. Query Validator AI first.
         logger.debug(f"Direct input '{user_input_stripped}' is unknown. Querying Validator AI.")
         append_output(f"🔎 Validating '{user_input_stripped}' with AI...")
         if get_app().is_running: get_app().invalidate()
 
         is_cmd_ai_says = await is_valid_linux_command_according_to_ai(user_input_stripped)
         
+        # Refined heuristic for "phrase-like"
         has_space = ' ' in user_input_stripped
         is_path_indicator = user_input_stripped.startswith(('/', './', '../'))
         has_double_hyphen = '--' in user_input_stripped
         has_single_hyphen_option = bool(re.search(r'(?:^|\s)-\w', user_input_stripped))
-        is_problematic_leading_dollar = False
-        if user_input_stripped.startswith('$'):
-            if len(user_input_stripped) == 1: 
-                is_problematic_leading_dollar = True
-            elif len(user_input_stripped) > 1 and user_input_stripped[1].isalnum() and user_input_stripped[1] != '{':
-                 is_problematic_leading_dollar = True
-        
-        is_command_syntax_present = is_path_indicator or \
-                                    has_double_hyphen or \
-                                    has_single_hyphen_option or \
-                                    ('$' in user_input_stripped and not is_problematic_leading_dollar)
+        has_dollar_var = '$' in user_input_stripped # Check for $ character
 
         user_input_looks_like_phrase = False
-        if is_problematic_leading_dollar:
-            user_input_looks_like_phrase = True 
-        elif not has_space: 
-            user_input_looks_like_phrase = False 
-        elif is_command_syntax_present: 
-            user_input_looks_like_phrase = False
-        else: 
-            user_input_looks_like_phrase = True
+        if is_path_indicator or has_double_hyphen or has_single_hyphen_option or has_dollar_var:
+            user_input_looks_like_phrase = False # Presence of these strongly suggests it's NOT a phrase
+        elif has_space:
+            user_input_looks_like_phrase = True # Has spaces, and none of the above command-like indicators
+        # else: no spaces, no path, no options, no $ -> could be a single-word command or single-word natural language.
+        # In this case, the Validator AI's output is more heavily relied upon.
         
-        logger.debug(f"Input: '{user_input_stripped}', Validator AI: {is_cmd_ai_says}, Looks like phrase (heuristic): {user_input_looks_like_phrase}")
+        logger.debug(f"Input: '{user_input_stripped}', Validator AI: {is_cmd_ai_says}, Looks like phrase: {user_input_looks_like_phrase}")
 
         if is_cmd_ai_says is True and not user_input_looks_like_phrase:
+            # Validator AI says "yes" AND it doesn't look like a phrase. Trust it.
             append_output(f"✅ AI believes '{user_input_stripped}' is a direct command. Proceeding to categorize.")
             logger.info(f"Validator AI confirmed '{user_input_stripped}' as a command (and it doesn't look like a phrase).")
             await process_command(user_input_stripped, 
@@ -343,6 +336,8 @@ async def handle_input_async(user_input: str):
                                   original_direct_input_if_different=None)
         
         else: 
+            # Validator AI says "no", OR "yes" but it looks like a phrase", OR was inconclusive.
+            # In all these cases, default to treating as natural language for translation (with validation).
             if is_cmd_ai_says is False:
                 log_msg = f"Validator AI suggests '{user_input_stripped}' is not a command."
                 ui_msg = f"💬 AI suggests '{user_input_stripped}' is not a direct command. Attempting as natural language query..."
@@ -371,7 +366,7 @@ async def handle_input_async(user_input: str):
                 logger.info(f"Validated AI translation failed for '{user_input_stripped}'. Proceeding to categorize original input directly.")
                 await process_command(user_input_stripped, 
                                       original_user_input_for_display=user_input_stripped, 
-                                      ai_raw_candidate=ai_raw_candidate, 
+                                      ai_raw_candidate=None, 
                                       original_direct_input_if_different=None)
 
 
@@ -665,10 +660,10 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
         if category == "semi_interactive":
             log_path = f"/tmp/micro_x_output_{unique_id}.log" 
             wrapped_command = f"bash -c '{command_to_execute} |& tee {log_path}; sleep {TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS}'"
-            tmux_cmd_list = ["tmux", "new-window", "-n", window_name, wrapped_command] # No -d, starts in foreground
+            tmux_cmd_list = ["tmux", "new-window", "-d", "-n", window_name, wrapped_command] 
             logger.info(f"Executing semi_interactive tmux: {tmux_cmd_list}")
-            subprocess.Popen(tmux_cmd_list) 
-            append_output(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for completion (max {TMUX_POLL_TIMEOUT_SECONDS}s)...")
+            subprocess.run(tmux_cmd_list, check=True) 
+            append_output(f"⏳ Launched semi-interactive in tmux (window: {window_name}). Waiting (max {TMUX_POLL_TIMEOUT_SECONDS}s)...")
             start_time = time.time(); output_captured, window_closed = False, False
             while time.time() - start_time < TMUX_POLL_TIMEOUT_SECONDS:
                 if window_name not in subprocess.run(["tmux", "list-windows", "-F", "#{window_name}"], stdout=subprocess.PIPE, text=True, errors="ignore").stdout:
@@ -689,7 +684,7 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
         else: # "interactive_tui"
             tmux_cmd_list = ["tmux", "new-window", "-n", window_name, command_to_execute]
             logger.info(f"Executing interactive_tui tmux: {tmux_cmd_list}")
-            append_output(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will pause.")
+            append_output(f"⚡ Launching interactive in tmux (window: {window_name}). micro_X will pause.")
             try:
                 subprocess.run(tmux_cmd_list, check=True) 
                 append_output(f"✅ Interactive tmux for '{original_user_input_display}' ended.")
@@ -745,11 +740,17 @@ _UNSAFE_TAG_CONTENT_GROUP = 14
 _INNER_TAG_EXTRACT_PATTERN = re.compile(r"^\s*<([a-zA-Z0-9_:]+)(?:\s+[^>]*)?>([\s\S]*?)<\/\1>\s*$", re.DOTALL)
 
 async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, str | None]:
+    """
+    Internal: Calls Ollama for translation, parses, and cleans.
+    Returns (cleaned_command, raw_candidate_from_regex)
+    """
     if COMMAND_PATTERN is None: return None, None
+    
     raw_candidate_from_regex = None 
     ollama_call_retries = 2 
     retry_delay_seconds = 1 
     last_exception_in_ollama_call = None 
+
     for attempt in range(ollama_call_retries + 1):
         current_attempt_exception = None 
         try:
@@ -763,14 +764,17 @@ async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, 
             ai_response = response['message']['content'].strip()
             logger.debug(f"Raw Translation AI response (attempt {attempt + 1}): {ai_response}")
             match = COMMAND_PATTERN.search(ai_response)
+            
             if match:
                 if COMMAND_PATTERN.groups >= _UNSAFE_TAG_CONTENT_GROUP and match.group(_UNSAFE_TAG_CONTENT_GROUP) is not None:
                     unsafe_message = match.group(_UNSAFE_TAG_CONTENT_GROUP).strip()
                     logger.warning(f"Translation AI unsafe query: '{human_input}'. AI Msg: '{unsafe_message}'"); append_output(f"⚠️ AI: {unsafe_message}"); return None, None
+                
                 for group_index in _COMMAND_EXTRACT_GROUPS:
                     if COMMAND_PATTERN.groups >= group_index and (extracted_candidate := match.group(group_index)) is not None:
                         if raw_candidate_from_regex is None: raw_candidate_from_regex = extracted_candidate.strip()
                         processed_candidate = extracted_candidate.strip()
+                        
                         inner_match = _INNER_TAG_EXTRACT_PATTERN.match(processed_candidate)
                         if inner_match:
                             tag_name = inner_match.group(1).lower()
@@ -778,11 +782,13 @@ async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, 
                                 extracted_content = inner_match.group(2).strip()
                                 logger.debug(f"Inner tag <{tag_name}> extracted: '{processed_candidate}' -> '{extracted_content}'"); processed_candidate = extracted_content
                             else: logger.debug(f"Inner tag <{tag_name}> found but not one of the expected types. Original: '{processed_candidate}'")
+                        
                         if len(processed_candidate) >= 2:
                             if processed_candidate.startswith("'") and processed_candidate.endswith("'"):
                                 processed_candidate = processed_candidate[1:-1].strip(); logger.debug(f"Stripped quotes from '{extracted_candidate.strip()}': -> '{processed_candidate}'")
                             elif processed_candidate.startswith("`") and processed_candidate.endswith("`"):
                                 processed_candidate = processed_candidate[1:-1].strip(); logger.debug(f"Stripped backticks from '{extracted_candidate.strip()}': -> '{processed_candidate}'")
+                        
                         if (processed_candidate.lower().startswith("bash ") or processed_candidate.lower().startswith("sh ")) and len(processed_candidate) > 6:
                             prefix_len = 5 if processed_candidate.lower().startswith("bash ") else 3
                             potential_inner_cmd = processed_candidate[prefix_len:].strip()
@@ -791,14 +797,18 @@ async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, 
                                 if not any(c in inner_cmd_content for c in '<>|&;'): 
                                     logger.debug(f"Stripped '{processed_candidate[:prefix_len]}<cmd>' pattern: '{processed_candidate}' -> '{inner_cmd_content}'"); processed_candidate = inner_cmd_content
                                 else: logger.debug(f"Retained '{processed_candidate[:prefix_len]}<cmd>' structure: '{processed_candidate}'")
+                        
                         if len(processed_candidate) >= 2 and processed_candidate.startswith("<") and processed_candidate.endswith(">"):
                             inner_content = processed_candidate[1:-1].strip()
-                            if not any(c in inner_cmd_content for c in '<>|&;'): 
+                            if not any(c in inner_content for c in '<>|&;'): 
                                 logger.debug(f"Stripped general angle brackets: '{processed_candidate}' -> '{inner_content}'"); processed_candidate = inner_content
                             else: logger.debug(f"Retained general angle brackets: '{processed_candidate}'")
+                        
                         cleaned_linux_command = processed_candidate.strip() 
+                        
                         if cleaned_linux_command.startswith('/') and '/' not in cleaned_linux_command[1:]:
                             original_for_log = cleaned_linux_command; cleaned_linux_command = cleaned_linux_command[1:]; logger.debug(f"Stripped leading slash: '{original_for_log}' -> '{cleaned_linux_command}'")
+                        
                         original_for_multicmd_log = cleaned_linux_command
                         try:
                             first_command_match = re.match(r"^([^;&|]+)", cleaned_linux_command)
@@ -807,12 +817,14 @@ async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, 
                                 if first_command_part != cleaned_linux_command: logger.info(f"AI multi-cmd: '{original_for_multicmd_log}' truncated to: '{first_command_part}'"); cleaned_linux_command = first_command_part
                             elif any(sep in cleaned_linux_command for sep in (';', '&&', '||')): logger.warning(f"AI cmd '{original_for_multicmd_log}' has separators but no clean first part. Discarding."); cleaned_linux_command = "" 
                         except Exception as e_shlex: logger.error(f"Multi-cmd heuristic error for '{original_for_multicmd_log}': {e_shlex}. Using as is."); cleaned_linux_command = original_for_multicmd_log 
+                        
                         if cleaned_linux_command and not cleaned_linux_command.lower().startswith(("sorry", "i cannot", "unable to", "cannot translate")):
                             logger.debug(f"_interpret_and_clean_ai_output returning: '{cleaned_linux_command}', raw: '{raw_candidate_from_regex}'")
                             return cleaned_linux_command, raw_candidate_from_regex 
                 logger.warning(f"Translation AI response matched but no valid cmd extracted. Response: {ai_response}") 
             else: 
                 logger.error(f"Translation AI response no match: {ai_response}") 
+            
             if attempt < ollama_call_retries:
                 logger.info(f"Retrying Translation AI call due to parsing/match failure (internal attempt {attempt + 2}/{ollama_call_retries+1}) for '{human_input}'."); 
                 await asyncio.sleep(retry_delay_seconds) 
@@ -820,6 +832,7 @@ async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, 
             else: 
                 logger.error(f"Translation AI parsing/match failed for '{human_input}' after {ollama_call_retries+1} internal attempts. Last AI: {ai_response}"); 
                 return None, raw_candidate_from_regex 
+        
         except ollama.ResponseError as e_resp: 
             current_attempt_exception = e_resp 
             append_output(f"❌ Ollama API Error (Translation): {e_resp}"); logger.error(f"Ollama API Error (Translation): {e_resp}", exc_info=True); 
@@ -830,6 +843,7 @@ async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, 
         except Exception as e_gen: 
             current_attempt_exception = e_gen
             append_output(f"❌ AI Processing Error (Translation): {e_gen}"); logger.exception(f"Unexpected error in _interpret_and_clean_ai_output for '{human_input}'") 
+        
         if current_attempt_exception:
             last_exception_in_ollama_call = current_attempt_exception
             if attempt < ollama_call_retries and not isinstance(current_attempt_exception, ollama.ResponseError): 
@@ -838,13 +852,19 @@ async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, 
             else: 
                 logger.error(f"All Translation AI call attempts failed for '{human_input}'. Last error: {current_attempt_exception}")
                 return None, raw_candidate_from_regex
+            
     logger.error(f"_interpret_and_clean_ai_output exhausted all internal retries for '{human_input}'. Last exception: {last_exception_in_ollama_call}")
     return None, raw_candidate_from_regex
 
+
 async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | None]:
+    """
+    Gets a command from the Translation AI and validates its output using the Validator AI.
+    Retries the entire translation-validation cycle up to TRANSLATION_VALIDATION_CYCLES.
+    Returns (validated_command, raw_ai_candidate_from_first_successful_regex_match) or (None, None).
+    """
     logger.info(f"Attempting validated translation for: '{human_query}'")
     last_raw_candidate = None 
-    last_cleaned_command_attempt = None
 
     for i in range(TRANSLATION_VALIDATION_CYCLES):
         append_output(f"🧠 AI translation & validation cycle {i+1}/{TRANSLATION_VALIDATION_CYCLES} for: '{human_query}'")
@@ -853,8 +873,6 @@ async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | 
         cleaned_command, raw_candidate = await _interpret_and_clean_ai_output(human_query)
         if raw_candidate and last_raw_candidate is None: 
             last_raw_candidate = raw_candidate
-        if cleaned_command: 
-            last_cleaned_command_attempt = cleaned_command
 
         if cleaned_command:
             append_output(f"🤖 AI translated to: '{cleaned_command}'. Validating with AI Validator...")
@@ -869,7 +887,7 @@ async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | 
             elif is_valid_by_validator is False:
                 logger.warning(f"Validator AI rejected translated command '{cleaned_command}'.")
                 append_output(f"❌ AI Validator rejected: '{cleaned_command}'.")
-            else: 
+            else: # None (inconclusive)
                 logger.warning(f"Validator AI inconclusive for translated command '{cleaned_command}'.")
                 append_output(f"⚠️ AI Validator inconclusive for: '{cleaned_command}'.")
         else: 
@@ -881,9 +899,10 @@ async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | 
         else:
             logger.error(f"All {TRANSLATION_VALIDATION_CYCLES} translation & validation cycles failed for '{human_query}'.")
             append_output(f"❌ AI failed to produce a validated command for '{human_query}' after {TRANSLATION_VALIDATION_CYCLES} cycles.")
-            return last_cleaned_command_attempt, last_raw_candidate 
+            return None, last_raw_candidate 
 
-    return None, last_raw_candidate 
+    return None, last_raw_candidate
+
 
 # --- Command Categorization Subsystem (Now uses full command strings) ---
 def load_command_categories() -> dict:
