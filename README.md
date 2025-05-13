@@ -36,16 +36,16 @@ micro\_X is designed to be adaptable and has specific setup guidance for the fol
 
 * **Linux Mint (and compatible Debian-based systems):**  
   * Automated setup script: setup.sh (or setup\_micro\_x\_mint.sh)  
-  * Detailed instructions: [setup\_micro\_x\_mint.md](https://github.com/thurtz/micro_X/blob/setup_micro_x_mint.md)  
+  * Detailed instructions: [setup\_micro\_x\_mint.md](https://github.com/thurtz/micro_X/blob/main/setup_micro_x_mint.md)  
 * **macOS:**  
   * Automated setup script: setup\_micro\_x\_mac.sh  
-  * Detailed instructions: [setup\_micro\_x\_mac.md](https://github.com/thurtz/setup_micro_x_mac.md)  
+  * Detailed instructions: [setup\_micro\_x\_mac.md](https://github.com/thurtz/micro_X/blob/main/setup_micro_x_mac.md)  
 * **Termux (Android):**  
   * Setup script (guides through Termux-specific steps): setup\_micro\_x\_termux.sh  
-  * Detailed instructions: [setup\_micro\_x\_termux.md](https://github.com/thurtz/setup_micro_x_termux.md)  
+  * Detailed instructions: [setup\_micro\_x\_termux.md](https://github.com/thurtz/micro_X/blob/main/setup_micro_x_termux.md)  
 * **WSL (Windows Subsystem for Linux):**  
   * Setup script (for within WSL, assumes Ollama on Windows host): setup\_micro\_x\_wsl.sh  
-  * Detailed instructions: [setup\_micro\_x\_wsl.md](https://github.com/thurtz/setup_micro_x_wsl.md)
+  * Detailed instructions: [setup\_micro\_x\_wsl.md](https://github.com/thurtz/micro_X/blob/main/setup_micro_x_wsl.md)
 
 **General Prerequisites (Common across platforms, details in specific setup guides):**
 
