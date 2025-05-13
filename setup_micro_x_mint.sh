@@ -113,7 +113,7 @@ echo ""
 echo "--- Setting up Python Environment for micro_X ---"
 
 # Check if main.py exists in the current directory
-if [ ! -f "main.py" ]; then
+if [ ! -f "$SCRIPT_ABS_DIR/main.py" ]; then
     echo "ERROR: main.py not found in the current directory ($SCRIPT_ABS_DIR)."
     echo "Please run this script from the same directory where main.py and other micro_X files are located."
     exit 1
@@ -148,7 +148,8 @@ fi
 
 # Install Python Dependencies into the virtual environment
 echo "Installing Python dependencies from $REQUIREMENTS_FILE into $VENV_DIR..."
-"$VENV_DIR/bin/pip3" install -r "$REQUIREMENTS_FILE"
+# MODIFIED: Use 'pip' instead of 'pip3' for the venv's pip
+"$VENV_DIR/bin/pip" install -r "$REQUIREMENTS_FILE"
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to install Python dependencies."
     echo "Try activating the virtual environment manually ('source $VENV_DIR/bin/activate') and then run 'pip3 install -r $REQUIREMENTS_FILE'."
@@ -183,29 +184,26 @@ if [ -f "$DESKTOP_FILE_SOURCE" ]; then
         LOCAL_APPS_DIR="$HOME/.local/share/applications"
         mkdir -p "$LOCAL_APPS_DIR"
 
-        # Create a temporary modified desktop file
         TEMP_DESKTOP_FILE=$(mktemp)
         cp "$DESKTOP_FILE_SOURCE" "$TEMP_DESKTOP_FILE"
 
-        # Replace the Exec line with the absolute path to micro_X.sh
-        # The micro_X.sh script itself handles cd'ing to its own directory.
-        # So, a direct absolute path in Exec should be fine.
-        # Ensure paths with spaces are quoted if necessary, though $SCRIPT_ABS_DIR should be safe.
-        # Using sed: escape slashes in path for sed replacement string
         ESCAPED_LAUNCHER_PATH=$(echo "$MICRO_X_LAUNCHER_SH" | sed 's/\//\\\//g')
         sed -i "s/^Exec=.*/Exec=\"$ESCAPED_LAUNCHER_PATH\"/" "$TEMP_DESKTOP_FILE"
         
-        # Also update Icon path if it's relative, assuming icon is in the script dir
-        # Example: If Icon=micro_x_icon.png, change to Icon=/path/to/script_dir/micro_x_icon.png
-        # This part is speculative as the .desktop file content for Icon isn't provided.
-        # If you have an Icon line like "Icon=some_icon.png", uncomment and adapt the line below:
-        # sed -i "s/^Icon=\(.*\)/Icon=$SCRIPT_ABS_DIR\/\1/" "$TEMP_DESKTOP_FILE"
+        # Example for updating Icon path if it's relative:
+        # Assuming Icon=micro_x_icon.png and the icon is in $SCRIPT_ABS_DIR
+        # Check if Icon line exists and is relative
+        # if grep -q "^Icon=[^/]" "$TEMP_DESKTOP_FILE"; then
+        #    ESCAPED_SCRIPT_DIR=$(echo "$SCRIPT_ABS_DIR" | sed 's/\//\\\//g')
+        #    sed -i "s/^Icon=\(.*\)/Icon=$ESCAPED_SCRIPT_DIR\/\1/" "$TEMP_DESKTOP_FILE"
+        #    echo "Updated Icon path in .desktop file to be absolute."
+        # fi
+
 
         echo "Copying modified $DESKTOP_FILE_SOURCE to $LOCAL_APPS_DIR/micro_X.desktop..."
         cp "$TEMP_DESKTOP_FILE" "$LOCAL_APPS_DIR/micro_X.desktop"
-        rm "$TEMP_DESKTOP_FILE" # Clean up temporary file
+        rm "$TEMP_DESKTOP_FILE" 
 
-        # Update desktop database to make sure it's recognized immediately
         if command_exists update-desktop-database; then
             echo "Updating desktop database..."
             update-desktop-database "$LOCAL_APPS_DIR"
