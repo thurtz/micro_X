@@ -1,0 +1,4 @@
+# Python dependencies for micro_X
+
+prompt_toolkit>=3.0.0
+ollama>=0.1.0

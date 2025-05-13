@@ -175,3 +175,6 @@ cython_debug/
 
 # nano saves
 *.save
+
+# micro_X history
+.micro_x_history
