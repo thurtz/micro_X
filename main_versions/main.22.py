@@ -257,7 +257,10 @@ async def is_valid_linux_command_according_to_ai(command_text: str) -> bool | No
         logger.debug(f"Skipping AI validation for command_text of length {len(command_text)}: '{command_text}'")
         return None
 
+    # UPDATED: System prompt for the validator to define its role.
     validator_system_prompt = "You are a Linux command validation assistant. Your task is to determine if a given string is likely a valid Linux command. If the string looks like a phrase rather than a linux command then the answer is no. If the string looks like a Linux command rather than a phrase then the answer is yes. Answer only with 'yes' or 'no'."
+
+    # UPDATED: User prompt for the validator (more concise).
     validator_user_prompt = f"Is the following string likely a Linux command: '{command_text}'"
 
     responses = []
@@ -267,6 +270,7 @@ async def is_valid_linux_command_according_to_ai(command_text: str) -> bool | No
             response = await asyncio.to_thread(
                 ollama.chat,
                 model=OLLAMA_VALIDATOR_MODEL,
+                # UPDATED: Include the system prompt.
                 messages=[
                     {'role': 'system', 'content': validator_system_prompt},
                     {'role': 'user', 'content': validator_user_prompt}
@@ -781,11 +785,7 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
 
         if category == "semi_interactive":
             log_path = f"/tmp/micro_x_output_{unique_id}.log"
-            # To handle single quotes within command_to_execute for bash -c '...'
-            # Replaces ' with '"'"' (end single quote, literal single quote in double quotes, start single quote)
-            replacement_for_single_quote = "'\"'\"'"
-            escaped_command_str = command_to_execute.replace("'", replacement_for_single_quote)
-            wrapped_command = f"bash -c '{escaped_command_str}' |& tee {log_path}; sleep {TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS}"
+            wrapped_command = f"bash -c '{command_to_execute} |& tee {log_path}; sleep {TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS}'"
             tmux_cmd_list = ["tmux", "new-window", "-n", window_name, wrapped_command]
             logger.info(f"Executing semi_interactive tmux: {tmux_cmd_list}")
             process = subprocess.Popen(tmux_cmd_list)
@@ -831,7 +831,6 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
             elif window_closed:
                  append_output(f"Output from '{original_user_input_display}': (Tmux window closed, no log found)")
         else: # category == "interactive_tui"
-            # Pass the full command_to_execute directly
             tmux_cmd_list = ["tmux", "new-window", "-n", window_name, command_to_execute]
             logger.info(f"Executing interactive_tui tmux: {tmux_cmd_list}")
             append_output(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will pause.")
@@ -855,18 +854,16 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
         logger.exception(f"Unexpected error during tmux interaction: {e}")
 
 def execute_shell_command(command_to_execute: str, original_user_input_display: str):
-    """Executes a 'simple' command directly using subprocess, now via bash -c for chain support."""
+    """Executes a 'simple' command directly using subprocess."""
     global current_directory
     try:
-        if not command_to_execute.strip():
+        parts = shlex.split(command_to_execute)
+        if not parts:
             append_output("⚠️ Empty command.")
-            logger.warning(f"Attempted to execute empty command: '{command_to_execute}'")
+            logger.warning(f"Attempted to execute empty command: {command_to_execute}")
             return
-
-        # MODIFIED: Execute the command string using bash -c
-        # This allows the shell to interpret operators like &&, ||, | for chained commands.
         process = subprocess.Popen(
-            ['bash', '-c', command_to_execute], # Pass the entire command string to bash
+            parts,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=current_directory,
@@ -886,8 +883,9 @@ def execute_shell_command(command_to_execute: str, original_user_input_display: 
             if not stderr:
                  append_output(f"⚠️ Command '{original_user_input_display}' exited with code {process.returncode}.")
     except FileNotFoundError:
-        append_output(f"❌ Shell (bash) not found. Cannot execute command.")
-        logger.error(f"Shell (bash) not found when trying to execute: {command_to_execute}")
+        cmd_name = parts[0] if parts else command_to_execute
+        append_output(f"❌ Command not found: {cmd_name}")
+        logger.error(f"Command not found during execution: {cmd_name}")
     except Exception as e:
         append_output(f"❌ Error executing '{command_to_execute}': {e}")
         logger.exception(f"Error executing shell command: {e}")
@@ -972,9 +970,20 @@ def _clean_extracted_command(extracted_candidate: str) -> str:
         cleaned_linux_command = cleaned_linux_command[1:]
         logger.debug(f"Stripped leading slash: '{original_slash_log}' -> '{cleaned_linux_command}'")
 
-    # The multi-command truncation logic that was previously here has been removed
-    # to allow full chained commands to be processed.
-    logger.debug(f"After cleaning (multi-command truncation removed): '{cleaned_linux_command}'")
+    original_for_multicmd_log = cleaned_linux_command
+    try:
+        first_command_match = re.match(r"^([^;&|]+)", cleaned_linux_command)
+        if first_command_match:
+            first_command_part = first_command_match.group(1).strip()
+            if first_command_part != cleaned_linux_command:
+                logger.info(f"AI potentially returned multiple commands: '{original_for_multicmd_log}'. Truncated to first part: '{first_command_part}'")
+                cleaned_linux_command = first_command_part
+        elif any(sep in cleaned_linux_command for sep in (';', '&&', '||')):
+            logger.warning(f"AI command '{original_for_multicmd_log}' contains separators but couldn't extract a clean first part. Discarding.")
+            cleaned_linux_command = ""
+    except Exception as e_shlex:
+         logger.error(f"Multi-command splitting heuristic failed for '{original_for_multicmd_log}': {e_shlex}. Using original extracted command.")
+         cleaned_linux_command = original_for_multicmd_log
 
     if cleaned_linux_command and not cleaned_linux_command.lower().startswith(("sorry", "i cannot", "unable to", "cannot translate")):
         return cleaned_linux_command
@@ -1085,6 +1094,7 @@ async def _get_direct_ai_output(human_input: str) -> tuple[str | None, str | Non
         current_attempt_exception = None
         try:
             logger.info(f"To Direct Translation AI (model: {OLLAMA_DIRECT_TRANSLATOR_MODEL}, attempt {attempt + 1}/{ollama_call_retries+1}): '{human_input}'")
+            # UPDATED: System prompt for the direct translator.
             direct_translator_system_prompt = "Translate the following user request into a single Linux command. Output only the command. Do not include any other text, explanations, or markdown formatting."
 
             messages = [
@@ -1152,6 +1162,8 @@ async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | 
         append_output(f"🧠 AI translation & validation cycle {i+1}/{TRANSLATION_VALIDATION_CYCLES} for: '{human_query}'")
         if get_app().is_running : get_app().invalidate()
 
+        validated_command_found = False # Flag not used in current logic, but kept for clarity
+
         append_output(f"   P-> Trying Primary Translator ({OLLAMA_MODEL})...")
         logger.debug(f"Cycle {i+1}: Trying primary translator.")
         cleaned_command_p, raw_candidate_p = await _interpret_and_clean_tagged_ai_output(human_query)
@@ -1176,14 +1188,14 @@ async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | 
             logger.warning(f"Primary AI translation (cycle {i+1}) failed to produce a command for '{human_query}'.")
             append_output(f"  P-> Primary translation failed.")
 
-        if OLLAMA_DIRECT_TRANSLATOR_MODEL:
+        if OLLAMA_DIRECT_TRANSLATOR_MODEL: # Only try secondary if it's configured
             append_output(f"  S-> Trying Secondary Translator ({OLLAMA_DIRECT_TRANSLATOR_MODEL})...")
             logger.debug(f"Cycle {i+1}: Trying secondary translator.")
             cleaned_command_s, raw_candidate_s = await _get_direct_ai_output(human_query)
             last_raw_candidate_secondary = raw_candidate_s
 
             if cleaned_command_s:
-                last_cleaned_command_attempt = cleaned_command_s
+                last_cleaned_command_attempt = cleaned_command_s # Update with latest attempt
                 append_output(f"  S-> Secondary Translated to: '{cleaned_command_s}'. Validating...")
                 if get_app().is_running : get_app().invalidate()
                 is_valid_by_validator = await is_valid_linux_command_according_to_ai(cleaned_command_s)

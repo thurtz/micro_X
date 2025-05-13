@@ -16,7 +16,11 @@
     "which",
     "which tmux",
     "ls --help",
-    "cat /etc/os-release"
+    "cat /etc/os-release",
+    "ls -a",
+    "uname -s",
+    "ls -al",
+    "echo \"hello\"; echo \"world\""
   ],
   "semi_interactive": [
     "less",
@@ -33,7 +37,15 @@
     "lsb_release -a",
     "sudo apt update",
     "nmap -sP 192.168.0.0/24 --script='http-server'",
-    "nmap -sT -p80,443 192.168.0.0/24"
+    "nmap -sT -p80,443 192.168.0.0/24",
+    "nmap -sT -p80,443 192.168.1.0/24",
+    "nmap -sT 192.168.1.0/24",
+    "cat /boot/version",
+    "cat /proc/version",
+    "nmap -sT -p80 192.168.254.0/24",
+    "nmap -sP 192.168.1.0/24",
+    "nmap -sT --open -Pn 192.168.1.0/24",
+    "ls;pwd"
   ],
   "interactive_tui": [
     "nano",
@@ -44,6 +56,7 @@
     "tail -f logs/micro_x.log",
     "ollama serve",
     "nmap -sT -P0 192.168.1.0/24",
-    "nano config/command_categories.json"
+    "nano config/command_categories.json",
+    "ls && nano"
   ]
 }
