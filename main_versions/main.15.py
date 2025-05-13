@@ -21,18 +21,22 @@ import ollama
 import logging
 import json
 import time
+import shutil 
 
 # --- Configuration Constants ---
 LOG_DIR = "logs"
 CONFIG_DIR = "config"
 CATEGORY_FILENAME = "command_categories.json"
 HISTORY_FILENAME = ".micro_x_history" 
-OLLAMA_MODEL = 'herawen/lisa' 
+OLLAMA_MODEL = 'herawen/lisa' # Main model for translation
+OLLAMA_VALIDATOR_MODEL = 'herawen/lisa' # Can be the same or a faster/simpler model
 TMUX_POLL_TIMEOUT_SECONDS = 300 
 TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS = 1 
 INPUT_FIELD_HEIGHT = 3 
-UNKNOWN_CATEGORY_SENTINEL = "##UNKNOWN_CATEGORY##" # Sentinel for unknown commands
-DEFAULT_CATEGORY_FOR_UNCLASSIFIED = "simple" # Default if user opts not to classify
+UNKNOWN_CATEGORY_SENTINEL = "##UNKNOWN_CATEGORY##" 
+DEFAULT_CATEGORY_FOR_UNCLASSIFIED = "simple" 
+VALIDATOR_AI_ATTEMPTS = 3 # Number of times to ask the validator AI for a single validation decision
+TRANSLATION_VALIDATION_CYCLES = 3 # How many times to try getting a validated translation
 
 # --- Path Setup ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -112,11 +116,13 @@ def _(event):
 def _(event):
     if output_field and output_field.window.render_info:
         output_field.window._scroll_up()
+        event.app.invalidate() 
 
 @kb.add('pagedown')
 def _(event):
     if output_field and output_field.window.render_info:
         output_field.window._scroll_down()
+        event.app.invalidate() 
 
 @kb.add('c-up')
 def _(event):
@@ -173,15 +179,11 @@ def append_output(text: str):
             else: 
                  buffer.cursor_position = len(new_text)
 
-        async def refresh_output():
-            await asyncio.sleep(0.001) 
-            if get_app().is_running:
-                get_app().invalidate()
-        
-        if get_app().is_running: 
-             get_app().create_background_task(refresh_output())
+        if get_app().is_running:
+            get_app().invalidate()
         else: 
-            logger.debug(f"Output appended while app not running: {text.strip()}")
+            logger.debug(f"Output appended while app not running (no invalidation): {text.strip()}")
+
 
 # --- Shell Variable Expansion ---
 def expand_shell_variables(command_string: str, current_pwd: str) -> str:
@@ -214,37 +216,163 @@ def restore_normal_input_handler():
         input_field.buffer.accept_handler = normal_input_accept_handler
         input_field.multiline = True
 
+# --- AI Command Validation ---
+async def is_valid_linux_command_according_to_ai(command_text: str) -> bool | None:
+    if not command_text or len(command_text) < 2 or len(command_text) > 200:
+        logger.debug(f"Skipping AI validation for command_text of length {len(command_text)}: '{command_text}'")
+        return None 
+
+    prompt = f"Answer the following question strictly with a yes or no: Is the following string likely to be a valid Linux command: '{command_text}'"
+    
+    responses = []
+    for i in range(VALIDATOR_AI_ATTEMPTS):
+        logger.info(f"To Validator AI (model: {OLLAMA_VALIDATOR_MODEL}, attempt {i+1}/{VALIDATOR_AI_ATTEMPTS}): '{command_text}'")
+        try:
+            response = await asyncio.to_thread(
+                ollama.chat,
+                model=OLLAMA_VALIDATOR_MODEL,
+                messages=[{'role': 'user', 'content': prompt}]
+            )
+            ai_answer = response['message']['content'].strip().lower()
+            logger.debug(f"Validator AI response (attempt {i+1}) for '{command_text}': '{ai_answer}'")
+            
+            is_yes = re.search(r'\byes\b', ai_answer, re.IGNORECASE)
+            is_no = re.search(r'\bno\b', ai_answer, re.IGNORECASE)
+
+            if is_yes and not is_no: responses.append(True)
+            elif is_no and not is_yes: responses.append(False)
+            else: responses.append(None); logger.warning(f"Validator AI unclear answer (attempt {i+1}): '{ai_answer}'")
+        except Exception as e:
+            logger.error(f"Error calling Validator AI (attempt {i+1}) for '{command_text}': {e}", exc_info=True)
+            responses.append(None) 
+        
+        if i < VALIDATOR_AI_ATTEMPTS - 1 and len(responses) <= i+1 and responses[-1] is None: 
+             await asyncio.sleep(0.5)
+
+    yes_count = responses.count(True)
+    no_count = responses.count(False)
+    logger.debug(f"Validator AI responses for '{command_text}': Yes: {yes_count}, No: {no_count}, Unclear/Error: {responses.count(None)}")
+
+    if yes_count >= (VALIDATOR_AI_ATTEMPTS // 2 + 1): return True
+    elif no_count >= (VALIDATOR_AI_ATTEMPTS // 2 + 1): return False
+    else: logger.warning(f"Validator AI result inconclusive for '{command_text}' after {VALIDATOR_AI_ATTEMPTS} attempts."); return None
+
 # --- Command Handling Logic ---
 async def handle_input_async(user_input: str): 
     global current_directory, categorization_flow_active
     if categorization_flow_active:
         logger.warning("handle_input_async called while categorization_flow_active. Ignoring."); return
 
-    user_input = user_input.strip()
-    logger.info(f"Received user input: '{user_input}'")
-    if not user_input: return 
+    user_input_stripped = user_input.strip()
+    logger.info(f"Received user input: '{user_input_stripped}'")
+    if not user_input_stripped: return 
 
-    if user_input.lower() in {"exit", "quit", "/exit", "/quit"}:
+    if user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
         append_output("Exiting micro_X Shell 🚪"); logger.info("Exit command received.");
         if get_app().is_running: get_app().exit(); return
 
-    if user_input.startswith("/ai "):
-        human_query = user_input[len("/ai "):].strip()
+    if user_input_stripped.startswith("/ai "): 
+        human_query = user_input_stripped[len("/ai "):].strip()
         if not human_query: append_output("⚠️ AI query is empty."); return
         append_output(f"🤖 AI Query: {human_query}\n🧠 Thinking..."); 
         if get_app().is_running: get_app().invalidate() 
-        linux_command = interpret_human_input(human_query) 
+        
+        linux_command, ai_raw_candidate = await get_validated_ai_command(human_query) 
+        
         if linux_command:
-            append_output(f"🤖 AI Suggests: {linux_command}")
-            await process_command(linux_command, original_user_input=f"/ai {human_query} -> {linux_command}")
-        else: append_output("🤔 AI could not process the request.")
+            append_output(f"🤖 AI Suggests (validated): {linux_command}")
+            await process_command(linux_command, 
+                                  original_user_input_for_display=f"/ai {human_query} -> {linux_command}", 
+                                  ai_raw_candidate=ai_raw_candidate,
+                                  original_direct_input_if_different=None) 
+        else: append_output("🤔 AI could not produce a validated command for your query.")
         return
 
-    if user_input.startswith("/command"):
-        handle_command_subsystem_input(user_input); return
-    await process_command(user_input, original_user_input=user_input)
+    if user_input_stripped.startswith("/command"): 
+        handle_command_subsystem_input(user_input_stripped); return
 
-async def process_command(command_str_original: str, original_user_input: str):
+    # For direct input that is not /ai or /command:
+    category = classify_command(user_input_stripped) 
+
+    if category != UNKNOWN_CATEGORY_SENTINEL:
+        # Known command, proceed directly
+        logger.debug(f"Direct input '{user_input_stripped}' is a known command in category '{category}'.")
+        await process_command(user_input_stripped, 
+                              original_user_input_for_display=user_input_stripped, 
+                              ai_raw_candidate=None,
+                              original_direct_input_if_different=None) 
+    else:
+        # Input is not a known categorized command. Query Validator AI first.
+        logger.debug(f"Direct input '{user_input_stripped}' is unknown. Querying Validator AI.")
+        append_output(f"🔎 Validating '{user_input_stripped}' with AI...")
+        if get_app().is_running: get_app().invalidate()
+
+        is_cmd_ai_says = await is_valid_linux_command_according_to_ai(user_input_stripped)
+        
+        # Refined heuristic for "phrase-like"
+        has_space = ' ' in user_input_stripped
+        is_path_indicator = user_input_stripped.startswith(('/', './', '../'))
+        has_double_hyphen = '--' in user_input_stripped
+        has_single_hyphen_option = bool(re.search(r'(?:^|\s)-\w', user_input_stripped))
+        has_dollar_var = '$' in user_input_stripped # Check for $ character
+
+        user_input_looks_like_phrase = False
+        if is_path_indicator or has_double_hyphen or has_single_hyphen_option or has_dollar_var:
+            user_input_looks_like_phrase = False # Presence of these strongly suggests it's NOT a phrase
+        elif has_space:
+            user_input_looks_like_phrase = True # Has spaces, and none of the above command-like indicators
+        # else: no spaces, no path, no options, no $ -> could be a single-word command or single-word natural language.
+        # In this case, the Validator AI's output is more heavily relied upon.
+        
+        logger.debug(f"Input: '{user_input_stripped}', Validator AI: {is_cmd_ai_says}, Looks like phrase: {user_input_looks_like_phrase}")
+
+        if is_cmd_ai_says is True and not user_input_looks_like_phrase:
+            # Validator AI says "yes" AND it doesn't look like a phrase. Trust it.
+            append_output(f"✅ AI believes '{user_input_stripped}' is a direct command. Proceeding to categorize.")
+            logger.info(f"Validator AI confirmed '{user_input_stripped}' as a command (and it doesn't look like a phrase).")
+            await process_command(user_input_stripped, 
+                                  original_user_input_for_display=user_input_stripped, 
+                                  ai_raw_candidate=None,
+                                  original_direct_input_if_different=None)
+        
+        else: 
+            # Validator AI says "no", OR "yes" but it looks like a phrase", OR was inconclusive.
+            # In all these cases, default to treating as natural language for translation (with validation).
+            if is_cmd_ai_says is False:
+                log_msg = f"Validator AI suggests '{user_input_stripped}' is not a command."
+                ui_msg = f"💬 AI suggests '{user_input_stripped}' is not a direct command. Attempting as natural language query..."
+            elif is_cmd_ai_says is True and user_input_looks_like_phrase: 
+                log_msg = f"Validator AI confirmed '{user_input_stripped}' as command, but heuristic overrides due to phrase-like structure."
+                ui_msg = f"💬 AI validated '{user_input_stripped}' as command, but it looks like a phrase. Attempting as natural language query..."
+            else: # is_cmd_ai_says is None
+                log_msg = f"Validator AI response for '{user_input_stripped}' inconclusive."
+                ui_msg = f"⚠️ AI validation for '{user_input_stripped}' was inconclusive. Attempting as natural language query..."
+            
+            logger.info(f"{log_msg} Treating as natural language.")
+            append_output(ui_msg)
+            if get_app().is_running: get_app().invalidate()
+
+            linux_command, ai_raw_candidate = await get_validated_ai_command(user_input_stripped) 
+
+            if linux_command:
+                append_output(f"🤖 AI Translated & Validated to: {linux_command}")
+                original_direct_for_prompt = user_input_stripped if linux_command != user_input_stripped else None
+                await process_command(linux_command,
+                                      original_user_input_for_display=f"'{user_input_stripped}' -> {linux_command}",
+                                      ai_raw_candidate=ai_raw_candidate,
+                                      original_direct_input_if_different=original_direct_for_prompt)
+            else:
+                append_output(f"🤔 AI could not produce a validated command for '{user_input_stripped}'. Treating original input as a potential direct command.")
+                logger.info(f"Validated AI translation failed for '{user_input_stripped}'. Proceeding to categorize original input directly.")
+                await process_command(user_input_stripped, 
+                                      original_user_input_for_display=user_input_stripped, 
+                                      ai_raw_candidate=None, 
+                                      original_direct_input_if_different=None)
+
+
+async def process_command(command_str_original: str, original_user_input_for_display: str, 
+                          ai_raw_candidate: str | None = None, 
+                          original_direct_input_if_different: str | None = None):
     global current_directory
     if command_str_original.startswith("cd "):
         handle_cd_command(command_str_original); return
@@ -252,141 +380,234 @@ async def process_command(command_str_original: str, original_user_input: str):
     command_for_classification = command_str_original 
     category = classify_command(command_for_classification) 
 
+    command_to_be_added_if_new = command_for_classification
+
     if category == UNKNOWN_CATEGORY_SENTINEL:
         logger.info(f"Command '{command_for_classification}' is not categorized. Initiating interactive flow.")
-        categorization_result = await prompt_for_categorization(command_for_classification)
+        categorization_result = await prompt_for_categorization(command_for_classification, 
+                                                                ai_raw_candidate, 
+                                                                original_direct_input_if_different)
+        
         if categorization_result.get('action') == 'cancel_execution':
             append_output(f"Execution of '{command_for_classification}' cancelled.")
             logger.info(f"Execution of '{command_for_classification}' cancelled by user.")
             return
         elif categorization_result.get('action') == 'categorize_and_execute':
-            cmd_added_to_json = categorization_result['command'] 
+            command_to_be_added_if_new = categorization_result['command'] 
             chosen_cat_for_json = categorization_result['category']
-            add_command_to_category(cmd_added_to_json, chosen_cat_for_json)
+            add_command_to_category(command_to_be_added_if_new, chosen_cat_for_json)
             category = chosen_cat_for_json 
-            logger.info(f"Command '{cmd_added_to_json}' categorized as '{category}' and will be used for this execution.")
+            logger.info(f"Command '{command_to_be_added_if_new}' categorized as '{category}'.")
+            if command_to_be_added_if_new != command_str_original:
+                 logger.info(f"Using '{command_to_be_added_if_new}' for execution based on categorization choice, overriding '{command_str_original}'.")
+                 command_str_original = command_to_be_added_if_new 
         else: 
             category = DEFAULT_CATEGORY_FOR_UNCLASSIFIED
             append_output(f"Executing '{command_for_classification}' as default category '{category}'.")
             logger.info(f"Command '{command_for_classification}' will be executed with default category '{category}'.")
 
     command_to_execute_expanded = expand_shell_variables(command_str_original, current_directory)
+    
     if command_str_original != command_to_execute_expanded:
-        logger.info(f"Command after variable expansion for execution: '{command_to_execute_expanded}' (original: '{command_str_original}')")
-        if command_to_execute_expanded != command_for_classification:
+        logger.info(f"Command after variable expansion for execution: '{command_to_execute_expanded}' (original for expansion: '{command_str_original}')")
+        if command_to_execute_expanded != command_for_classification and command_to_execute_expanded != command_to_be_added_if_new:
              append_output(f"Expanded for execution: {command_to_execute_expanded}")
 
-    command_to_execute_sanitized = sanitize_and_validate(command_to_execute_expanded, original_user_input)
+    command_to_execute_sanitized = sanitize_and_validate(command_to_execute_expanded, original_user_input_for_display)
     if not command_to_execute_sanitized: 
         append_output(f"Command '{command_to_execute_expanded}' blocked by sanitization after variable expansion.")
-        logger.warning(f"Command '{command_to_execute_expanded}' (from '{original_user_input}') blocked by post-expansion sanitization.")
+        logger.warning(f"Command '{command_to_execute_expanded}' (from '{original_user_input_for_display}') blocked by post-expansion sanitization.")
         return
 
-    logger.info(f"Final command for execution: '{command_to_execute_sanitized}', Category: '{category}' (derived from '{command_for_classification}')")
+    logger.info(f"Final command for execution: '{command_to_execute_sanitized}', Category: '{category}'")
     append_output(f"▶️ Executing ({category}): {command_to_execute_sanitized}")
 
     if category == "simple":
-        execute_shell_command(command_to_execute_sanitized, original_user_input)
+        execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
     else: 
-        execute_command_in_tmux(command_to_execute_sanitized, original_user_input, category)
+        execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category)
 
 # --- Interactive Categorization Flow ---
-async def prompt_for_categorization(command_to_categorize_unexpanded: str) -> dict:
+async def prompt_for_categorization(command_initially_proposed: str, 
+                                  ai_raw_candidate_for_suggestions: str | None,
+                                  original_direct_input_if_different: str | None) -> dict:
     global categorization_flow_active, categorization_flow_state, input_field
     categorization_flow_active = True
-    categorization_flow_state = {'command_to_categorize_display': command_to_categorize_unexpanded, 
-                                 'command_to_add_final': command_to_categorize_unexpanded, 
-                                 'step': 1}
+    categorization_flow_state = {
+        'command_initially_proposed': command_initially_proposed, 
+        'ai_raw_candidate': ai_raw_candidate_for_suggestions,      
+        'original_direct_input': original_direct_input_if_different, 
+        'command_to_add_final': command_initially_proposed,     
+        'step': 0.5 
+    }
     flow_completion_future = asyncio.Future()
     categorization_flow_state['future'] = flow_completion_future
     if input_field: input_field.multiline = False
-    _ask_step_1_add_or_not()
+    
+    _ask_step_0_5_confirm_command_base() 
+    
     try: return await flow_completion_future
     finally: restore_normal_input_handler(); logger.debug("Categorization flow ended.")
 
-def _ask_step_1_add_or_not():
+def _ask_step_0_5_confirm_command_base():
+    global categorization_flow_state
+    proposed = categorization_flow_state['command_initially_proposed']
+    original = categorization_flow_state['original_direct_input']
+
+    if original and original.strip() != proposed.strip():
+        append_output(f"\nSystem processed input to: '{proposed}'")
+        append_output(f"Your original input was: '{original}'")
+        append_output("Which version to use as a base for categorization?")
+        append_output(f"  1: Processed ('{proposed}')")
+        append_output(f"  2: Original ('{original}')")
+        append_output("  3: Modify a new command string")
+        append_output("  4: Cancel execution")
+        if input_field:
+            input_field.prompt = "[Categorize] Choice (1-4): "
+            input_field.buffer.accept_handler = _handle_step_0_5_response
+            get_app().invalidate()
+    else:
+        categorization_flow_state['command_to_add_final'] = proposed 
+        categorization_flow_state['step'] = 1
+        _ask_step_1_main_action()
+
+def _handle_step_0_5_response(buff):
+    global categorization_flow_state
+    response = buff.text.strip()
+    proposed = categorization_flow_state['command_initially_proposed']
+    original = categorization_flow_state['original_direct_input']
+
+    if response == '1':
+        categorization_flow_state['command_to_add_final'] = proposed
+        append_output(f"Using processed: '{proposed}'")
+        categorization_flow_state['step'] = 1
+        _ask_step_1_main_action()
+    elif response == '2' and original: 
+        categorization_flow_state['command_to_add_final'] = original
+        append_output(f"Using original: '{original}'")
+        categorization_flow_state['step'] = 1
+        _ask_step_1_main_action()
+    elif response == '3':
+        categorization_flow_state['step'] = 3.5 
+        _ask_step_3_5_enter_custom_command_for_categorization()
+    elif response == '4':
+        categorization_flow_state.get('future').set_result({'action': 'cancel_execution'})
+    else:
+        append_output("Invalid choice. Please enter 1-4.")
+        _ask_step_0_5_confirm_command_base() 
+        return
+    
+def _ask_step_1_main_action():
     global categorization_flow_state, input_field
-    cmd_display = categorization_flow_state['command_to_categorize_display']
-    append_output(f"\nCommand '{cmd_display}' is not categorized.")
-    append_output("Add to a category? (y/n/c=cancel execution)")
+    cmd_display = categorization_flow_state['command_to_add_final']
+    append_output(f"\nCommand '{cmd_display}' is not categorized. Choose an action:")
+    append_output("  1: Add to 'simple'")
+    append_output("  2: Add to 'semi_interactive'")
+    append_output("  3: Add to 'interactive_tui'")
+    append_output(f"  M: Modify this command string ('{cmd_display}') before adding")
+    append_output("  D: Do not categorize (execute as default)")
+    append_output("  C: Cancel execution")
     if input_field:
-        input_field.prompt = "[Categorize] Add? (y/n/c): "
-        input_field.buffer.accept_handler = _handle_step_1_response
+        input_field.prompt = "[Categorize] Action (1-3/M/D/C): "
+        input_field.buffer.accept_handler = _handle_step_1_main_action_response
         get_app().invalidate()
 
-def _handle_step_1_response(buff):
+def _handle_step_1_main_action_response(buff):
     global categorization_flow_state
     response = buff.text.strip().lower()
-    if response == 'y': categorization_flow_state['step'] = 2; _ask_step_2_category_choice()
-    elif response == 'n': categorization_flow_state.get('future').set_result({'action': 'execute_as_default'})
-    elif response == 'c': categorization_flow_state.get('future').set_result({'action': 'cancel_execution'})
-    else: append_output("Invalid. (y/n/c)"); _ask_step_1_add_or_not()
+    cmd_to_add = categorization_flow_state['command_to_add_final']
 
-def _ask_step_2_category_choice():
+    if response in ['1', '2', '3']:
+        category_map_key = response 
+        chosen_category = CATEGORY_MAP.get(category_map_key)
+        categorization_flow_state.get('future').set_result({
+            'action': 'categorize_and_execute',
+            'command': cmd_to_add,
+            'category': chosen_category
+        })
+    elif response == 'm':
+        categorization_flow_state['step'] = 4 
+        _ask_step_4_enter_modified_command(base_command=cmd_to_add) 
+    elif response == 'd':
+        categorization_flow_state.get('future').set_result({'action': 'execute_as_default'})
+    elif response == 'c':
+        categorization_flow_state.get('future').set_result({'action': 'cancel_execution'})
+    else:
+        append_output("Invalid choice. Please enter 1-3, M, D, or C.")
+        _ask_step_1_main_action() 
+
+def _ask_step_3_5_enter_custom_command_for_categorization():
+    """New step if user chose 'Modify a new command string' from step 0.5"""
     global categorization_flow_state, input_field
-    cmd_display = categorization_flow_state['command_to_categorize_display']
-    append_output(f"Enter category for '{cmd_display}':")
-    append_output("(1: simple, 2: semi_interactive, 3: interactive_tui, or full name)")
+    append_output("\nEnter the new command string you want to categorize:")
     if input_field:
-        input_field.prompt = "[Categorize] Category: "
-        input_field.buffer.accept_handler = _handle_step_2_response
+        input_field.prompt = "[Categorize] New command string: "
+        input_field.buffer.text = "" 
+        input_field.buffer.accept_handler = _handle_step_3_5_response
         get_app().invalidate()
 
-def _handle_step_2_response(buff):
+def _handle_step_3_5_response(buff):
     global categorization_flow_state
-    response = buff.text.strip().lower()
-    chosen_category = CATEGORY_MAP.get(response, response if response in CATEGORY_MAP.values() else None)
-    if chosen_category and chosen_category in set(CATEGORY_MAP.values()):
-        categorization_flow_state['chosen_category'] = chosen_category
-        categorization_flow_state['step'] = 3; _ask_step_3_modify_command()
-    else: append_output(f"Invalid category '{response}'."); _ask_step_2_category_choice()
+    custom_command = buff.text.strip()
+    if not custom_command:
+        append_output("⚠️ Command cannot be empty. Please try again or cancel (Ctrl+C).")
+        _ask_step_3_5_enter_custom_command_for_categorization() 
+        return
+    
+    categorization_flow_state['command_to_add_final'] = custom_command
+    append_output(f"Proceeding to categorize: '{custom_command}'")
+    categorization_flow_state['step'] = 1 
+    _ask_step_1_main_action()
 
-def _ask_step_3_modify_command():
+
+def _ask_step_4_enter_modified_command(base_command: str): 
+    """Modified to accept a base_command to pre-fill."""
     global categorization_flow_state, input_field
-    cmd_to_add_default = categorization_flow_state['command_to_add_final'] 
-    append_output(f"The command to be added is currently: '{cmd_to_add_default}'")
-    append_output("Modify this command string for categorization (e.g., make it more general, remove specific args)? (y/n)")
+    append_output(f"\nEnter the modified command string (based on '{base_command}'):")
     if input_field:
-        input_field.prompt = "[Categorize] Modify cmd string? (y/n): "
-        input_field.buffer.accept_handler = _handle_step_3_response
+        input_field.prompt = f"[Categorize] Modified Command: "
+        input_field.buffer.text = base_command 
+        input_field.buffer.cursor_position = len(base_command)
+        input_field.buffer.accept_handler = _handle_step_4_modified_command_response
         get_app().invalidate()
 
-def _handle_step_3_response(buff):
+def _handle_step_4_modified_command_response(buff):
     global categorization_flow_state
-    response = buff.text.strip().lower()
-    if response == 'y': categorization_flow_state['step'] = 4; _ask_step_4_enter_modified_command()
-    elif response == 'n':
+    modified_command = buff.text.strip()
+    if not modified_command:
+        append_output("⚠️ Modified command cannot be empty. Using previous.")
+    else:
+        categorization_flow_state['command_to_add_final'] = modified_command
+    
+    categorization_flow_state['step'] = 4.5 
+    _ask_step_4_5_category_for_modified()
+
+def _ask_step_4_5_category_for_modified():
+    global categorization_flow_state, input_field
+    cmd_to_categorize = categorization_flow_state['command_to_add_final']
+    append_output(f"Choose category for the modified command '{cmd_to_categorize}':")
+    append_output("  1: simple")
+    append_output("  2: semi_interactive")
+    append_output("  3: interactive_tui")
+    if input_field:
+        input_field.prompt = "[Categorize] Category (1-3): "
+        input_field.buffer.accept_handler = _handle_step_4_5_response
+        get_app().invalidate()
+
+def _handle_step_4_5_response(buff):
+    global categorization_flow_state
+    response = buff.text.strip()
+    chosen_category = CATEGORY_MAP.get(response)
+
+    if chosen_category:
         categorization_flow_state.get('future').set_result({
             'action': 'categorize_and_execute',
             'command': categorization_flow_state['command_to_add_final'], 
-            'category': categorization_flow_state['chosen_category']
+            'category': chosen_category
         })
-    else: append_output("Invalid. (y/n)"); _ask_step_3_modify_command()
-
-def _ask_step_4_enter_modified_command():
-    global categorization_flow_state, input_field
-    default_cmd_for_editing = categorization_flow_state['command_to_add_final']
-    append_output(f"Enter the command string to save for categorization (default: '{default_cmd_for_editing}')")
-    if input_field:
-        input_field.prompt = f"[Categorize] Command to save (default: '{default_cmd_for_editing}'): "
-        input_field.buffer.text = default_cmd_for_editing 
-        input_field.buffer.cursor_position = len(default_cmd_for_editing)
-        input_field.buffer.accept_handler = _handle_step_4_response
-        get_app().invalidate()
-
-def _handle_step_4_response(buff):
-    global categorization_flow_state
-    final_command_str_to_add = buff.text.strip()
-    if not final_command_str_to_add: 
-        final_command_str_to_add = categorization_flow_state['command_to_add_final'] 
-        append_output(f"Empty input, using: '{final_command_str_to_add}'")
-    
-    categorization_flow_state['command_to_add_final'] = final_command_str_to_add 
-    categorization_flow_state.get('future').set_result({
-        'action': 'categorize_and_execute',
-        'command': final_command_str_to_add, 
-        'category': categorization_flow_state['chosen_category']
-    })
+    else:
+        append_output("Invalid category choice. Please enter 1, 2, or 3.")
+        _ask_step_4_5_category_for_modified() 
 
 def handle_cd_command(full_cd_command: str):
     global current_directory, input_field
@@ -433,8 +654,9 @@ def sanitize_and_validate(command: str, original_input_for_log: str):
 def execute_command_in_tmux(command_to_execute: str, original_user_input_display: str, category: str):
     try:
         unique_id = str(uuid.uuid4())[:8]; window_name = f"micro_x_{unique_id}"
-        if subprocess.call(["which", "tmux"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
-            append_output("Error: tmux not found. ❌"); logger.error("tmux not found."); return
+        if shutil.which("tmux") is None: 
+            append_output("Error: tmux not found. Please ensure tmux is installed. ❌"); logger.error("tmux not found."); return
+        
         if category == "semi_interactive":
             log_path = f"/tmp/micro_x_output_{unique_id}.log" 
             wrapped_command = f"bash -c '{command_to_execute} |& tee {log_path}; sleep {TMUX_SEMI_INTERACTIVE_SLEEP_SECONDS}'"
@@ -467,7 +689,7 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
                 subprocess.run(tmux_cmd_list, check=True) 
                 append_output(f"✅ Interactive tmux for '{original_user_input_display}' ended.")
             except subprocess.CalledProcessError as e: append_output(f"❌ Error in tmux session '{window_name}': {e}"); logger.error(f"Error for tmux cmd '{command_to_execute}': {e}")
-            except FileNotFoundError: append_output("Error: tmux not found. ❌"); logger.error("tmux not found for interactive_tui.")
+            except FileNotFoundError: append_output("Error: tmux not found. ❌"); logger.error("tmux not found for interactive_tui.") 
     except subprocess.CalledProcessError as e: append_output(f"❌ Error setting up tmux for '{command_to_execute}': {e}"); logger.exception(f"Error for tmux: {e}")
     except Exception as e: append_output(f"❌ Unexpected error with tmux: {e}"); logger.exception(f"Unexpected error with tmux: {e}")
 
@@ -515,55 +737,58 @@ except re.error as e:
     logger.critical(f"Failed to compile COMMAND_PATTERN: {e}", exc_info=True); COMMAND_PATTERN = None 
 _COMMAND_EXTRACT_GROUPS = list(range(1, 14)) 
 _UNSAFE_TAG_CONTENT_GROUP = 14
-
-# Regex to find common XML-like tags if they are the primary content
 _INNER_TAG_EXTRACT_PATTERN = re.compile(r"^\s*<([a-zA-Z0-9_:]+)(?:\s+[^>]*)?>([\s\S]*?)<\/\1>\s*$", re.DOTALL)
 
+async def _interpret_and_clean_ai_output(human_input: str) -> tuple[str | None, str | None]:
+    """
+    Internal: Calls Ollama for translation, parses, and cleans.
+    Returns (cleaned_command, raw_candidate_from_regex)
+    """
+    if COMMAND_PATTERN is None: return None, None
+    
+    raw_candidate_from_regex = None 
+    ollama_call_retries = 2 
+    retry_delay_seconds = 1 
+    last_exception_in_ollama_call = None 
 
-def interpret_human_input(human_input: str) -> str | None:
-    if COMMAND_PATTERN is None:
-        logger.error("COMMAND_PATTERN not compiled."); append_output("❌ Internal error: AI parser unavailable."); return None
-    retries, retry_delay_seconds = 2, 2
-    for attempt in range(retries + 1):
+    for attempt in range(ollama_call_retries + 1):
+        current_attempt_exception = None 
         try:
-            logger.info(f"To Ollama (model: {OLLAMA_MODEL}, attempt {attempt + 1}): '{human_input}'")
-            response = ollama.chat(model=OLLAMA_MODEL, messages=[
-                {'role': 'system', 'content': 'You are a helpful assistant that translates human language queries into a single, precise Linux command. Strictly enclose the Linux command within <bash></bash> tags. Do not add any other explanations, apologies, or text outside these tags. If the request is ambiguous, unsafe, or cannot be translated into a single command, respond with only "<unsafe>Cannot translate safely</unsafe>" or a similar message within <unsafe> tags.'},
-                {'role': 'user', 'content': f'Translate to a single Linux command: "{human_input}".'}
-            ])
+            logger.info(f"To Translation AI (model: {OLLAMA_MODEL}, attempt {attempt + 1}/{ollama_call_retries+1}): '{human_input}'")
+            response = await asyncio.to_thread(
+                ollama.chat, model=OLLAMA_MODEL, messages=[
+                    {'role': 'system', 'content': 'You are a helpful assistant that translates human language queries into a single, precise Linux command. Strictly enclose the Linux command within <bash></bash> tags. Do not add any other explanations, apologies, or text outside these tags. If the request is ambiguous, unsafe, or cannot be translated into a single command, respond with only "<unsafe>Cannot translate safely</unsafe>" or a similar message within <unsafe> tags.'},
+                    {'role': 'user', 'content': f'Translate to a single Linux command: "{human_input}".'}
+                ]
+            )
             ai_response = response['message']['content'].strip()
-            logger.debug(f"Raw AI response (attempt {attempt + 1}): {ai_response}")
+            logger.debug(f"Raw Translation AI response (attempt {attempt + 1}): {ai_response}")
             match = COMMAND_PATTERN.search(ai_response)
+            
             if match:
                 if COMMAND_PATTERN.groups >= _UNSAFE_TAG_CONTENT_GROUP and match.group(_UNSAFE_TAG_CONTENT_GROUP) is not None:
                     unsafe_message = match.group(_UNSAFE_TAG_CONTENT_GROUP).strip()
-                    logger.warning(f"AI unsafe query: '{human_input}'. AI Msg: '{unsafe_message}'"); append_output(f"⚠️ AI: {unsafe_message}"); return None
+                    logger.warning(f"Translation AI unsafe query: '{human_input}'. AI Msg: '{unsafe_message}'"); append_output(f"⚠️ AI: {unsafe_message}"); return None, None
+                
                 for group_index in _COMMAND_EXTRACT_GROUPS:
-                    if COMMAND_PATTERN.groups >= group_index and (command_candidate := match.group(group_index)) is not None:
-                        processed_candidate = command_candidate.strip()
-                        original_after_initial_strip = processed_candidate # For logging
-
-                        # Stage 0: Inner Tag Extraction (handles cases like ```<bash>cmd</bash>```)
+                    if COMMAND_PATTERN.groups >= group_index and (extracted_candidate := match.group(group_index)) is not None:
+                        if raw_candidate_from_regex is None: raw_candidate_from_regex = extracted_candidate.strip()
+                        processed_candidate = extracted_candidate.strip()
+                        
                         inner_match = _INNER_TAG_EXTRACT_PATTERN.match(processed_candidate)
                         if inner_match:
-                            # Check if the extracted tag is one we expect (e.g., bash, code, cmd)
-                            # This avoids misinterpreting something like "echo '<foo>bar</foo>'"
                             tag_name = inner_match.group(1).lower()
                             if tag_name in ["bash", "code", "cmd", "command", "pre"]:
                                 extracted_content = inner_match.group(2).strip()
-                                logger.debug(f"Inner tag <{tag_name}> extracted: '{processed_candidate}' -> '{extracted_content}'")
-                                processed_candidate = extracted_content
-                            else:
-                                logger.debug(f"Inner tag <{tag_name}> found but not one of the expected types for extraction. Original: '{processed_candidate}'")
+                                logger.debug(f"Inner tag <{tag_name}> extracted: '{processed_candidate}' -> '{extracted_content}'"); processed_candidate = extracted_content
+                            else: logger.debug(f"Inner tag <{tag_name}> found but not one of the expected types. Original: '{processed_candidate}'")
                         
-                        # Stage 1: Strip leading/trailing quotes or backticks
                         if len(processed_candidate) >= 2:
                             if processed_candidate.startswith("'") and processed_candidate.endswith("'"):
-                                processed_candidate = processed_candidate[1:-1].strip(); logger.debug(f"Stripped quotes from '{original_after_initial_strip}': -> '{processed_candidate}'")
+                                processed_candidate = processed_candidate[1:-1].strip(); logger.debug(f"Stripped quotes from '{extracted_candidate.strip()}': -> '{processed_candidate}'")
                             elif processed_candidate.startswith("`") and processed_candidate.endswith("`"):
-                                processed_candidate = processed_candidate[1:-1].strip(); logger.debug(f"Stripped backticks from '{original_after_initial_strip}': -> '{processed_candidate}'")
+                                processed_candidate = processed_candidate[1:-1].strip(); logger.debug(f"Stripped backticks from '{extracted_candidate.strip()}': -> '{processed_candidate}'")
                         
-                        # Stage 2: Handle "bash <cmd>" or "sh <cmd>" patterns
                         if (processed_candidate.lower().startswith("bash ") or processed_candidate.lower().startswith("sh ")) and len(processed_candidate) > 6:
                             prefix_len = 5 if processed_candidate.lower().startswith("bash ") else 3
                             potential_inner_cmd = processed_candidate[prefix_len:].strip()
@@ -573,46 +798,111 @@ def interpret_human_input(human_input: str) -> str | None:
                                     logger.debug(f"Stripped '{processed_candidate[:prefix_len]}<cmd>' pattern: '{processed_candidate}' -> '{inner_cmd_content}'"); processed_candidate = inner_cmd_content
                                 else: logger.debug(f"Retained '{processed_candidate[:prefix_len]}<cmd>' structure: '{processed_candidate}'")
                         
-                        # Stage 3: Strip general leading/trailing angle brackets if they are the outermost
-                        # This should ideally run *after* the "bash <cmd>" check to avoid conflict
                         if len(processed_candidate) >= 2 and processed_candidate.startswith("<") and processed_candidate.endswith(">"):
                             inner_content = processed_candidate[1:-1].strip()
                             if not any(c in inner_content for c in '<>|&;'): 
                                 logger.debug(f"Stripped general angle brackets: '{processed_candidate}' -> '{inner_content}'"); processed_candidate = inner_content
                             else: logger.debug(f"Retained general angle brackets: '{processed_candidate}'")
                         
-                        linux_command = processed_candidate.strip() 
-
-                        # Stage 4: Handle erroneously prepended slash
-                        if linux_command.startswith('/') and '/' not in linux_command[1:]:
-                            original_for_log = linux_command; linux_command = linux_command[1:]; logger.debug(f"Stripped leading slash: '{original_for_log}' -> '{linux_command}'")
+                        cleaned_linux_command = processed_candidate.strip() 
                         
-                        # Stage 5: Truncate to first command if multiple sequential commands are detected
-                        original_for_multicmd_log = linux_command
+                        if cleaned_linux_command.startswith('/') and '/' not in cleaned_linux_command[1:]:
+                            original_for_log = cleaned_linux_command; cleaned_linux_command = cleaned_linux_command[1:]; logger.debug(f"Stripped leading slash: '{original_for_log}' -> '{cleaned_linux_command}'")
+                        
+                        original_for_multicmd_log = cleaned_linux_command
                         try:
-                            first_command_match = re.match(r"^([^;&|]+)", linux_command)
+                            first_command_match = re.match(r"^([^;&|]+)", cleaned_linux_command)
                             if first_command_match:
                                 first_command_part = first_command_match.group(1).strip()
-                                if first_command_part != linux_command: logger.info(f"AI multi-cmd: '{original_for_multicmd_log}' truncated to: '{first_command_part}'"); linux_command = first_command_part
-                            elif any(sep in linux_command for sep in (';', '&&', '||')): logger.warning(f"AI cmd '{original_for_multicmd_log}' has separators but no clean first part. Discarding."); linux_command = "" 
-                        except Exception as e_shlex: logger.error(f"Multi-cmd heuristic error for '{original_for_multicmd_log}': {e_shlex}. Using as is."); linux_command = original_for_multicmd_log 
+                                if first_command_part != cleaned_linux_command: logger.info(f"AI multi-cmd: '{original_for_multicmd_log}' truncated to: '{first_command_part}'"); cleaned_linux_command = first_command_part
+                            elif any(sep in cleaned_linux_command for sep in (';', '&&', '||')): logger.warning(f"AI cmd '{original_for_multicmd_log}' has separators but no clean first part. Discarding."); cleaned_linux_command = "" 
+                        except Exception as e_shlex: logger.error(f"Multi-cmd heuristic error for '{original_for_multicmd_log}': {e_shlex}. Using as is."); cleaned_linux_command = original_for_multicmd_log 
                         
-                        if linux_command and not linux_command.lower().startswith(("sorry", "i cannot", "unable to", "cannot translate")):
-                            logger.info(f"AI interpreted '{human_input}' as: '{linux_command}' (group {group_index}, after all stripping)"); return linux_command
-                logger.warning(f"AI response matched but no valid cmd extracted. Response: {ai_response}")
-            else: logger.error(f"AI response no match: {ai_response}")
-            if attempt < retries: logger.info(f"Retrying Ollama (attempt {attempt + 2}/{retries + 1}) for '{human_input}'."); time.sleep(retry_delay_seconds)
-            else: append_output("AI failed to provide usable command."); logger.error(f"Ollama parsing failed for '{human_input}'. Last AI: {ai_response}"); return None 
-        except ollama.ResponseError as e: append_output(f"❌ Ollama API Error: {e}"); logger.error(f"Ollama API Error: {e}", exc_info=True); return None 
-        except ollama.RequestError as e: append_output(f"❌ Ollama Connection Error: {e}"); logger.error(f"Ollama Connection Error: {e}", exc_info=True)
-        except Exception as e: append_output(f"❌ AI Processing Error: {e}"); logger.exception(f"Unexpected error in interpret_human_input for '{human_input}'") 
-        if attempt < retries and not isinstance(e, ollama.ResponseError): 
-            logger.info(f"Retrying after error (attempt {attempt + 2}/{retries + 1}) for '{human_input}'."); time.sleep(retry_delay_seconds)
+                        if cleaned_linux_command and not cleaned_linux_command.lower().startswith(("sorry", "i cannot", "unable to", "cannot translate")):
+                            logger.debug(f"_interpret_and_clean_ai_output returning: '{cleaned_linux_command}', raw: '{raw_candidate_from_regex}'")
+                            return cleaned_linux_command, raw_candidate_from_regex 
+                logger.warning(f"Translation AI response matched but no valid cmd extracted. Response: {ai_response}") 
+            else: 
+                logger.error(f"Translation AI response no match: {ai_response}") 
+            
+            if attempt < ollama_call_retries:
+                logger.info(f"Retrying Translation AI call due to parsing/match failure (internal attempt {attempt + 2}/{ollama_call_retries+1}) for '{human_input}'."); 
+                await asyncio.sleep(retry_delay_seconds) 
+                continue 
+            else: 
+                logger.error(f"Translation AI parsing/match failed for '{human_input}' after {ollama_call_retries+1} internal attempts. Last AI: {ai_response}"); 
+                return None, raw_candidate_from_regex 
+        
+        except ollama.ResponseError as e_resp: 
+            current_attempt_exception = e_resp 
+            append_output(f"❌ Ollama API Error (Translation): {e_resp}"); logger.error(f"Ollama API Error (Translation): {e_resp}", exc_info=True); 
+            return None, raw_candidate_from_regex 
+        except ollama.RequestError as e_req: 
+            current_attempt_exception = e_req
+            append_output(f"❌ Ollama Connection Error (Translation): {e_req}"); logger.error(f"Ollama Connection Error (Translation): {e_req}", exc_info=True)
+        except Exception as e_gen: 
+            current_attempt_exception = e_gen
+            append_output(f"❌ AI Processing Error (Translation): {e_gen}"); logger.exception(f"Unexpected error in _interpret_and_clean_ai_output for '{human_input}'") 
+        
+        if current_attempt_exception:
+            last_exception_in_ollama_call = current_attempt_exception
+            if attempt < ollama_call_retries and not isinstance(current_attempt_exception, ollama.ResponseError): 
+                logger.info(f"Retrying Translation AI call after error '{type(current_attempt_exception).__name__}' (internal attempt {attempt + 2}/{ollama_call_retries+1}) for '{human_input}'."); 
+                await asyncio.sleep(retry_delay_seconds) 
+            else: 
+                logger.error(f"All Translation AI call attempts failed for '{human_input}'. Last error: {current_attempt_exception}")
+                return None, raw_candidate_from_regex
+            
+    logger.error(f"_interpret_and_clean_ai_output exhausted all internal retries for '{human_input}'. Last exception: {last_exception_in_ollama_call}")
+    return None, raw_candidate_from_regex
+
+
+async def get_validated_ai_command(human_query: str) -> tuple[str | None, str | None]:
+    """
+    Gets a command from the Translation AI and validates its output using the Validator AI.
+    Retries the entire translation-validation cycle up to TRANSLATION_VALIDATION_CYCLES.
+    Returns (validated_command, raw_ai_candidate_from_first_successful_regex_match) or (None, None).
+    """
+    logger.info(f"Attempting validated translation for: '{human_query}'")
+    last_raw_candidate = None 
+
+    for i in range(TRANSLATION_VALIDATION_CYCLES):
+        append_output(f"🧠 AI translation & validation cycle {i+1}/{TRANSLATION_VALIDATION_CYCLES} for: '{human_query}'")
+        if get_app().is_running : get_app().invalidate()
+
+        cleaned_command, raw_candidate = await _interpret_and_clean_ai_output(human_query)
+        if raw_candidate and last_raw_candidate is None: 
+            last_raw_candidate = raw_candidate
+
+        if cleaned_command:
+            append_output(f"🤖 AI translated to: '{cleaned_command}'. Validating with AI Validator...")
+            if get_app().is_running : get_app().invalidate()
+            
+            is_valid_by_validator = await is_valid_linux_command_according_to_ai(cleaned_command)
+
+            if is_valid_by_validator is True:
+                logger.info(f"Validator AI confirmed translated command: '{cleaned_command}'")
+                append_output(f"✅ AI Validator confirmed: '{cleaned_command}'")
+                return cleaned_command, raw_candidate 
+            elif is_valid_by_validator is False:
+                logger.warning(f"Validator AI rejected translated command '{cleaned_command}'.")
+                append_output(f"❌ AI Validator rejected: '{cleaned_command}'.")
+            else: # None (inconclusive)
+                logger.warning(f"Validator AI inconclusive for translated command '{cleaned_command}'.")
+                append_output(f"⚠️ AI Validator inconclusive for: '{cleaned_command}'.")
         else: 
-            if isinstance(e, ollama.RequestError) : append_output("AI connection failed.")
-            logger.error(f"All Ollama attempts failed for '{human_input}'. Last error: {e if 'e' in locals() else 'Unknown'}")
-            return None
-    logger.error(f"interpret_human_input exhausted retries for '{human_input}'"); return None
+            logger.warning(f"Main AI translation (cycle {i+1}) failed to produce a command for '{human_query}'.")
+        
+        if i < TRANSLATION_VALIDATION_CYCLES - 1:
+            append_output(f"Retrying translation & validation cycle for '{human_query}'...")
+            await asyncio.sleep(1) 
+        else:
+            logger.error(f"All {TRANSLATION_VALIDATION_CYCLES} translation & validation cycles failed for '{human_query}'.")
+            append_output(f"❌ AI failed to produce a validated command for '{human_query}' after {TRANSLATION_VALIDATION_CYCLES} cycles.")
+            return None, last_raw_candidate 
+
+    return None, last_raw_candidate
+
 
 # --- Command Categorization Subsystem (Now uses full command strings) ---
 def load_command_categories() -> dict:
