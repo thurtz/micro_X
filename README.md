@@ -36,16 +36,16 @@ micro\_X is designed to be adaptable and has specific setup guidance for the fol
 
 * **Linux Mint (and compatible Debian-based systems):**  
   * Automated setup script: setup.sh (or setup\_micro\_x\_mint.sh)  
-  * Detailed instructions: [setup\_micro\_x\_mint.md](http://docs.google.com/setup_micro_x_mint.md)  
+  * Detailed instructions: [setup\_micro\_x\_mint.md](https://github.com/thurtz/micro_X/blob/main/setup_micro_x_mint.md)  
 * **macOS:**  
   * Automated setup script: setup\_micro\_x\_mac.sh  
-  * Detailed instructions: [setup\_micro\_x\_mac.md](http://docs.google.com/setup_micro_x_mac.md)  
+  * Detailed instructions: [setup\_micro\_x\_mac.md](https://github.com/thurtz/micro_X/blob/main/setup_micro_x_mac.md)  
 * **Termux (Android):**  
   * Setup script (guides through Termux-specific steps): setup\_micro\_x\_termux.sh  
-  * Detailed instructions: [setup\_micro\_x\_termux.md](http://docs.google.com/setup_micro_x_termux.md)  
+  * Detailed instructions: [setup\_micro\_x\_termux.md](https://github.com/thurtz/micro_X/blob/main/setup_micro_x_termux.md)  
 * **WSL (Windows Subsystem for Linux):**  
   * Setup script (for within WSL, assumes Ollama on Windows host): setup\_micro\_x\_wsl.sh  
-  * Detailed instructions: [setup\_micro\_x\_wsl.md](http://docs.google.com/setup_micro_x_wsl.md)
+  * Detailed instructions: [setup\_micro\_x\_wsl.md](https://github.com/thurtz/micro_X/blob/main/setup_micro_x_wsl.md)
 
 **General Prerequisites (Common across platforms, details in specific setup guides):**
 
@@ -64,12 +64,22 @@ micro\_X is designed to be adaptable and has specific setup guidance for the fol
    git clone https://github.com/thurtz/micro\_X.git  
    cd micro\_X
 
-2. **Run the Appropriate Setup Script** for your platform (e.g., ./setup.sh or ./setup\_micro\_x\_mac.sh). These scripts typically:  
+2. **Navigate to the micro\_X directory.**  
+3. Make the appropriate setup script executable:  
+   For example, for Linux Mint:  
+   chmod \+x setup\_micro\_x\_mint.sh
+
+   (Use setup\_micro\_x\_mac.sh for macOS, setup\_micro\_x\_termux.sh for Termux, or setup\_micro\_x\_wsl.sh for WSL).  
+4. Run the Setup Script:  
+   For example:  
+   ./setup\_micro\_x\_mint.sh
+
+   These scripts typically:  
    * Check and help install system dependencies.  
    * Guide Ollama setup and model pulling.  
    * Create a Python virtual environment (.venv).  
    * Install Python packages from requirements.txt.  
-   * Make scripts executable.  
+   * Make other necessary scripts executable.  
    * Handle platform-specific configurations (like .desktop files or aliases).
 
 ## **Usage**
@@ -77,7 +87,8 @@ micro\_X is designed to be adaptable and has specific setup guidance for the fol
 1. **Ensure Ollama is Running** (on your host machine or as per your platform's setup).  
 2. **Launch micro\_X:**  
    * **Desktop Menu:** If a .desktop entry was installed (Linux Mint), look for "micro\_X".  
-   * **Using the Launch Script (Recommended for Terminal):**  
+   * Using the Launch Script (Recommended for Terminal):  
+     From within the micro\_X directory:  
      ./micro\_X.sh
 
    * **Manually (from the micro\_X directory):**  
