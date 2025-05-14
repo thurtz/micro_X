@@ -23,7 +23,6 @@ import json
 import time
 import shutil
 import hashlib # For checking file changes
-import sys # Added for /utils command to use the current Python interpreter
 
 # --- Configuration Constants (File Names & Static Values) ---
 LOG_DIR = "logs"
@@ -33,7 +32,6 @@ USER_CATEGORY_FILENAME = "user_command_categories.json"
 HISTORY_FILENAME = ".micro_x_history"
 REQUIREMENTS_FILENAME = "requirements.txt"
 UNKNOWN_CATEGORY_SENTINEL = "##UNKNOWN_CATEGORY##"
-UTILS_DIR_NAME = "utils" # Added for /utils command
 
 # --- Path Setup ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -44,8 +42,6 @@ DEFAULT_CATEGORY_PATH = os.path.join(SCRIPT_DIR, CONFIG_DIR, DEFAULT_CATEGORY_FI
 USER_CATEGORY_PATH = os.path.join(SCRIPT_DIR, CONFIG_DIR, USER_CATEGORY_FILENAME)
 HISTORY_FILE_PATH = os.path.join(SCRIPT_DIR, HISTORY_FILENAME)
 REQUIREMENTS_FILE_PATH = os.path.join(SCRIPT_DIR, REQUIREMENTS_FILENAME)
-UTILS_DIR_PATH = os.path.join(SCRIPT_DIR, UTILS_DIR_NAME) # Added for /utils command
-os.makedirs(UTILS_DIR_PATH, exist_ok=True) # Ensure utils directory exists
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -60,7 +56,7 @@ logger = logging.getLogger(__name__)
 # --- Global Configuration ---
 config = {}
 DEFAULT_CONFIG_FILENAME = "default_config.json" # For general app settings
-USER_CONFIG_FILENAME = "user_config.json"      # For user overrides of general settings
+USER_CONFIG_FILENAME = "user_config.json"       # For user overrides of general settings
 
 def merge_configs(base, override):
     """Recursively merges override dict into base dict."""
@@ -390,131 +386,13 @@ async def handle_update_command():
                 append_output("✅ Updates downloaded.")
                 if original_req_hash != get_file_hash(REQUIREMENTS_FILE_PATH): requirements_changed = True; append_output("⚠️ requirements.txt changed."); logger.info("requirements.txt changed.")
                 append_output("💡 Restart micro_X for changes.")
-                if requirements_changed: append_output(f"💡 After restart, update dependencies:\n    cd \"{SCRIPT_DIR}\"\n    source .venv/bin/activate\n    pip install -r {REQUIREMENTS_FILENAME}")
+                if requirements_changed: append_output(f"💡 After restart, update dependencies:\n   cd \"{SCRIPT_DIR}\"\n   source .venv/bin/activate\n   pip install -r {REQUIREMENTS_FILENAME}")
         else: append_output(f"❌ Git pull failed.\nError:\n{pull_process.stderr.strip()}"); logger.error(f"Git pull failed. Stderr: {pull_process.stderr.strip()}")
     except subprocess.CalledProcessError as e: append_output(f"❌ Update failed: git error.\n{e.stderr}"); logger.error(f"Update git error: {e}", exc_info=True)
     except FileNotFoundError: append_output("❌ Update failed: 'git' not found."); logger.error("Update failed: git not found.")
     except Exception as e: append_output(f"❌ Unexpected error during update: {e}"); logger.error(f"Unexpected update error: {e}", exc_info=True)
     finally:
         if get_app().is_running: get_app().invalidate()
-
-# --- Utils Command Helper ---
-async def handle_utils_command_async(full_command_str: str):
-    """Handles /utils subcommands to run scripts from the utils directory."""
-    logger.info(f"Handling /utils command: {full_command_str}")
-    append_output(f"🛠️ Processing /utils command...") # Simplified initial message
-    if get_app().is_running: get_app().invalidate()
-
-    try:
-        parts = shlex.split(full_command_str)
-    except ValueError as e:
-        append_output(f"❌ Error parsing /utils command: {e}")
-        logger.warning(f"shlex error for /utils '{full_command_str}': {e}")
-        if get_app().is_running: get_app().invalidate()
-        return
-
-    utils_help_message = "ℹ️ Usage: /utils <script_name_no_ext> [args...] | list | help"
-
-    if len(parts) < 2: # Only "/utils"
-        append_output(utils_help_message)
-        logger.debug("Insufficient arguments for /utils command.")
-        if get_app().is_running: get_app().invalidate()
-        return
-
-    subcommand_or_script_name = parts[1]
-    args = parts[2:]
-    
-    if subcommand_or_script_name.lower() in ["list", "help"]:
-        try:
-            if not os.path.exists(UTILS_DIR_PATH) or not os.path.isdir(UTILS_DIR_PATH):
-                append_output(f"❌ Utility directory '{UTILS_DIR_NAME}' not found at '{UTILS_DIR_PATH}'.")
-                logger.error(f"Utility directory not found: {UTILS_DIR_PATH}")
-                if get_app().is_running: get_app().invalidate()
-                return
-
-            available_scripts = [
-                f[:-3] for f in os.listdir(UTILS_DIR_PATH) # Use UTILS_DIR_PATH
-                if os.path.isfile(os.path.join(UTILS_DIR_PATH, f)) and f.endswith(".py") and f != "__init__.py"
-            ]
-            if available_scripts:
-                append_output("Available utility scripts (run with /utils <script_name>):")
-                for script_name in sorted(available_scripts):
-                    append_output(f"  - {script_name}")
-            else:
-                append_output(f"No executable Python utility scripts found in '{UTILS_DIR_NAME}'.")
-            logger.info(f"Listed utils scripts: {available_scripts}")
-        except Exception as e:
-            append_output(f"❌ Error listing utility scripts: {e}")
-            logger.error(f"Error listing utility scripts: {e}", exc_info=True)
-        finally:
-            if get_app().is_running: get_app().invalidate()
-        return
-
-    # Assume it's a script name
-    script_filename = f"{subcommand_or_script_name}.py"
-    script_path = os.path.join(UTILS_DIR_PATH, script_filename) # Use UTILS_DIR_PATH
-
-    if not os.path.isfile(script_path):
-        append_output(f"❌ Utility script not found: {script_filename} in '{UTILS_DIR_NAME}' directory.")
-        logger.warning(f"Utility script not found: {script_path}")
-        append_output(utils_help_message) # Show help if script not found
-        if get_app().is_running: get_app().invalidate()
-        return
-
-    # Use sys.executable to ensure the script is run with the same Python interpreter
-    command_to_execute_list = [sys.executable, script_path] + args
-    # For logging, create a string representation that's easier to read
-    command_str_for_display = f"{sys.executable} {script_path} {' '.join(args)}"
-
-
-    append_output(f"🚀 Executing utility: {command_str_for_display}\n   (Working directory: {SCRIPT_DIR})")
-    logger.info(f"Executing utility script: {command_to_execute_list} with cwd={SCRIPT_DIR}")
-    if get_app().is_running: get_app().invalidate()
-
-    try:
-        # Using asyncio.to_thread for subprocess.run to keep it non-blocking
-        process = await asyncio.to_thread(
-            subprocess.run,
-            command_to_execute_list,
-            capture_output=True,
-            text=True,
-            cwd=SCRIPT_DIR, # Run with SCRIPT_DIR as CWD
-            check=False,    # Don't raise CalledProcessError, handle returncode manually
-            errors='replace'# Handle potential encoding errors in output
-        )
-        
-        output_prefix = f"Output from '{script_filename}':\n"
-        has_output = False
-        if process.stdout:
-            append_output(f"{output_prefix}{process.stdout.strip()}")
-            has_output = True
-        if process.stderr:
-            append_output(f"Stderr from '{script_filename}':\n{process.stderr.strip()}")
-            has_output = True
-        
-        if not has_output and process.returncode == 0:
-            append_output(f"{output_prefix}(No output)")
-
-        if process.returncode != 0:
-            append_output(f"⚠️ Utility '{script_filename}' exited with code {process.returncode}.")
-            logger.warning(f"Utility script '{script_path}' exited with code {process.returncode}. Args: {args}")
-        else:
-            # Only show success if there was no error message already from stderr
-            if not process.stderr: # Or if stderr was just warnings and not errors. This is a simplification.
-                 append_output(f"✅ Utility '{script_filename}' completed.")
-            logger.info(f"Utility script '{script_path}' completed with code {process.returncode}. Args: {args}")
-
-    except FileNotFoundError: 
-        # This could happen if sys.executable is somehow invalid, though unlikely.
-        # The script_path itself is checked with os.path.isfile earlier.
-        append_output(f"❌ Error: Python interpreter ('{sys.executable}') or script ('{script_filename}') not found.")
-        logger.error(f"FileNotFoundError executing utility: {command_to_execute_list}", exc_info=True)
-    except Exception as e:
-        append_output(f"❌ Unexpected error executing utility '{script_filename}': {e}")
-        logger.error(f"Error executing utility script '{script_path}': {e}", exc_info=True)
-    finally:
-        if get_app().is_running: get_app().invalidate()
-
 
 # --- General Help Function ---
 def display_general_help():
@@ -523,15 +401,13 @@ def display_general_help():
         "micro_X AI-Enhanced Shell - Help\n",
         "Welcome to micro_X! An intelligent shell that blends traditional command execution with AI capabilities.",
         "\nAvailable Commands:",
-        "  /ai <query>           - Translate natural language <query> into a Linux command.",
-        "                          Example: /ai list all text files in current folder",
+        "  /ai <query>          - Translate natural language <query> into a Linux command.",
+        "                         Example: /ai list all text files in current folder",
         "  /command <subcommand> - Manage command categorizations (simple, semi_interactive, interactive_tui).",
-        "                          Type '/command help' for detailed options.",
-        "  /utils <script> [args] - Run a utility script from the 'utils' directory.",
-        "                          Type '/utils list' or '/utils help' for available scripts.", # Added /utils help
-        "  /update               - Check for and download updates for micro_X from its repository.",
-        "  /help                 - Display this help message.",
-        "  exit | quit           - Exit the micro_X shell.",
+        "                         Type '/command help' for detailed options.",
+        "  /update              - Check for and download updates for micro_X from its repository.",
+        "  /help                - Display this help message.",
+        "  exit | quit          - Exit the micro_X shell.",
         "\nDirect Commands:",
         "  You can type standard Linux commands directly (e.g., 'ls -l', 'cd my_folder').",
         "  Unknown commands will trigger an interactive categorization flow.",
@@ -563,17 +439,7 @@ async def handle_input_async(user_input: str):
     if user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
         append_output("Exiting micro_X Shell 🚪"); logger.info("Exit command received.")
         if get_app().is_running: get_app().exit(); return
-    
-    if user_input_stripped.lower() == "/update": 
-        await handle_update_command()
-        return
-    
-    # --- BEGIN /utils command integration ---
-    if user_input_stripped.startswith("/utils"): # Handles "/utils" and "/utils "
-        await handle_utils_command_async(user_input_stripped)
-        return
-    # --- END /utils command integration ---
-
+    if user_input_stripped.lower() == "/update": await handle_update_command(); return
     if user_input_stripped.startswith("/ai "):
         human_query = user_input_stripped[len("/ai "):].strip()
         if not human_query: append_output("⚠️ AI query empty."); return
@@ -585,10 +451,7 @@ async def handle_input_async(user_input: str):
             await process_command(linux_command, f"/ai {human_query} -> {linux_command}", ai_raw_candidate, None)
         else: append_output("🤔 AI could not produce a validated command.")
         return
-    
-    if user_input_stripped.startswith("/command"): 
-        handle_command_subsystem_input(user_input_stripped)
-        return
+    if user_input_stripped.startswith("/command"): handle_command_subsystem_input(user_input_stripped); return
     
     category = classify_command(user_input_stripped) # classify_command uses the merged view
     if category != UNKNOWN_CATEGORY_SENTINEL:
@@ -656,8 +519,8 @@ async def process_command(command_str_original: str, original_user_input_for_dis
             category = chosen_cat_for_json # This is now the determined category
             logger.info(f"Command '{command_to_be_added_if_new}' categorized as '{category}'.")
             if command_to_be_added_if_new != command_str_original: # If user modified the command
-                logger.info(f"Using '{command_to_be_added_if_new}' for execution, overriding '{command_str_original}'.")
-                command_str_original = command_to_be_added_if_new # Update for expansion
+                 logger.info(f"Using '{command_to_be_added_if_new}' for execution, overriding '{command_str_original}'.")
+                 command_str_original = command_to_be_added_if_new # Update for expansion
         else: # 'execute_as_default' or other unhandled action
             category = config['behavior']['default_category_for_unclassified']
             append_output(f"Executing '{command_for_classification}' as default '{category}'."); logger.info(f"Command '{command_for_classification}' executed with default category '{category}'.")
@@ -1142,7 +1005,7 @@ def run_shell():
         base_name = os.path.basename(current_directory)
         initial_prompt_dir = base_name if len(base_name) <= max_prompt_len else "..." + base_name[-(max_prompt_len - 3):] if (max_prompt_len - 3) > 0 else "..."
     
-    output_field = TextArea(text="Welcome to micro_X Shell 🚀\nType '/ai query' or a command. '/help' for general help. '/command help' for category options. '/utils help' for utils. '/update' for new code.\n", style='class:output-field', scrollbar=True, focusable=False, wrap_lines=True, read_only=True)
+    output_field = TextArea(text="Welcome to micro_X Shell 🚀\nType '/ai query' or a command. '/help' for general help. '/command help' for category options. '/update' for new code.\n", style='class:output-field', scrollbar=True, focusable=False, wrap_lines=True, read_only=True)
     if not output_buffer: output_buffer.append(output_field.text) # Initialize buffer with welcome message
     
     input_field = TextArea(prompt=f"({initial_prompt_dir}) > ", style='class:input-field', multiline=True, wrap_lines=False, history=history, accept_handler=normal_input_accept_handler, height=config['behavior']['input_field_height'])
