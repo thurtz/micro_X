@@ -9,7 +9,9 @@ micro_X
 |   └── user_config.json
 ├── docs/
 |   ├── generate_snapshot.md
-|   └── generate_tree.md
+|   ├── generate_tree.md
+|   ├── micro_X_User_Guide.md
+|   └── micro_x_testing_plan.md
 ├── utils/
 |   ├── generate_snapshot.py
 |   └── generate_tree.py
@@ -19,11 +21,9 @@ micro_X
 ├── README.md
 ├── ai_analysis_of_micro_X_2025_05_13.md
 ├── main.py
+├── micro_X-A_Technical_Whitepaper_2025_05_12.md
 ├── micro_X.desktop
 ├── micro_X.sh
-├── micro_X_ An_AI-Enhanced_Command-Line_Interface-A_Technical_Whitepaper_2025_05_12.md
-├── micro_X_User_Guide.md
-├── micro_x_testing_plan.md
 ├── requirements.txt
 ├── setup_micro_x_mac.md
 ├── setup_micro_x_mac.sh
