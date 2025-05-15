@@ -9,8 +9,8 @@
     "tmux_semi_interactive_sleep_seconds": 1
   },
   "behavior": {
-    "input_field_height": 3,
-    "default_category_for_unclassified": "simple",
+    "input_field_height": 4,
+    "default_category_for_unclassified": "semi_interactive",
     "validator_ai_attempts": 3,
     "translation_validation_cycles": 3,
     "ai_retry_delay_seconds": 1,
