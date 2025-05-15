@@ -139,9 +139,9 @@ def classify_command(cmd: str) -> str:
         logger.warning("Categories not loaded. Attempting to load now.")
         load_and_merge_command_categories() # Attempt to load if not already
         if not _CURRENTLY_LOADED_CATEGORIES: # Still not loaded (e.g. paths not set)
-            logger.error("Cannot classify command: categories are not loaded and path might be uninitialized.")
-            return UNKNOWN_CATEGORY_SENTINEL
-            
+             logger.error("Cannot classify command: categories are not loaded and path might be uninitialized.")
+             return UNKNOWN_CATEGORY_SENTINEL
+             
     if not cmd: # Empty command string
         return UNKNOWN_CATEGORY_SENTINEL
         
@@ -265,8 +265,8 @@ def list_categorized_commands():
         logger.warning("Categories not loaded. Attempting to load for listing.")
         load_and_merge_command_categories()
         if not _CURRENTLY_LOADED_CATEGORIES:
-            _append_output_func_ref("❌ Error: Categories could not be loaded for listing.", style_class='error')
-            return
+             _append_output_func_ref("❌ Error: Categories could not be loaded for listing.", style_class='error')
+             return
 
     _append_output_func_ref("📄 Current command categories (defaults + user overrides):", style_class='info-header') 
     
@@ -280,7 +280,7 @@ def list_categorized_commands():
         
         if full_commands_in_cat:
             for cmd in full_commands_in_cat:
-                _append_output_func_ref(f"  - {cmd}", style_class='info-item') 
+                   _append_output_func_ref(f"  - {cmd}", style_class='info-item') 
         else:
             _append_output_func_ref("  (No commands in this category)", style_class='info-item-empty') 
     _append_output_func_ref("") # Add a blank line at the end for spacing
@@ -294,37 +294,33 @@ def move_command_category(full_cmd_to_move: str, new_category_input: str):
     add_command_to_category(full_cmd_to_move, new_category_input)
 
 
-def handle_command_subsystem_input(input_str: str): # Modified to return action for 'run'
-    """
-    Parses and handles '/command' subcommands.
-    Returns a dictionary for 'run' action, None otherwise.
-    """
+def handle_command_subsystem_input(input_str: str):
+    """Parses and handles '/command' subcommands."""
     if not _append_output_func_ref:
         logger.error("append_output function not available for /command subsystem.")
-        return None # Indicate no action for main.py
+        return
         
     try:
         parts = shlex.split(input_str.strip())
     except ValueError as e:
         _append_output_func_ref(f"❌ Error parsing /command: {e}", style_class='error')
         logger.warning(f"shlex error for /command '{input_str}': {e}")
-        return None 
+        return 
 
     cmd_help = (f"ℹ️ /command usage:\n" 
-                f"  add \"<cmd>\" <cat>          - Add command to a category.\n"
-                f"  remove \"<cmd>\"             - Remove command from your settings.\n"
-                f"  list                       - List all categorized commands.\n"
-                f"  move \"<cmd>\" <new_cat>     - Move command to a new category.\n"
-                f"  run <cat_num|cat_name> \"<cmd>\" - Force run command with category.\n" # New help line
-                f"  help                       - Show this help message.\n"
-                f"Categories: 1/simple, 2/semi_interactive, 3/interactive_tui\n"
-                f"  simple: {CATEGORY_DESCRIPTIONS['simple']}\n"
-                f"  semi_interactive: {CATEGORY_DESCRIPTIONS['semi_interactive']}\n"
-                f"  interactive_tui: {CATEGORY_DESCRIPTIONS['interactive_tui']}")
+                  f"  add \"<cmd>\" <cat>    - Add command to a category.\n"
+                  f"  remove \"<cmd>\"       - Remove command from your settings.\n"
+                  f"  list                 - List all categorized commands.\n"
+                  f"  move \"<cmd>\" <new_cat> - Move command to a new category.\n"
+                  f"  help                 - Show this help message.\n"
+                  f"Categories: 1/simple, 2/semi_interactive, 3/interactive_tui\n"
+                  f"  simple: {CATEGORY_DESCRIPTIONS['simple']}\n"
+                  f"  semi_interactive: {CATEGORY_DESCRIPTIONS['semi_interactive']}\n"
+                  f"  interactive_tui: {CATEGORY_DESCRIPTIONS['interactive_tui']}")
 
     if len(parts) < 2 or parts[0] != "/command":
         _append_output_func_ref(f"❌ Invalid /command structure.\n{cmd_help}", style_class='error')
-        return None 
+        return 
         
     subcmd = parts[1].lower()
     
@@ -348,23 +344,7 @@ def handle_command_subsystem_input(input_str: str): # Modified to return action 
             move_command_category(parts[2], parts[3])
         else:
             _append_output_func_ref(f"❌ Usage: /command move \"<full_command_string>\" <new_category_name_or_number>\n{cmd_help}", style_class='error') 
-    elif subcmd == "run": # New subcommand
-        if len(parts) == 4:
-            category_input = parts[2]
-            command_to_run = parts[3]
-            
-            resolved_category = CATEGORY_MAP.get(category_input.lower())
-            if not resolved_category:
-                 _append_output_func_ref(f"❌ Invalid category for 'run': '{category_input}'. Use number (1-3) or name.\n{cmd_help}", style_class='error')
-                 return None
-            
-            logger.info(f"/command run: category '{resolved_category}', command '{command_to_run}'")
-            return {'action': 'force_run', 'command': command_to_run, 'category': resolved_category}
-        else:
-            _append_output_func_ref(f"❌ Usage: /command run <category_name_or_number> \"<full_command_string>\"\n{cmd_help}", style_class='error')
     elif subcmd == "help":
         _append_output_func_ref(cmd_help, style_class='help-base') 
     else:
         _append_output_func_ref(f"❌ Unknown /command subcommand '{subcmd}'.\n{cmd_help}", style_class='error')
-    
-    return None # Default return if not 'run' or error handled by printing help
