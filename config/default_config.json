@@ -14,7 +14,9 @@
     "validator_ai_attempts": 3,
     "translation_validation_cycles": 3,
     "ai_retry_delay_seconds": 1,
-    "ollama_api_call_retries": 2 
+    "ollama_api_call_retries": 2,
+    "tui_detection_line_threshold_pct": 30.0,
+    "tui_detection_char_threshold_pct": 3.0
   },
   "ui": {
     "max_prompt_length": 20

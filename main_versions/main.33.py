@@ -40,8 +40,6 @@ from modules.category_manager import (
     CATEGORY_DESCRIPTIONS as CM_CATEGORY_DESCRIPTIONS # Aliased
 )
 
-from modules.output_analyzer import is_tui_like_output
-
 # --- Configuration Constants (File Names & Static Values) ---
 LOG_DIR = "logs"
 CONFIG_DIR = "config"
@@ -789,89 +787,57 @@ def sanitize_and_validate(command: str, original_input_for_log: str) -> str | No
 def execute_command_in_tmux(command_to_execute: str, original_user_input_display: str, category: str):
     try:
         unique_id = str(uuid.uuid4())[:8]; window_name = f"micro_x_{unique_id}"
-        if shutil.which("tmux") is None: append_output("❌ Error: tmux not found. Cannot execute semi_interactive or interactive_tui commands.", style_class='error'); logger.error("tmux not found."); return
-
+        if shutil.which("tmux") is None: append_output("❌ Error: tmux not found. Cannot execute semi_interactive or interactive_tui commands.", style_class='error'); logger.error("tmux not found."); return 
+        
         tmux_poll_timeout = config['timeouts']['tmux_poll_seconds']
         tmux_sleep_after = config['timeouts']['tmux_semi_interactive_sleep_seconds']
-        tmux_log_base = config.get('paths', {}).get('tmux_log_base_path', '/tmp')
+        tmux_log_base = config.get('paths', {}).get('tmux_log_base_path', '/tmp') 
 
         if category == "semi_interactive":
-            os.makedirs(tmux_log_base, exist_ok=True)
-            log_path = os.path.join(tmux_log_base, f"micro_x_output_{unique_id}.log")
-
+            os.makedirs(tmux_log_base, exist_ok=True) 
+            log_path = os.path.join(tmux_log_base, f"micro_x_output_{unique_id}.log") 
+            
             replacement_for_single_quote = "'\"'\"'"; escaped_command_str = command_to_execute.replace("'", replacement_for_single_quote)
             wrapped_command = f"bash -c '{escaped_command_str}' |& tee {log_path}; sleep {tmux_sleep_after}"
-
+            
             tmux_cmd_list_launch = ["tmux", "new-window", "-n", window_name, wrapped_command]
             logger.info(f"Executing semi_interactive tmux (non-detached): {tmux_cmd_list_launch} (log: {log_path})")
-
+            
             subprocess.run(tmux_cmd_list_launch, check=True, cwd=current_directory)
 
-            append_output(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output (max {tmux_poll_timeout}s)...", style_class='info')
-            start_time = time.time(); output_captured = False; window_closed_or_cmd_done = False
+            append_output(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output (max {tmux_poll_timeout}s)...", style_class='info') 
+            start_time = time.time(); output_captured = False; window_closed_or_cmd_done = False 
 
             while time.time() - start_time < tmux_poll_timeout:
-                time.sleep(1)
+                time.sleep(1) 
                 try:
                     result = subprocess.run(["tmux", "list-windows", "-F", "#{window_name}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="ignore", check=True)
                     if window_name not in result.stdout:
                         logger.info(f"Tmux window '{window_name}' closed or command finished.")
                         window_closed_or_cmd_done = True
-                        break
+                        break 
                 except (subprocess.CalledProcessError, FileNotFoundError) as tmux_err:
                     logger.warning(f"Error checking tmux windows (assuming closed or command done): {tmux_err}")
                     window_closed_or_cmd_done = True
                     break
                 
-                # Removed the 'pass' here as it's not strictly needed for the logic flow
-                # if os.path.exists(log_path) and os.path.getsize(log_path) > 0:
-                #     pass
+                if os.path.exists(log_path) and os.path.getsize(log_path) > 0:
+                    pass 
 
-            if not window_closed_or_cmd_done: append_output(f"⚠️ Tmux window '{window_name}' poll timed out. Output might be incomplete or command still running.", style_class='warning'); logger.warning(f"Tmux poll for '{window_name}' timed out.")
-
+            if not window_closed_or_cmd_done: append_output(f"⚠️ Tmux window '{window_name}' poll timed out. Output might be incomplete or command still running.", style_class='warning'); logger.warning(f"Tmux poll for '{window_name}' timed out.") 
+            
             if os.path.exists(log_path):
                 try:
-                    with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
-                        output_content = f.read().strip()
-
-                    # *** MODIFIED SECTION START ***
-                    # Get TUI detection thresholds from config, with defaults
-                    # These keys would ideally be added to default_config.json
-                    tui_line_threshold = config.get('behavior', {}).get('tui_detection_line_threshold_pct', 30.0)
-                    tui_char_threshold = config.get('behavior', {}).get('tui_detection_char_threshold_pct', 3.0)
-
-                    if output_content and is_tui_like_output(output_content, tui_line_threshold, tui_char_threshold):
-                        logger.info(f"Output from '{original_user_input_display}' determined to be TUI-like. Not displaying raw content.")
-                        suggestion_command = f'/command move "{command_to_execute}" interactive_tui' # Use the command that was actually executed
-                        append_output(
-                            f"Output from '{original_user_input_display}':\n"
-                            f"[Semi-interactive session output appears TUI-specific and was not displayed directly.]\n"
-                            f"💡 Tip: This command might work better if categorized as 'interactive_tui'.\n"
-                            f"   You can try: {suggestion_command}",
-                            style_class='info'
-                        )                        
-                        output_captured = True # Mark as captured, even if not displayed raw
-                    elif output_content: # If not TUI-like and has content
-                        append_output(f"Output from '{original_user_input_display}':\n{output_content}")
-                        output_captured = True
-                    elif window_closed_or_cmd_done: # No output, but window closed/command done
-                        append_output(f"Output from '{original_user_input_display}': (No output captured)", style_class='info')
-                        output_captured = True
-                    # *** MODIFIED SECTION END ***
-
-                except Exception as e:
-                    logger.error(f"Error reading or analyzing tmux log {log_path}: {e}", exc_info=True)
-                    append_output(f"❌ Error reading or analyzing tmux log: {e}", style_class='error')
+                    with open(log_path, "r", encoding="utf-8", errors="ignore") as f: output_content = f.read().strip()
+                    if output_content: append_output(f"Output from '{original_user_input_display}':\n{output_content}"); output_captured = True
+                    elif window_closed_or_cmd_done: append_output(f"Output from '{original_user_input_display}': (No output captured)", style_class='info'); output_captured = True 
+                except Exception as e: logger.error(f"Error reading tmux log {log_path}: {e}"); append_output(f"❌ Error reading tmux log: {e}", style_class='error') 
                 finally:
-                    try:
-                        os.remove(log_path)
-                    except OSError as e_del:
-                        logger.error(f"Error deleting tmux log {log_path}: {e_del}")
-            elif window_closed_or_cmd_done: # Log file didn't exist, but window closed
-                append_output(f"Output from '{original_user_input_display}': (Tmux window closed, no log found)", style_class='info')
-
-            if not output_captured and not window_closed_or_cmd_done:
-                append_output(f"Output from '{original_user_input_display}': (Tmux window may still be running or timed out without output)", style_class='warning')
+                    try: os.remove(log_path)
+                    except OSError as e_del: logger.error(f"Error deleting tmux log {log_path}: {e_del}")
+            elif window_closed_or_cmd_done: append_output(f"Output from '{original_user_input_display}': (Tmux window closed, no log found)", style_class='info') 
+            
+            if not output_captured and not window_closed_or_cmd_done: append_output(f"Output from '{original_user_input_display}': (Tmux window may still be running or timed out without output)", style_class='warning') 
 
         else: # interactive_tui
             tmux_cmd_list = ["tmux", "new-window", "-n", window_name, command_to_execute]

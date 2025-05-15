@@ -20,7 +20,8 @@ FILES_TO_INCLUDE = [
     "micro_X.sh",                 # Added micro_X.sh
     "micro_X.desktop",             # Added micro_X.desktop
     "modules/ai_handler.py",     # Added ai_handler.py
-    "modules/category_manager.py" # Added category_handler.py
+    "modules/category_manager.py", # Added category_handler.py
+    "modules/output_analyzer.py" # Added output_analyzer.py
 ]
 
 # Output directory and filename for the snapshot

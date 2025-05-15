@@ -1,0 +1,28 @@
+The three command categories in micro_X (simple, semi_interactive, and interactive_tui) are designed to handle the diverse ways Linux commands behave and interact with the user, especially in a custom shell environment that also integrates with tmux. Here's the likely reasoning:
+
+simple Commands:
+
+Behavior: These are commands that typically execute quickly, produce a finite amount of output directly to standard output/error, and then exit. They don't require ongoing user interaction.
+Examples: ls, pwd, echo, date, cat some_small_file.txt.
+Why a category? micro_X can execute these directly using subprocess.Popen, capture their output, and display it immediately within its own output area. This is the most straightforward execution path.
+semi_interactive Commands:
+
+Behavior: These commands might produce a larger volume of output that is best viewed in a scrollable manner (like a pager), or they might have some limited interactivity but are not full-blown TUI applications. They might also run for a moderate amount of time.
+Examples: less, more, grep -R "pattern" ., git log, nmap scan.
+Why a category?
+Output Handling: For commands like less or git log, micro_X doesn't want to replicate a full pager. Running them in a tmux window allows the command's own paging/scrolling to be used.
+Non-Blocking Execution: micro_X can launch these in tmux, let them run, and then attempt to capture their output after they complete or the tmux window is closed. This prevents the micro_X interface from freezing while waiting for potentially lengthy output.
+Controlled Interaction: The "semi" part implies that while there might be some interaction, the primary goal is often to get a result back into micro_X. The tmux_semi_interactive_sleep_seconds and tmux_poll_seconds in the configuration suggest a mechanism to wait for these commands to produce output.
+interactive_tui Commands:
+
+Behavior: These are commands that launch full-screen, interactive Text-based User Interfaces. They require continuous user input and manage their own screen rendering.
+Examples: nano, vim, htop, top, ollama serve (if it has an interactive component or log output you want to monitor live).
+Why a category?
+Full Terminal Control: These applications need to take over the terminal. micro_X cannot simply capture their output stream like a simple command, nor would it want to try and render their TUI within its own.
+tmux Integration: tmux is the ideal solution here. micro_X launches the command in a new tmux window, giving the command full terminal control. The user interacts with it in that dedicated tmux window. When done, the user closes the tmux window (or the command exits), and focus returns to micro_X.
+In summary, the categorization allows micro_X to:
+
+Choose the correct execution strategy: Direct subprocess, tmux with output capture, or tmux with full interactive handoff.
+Manage user experience: Prevent the micro_X TUI from freezing for long-running or interactive commands.
+Handle I/O appropriately: Display simple output directly, capture output from semi-interactive commands, and cede terminal control for fully interactive ones.
+Leverage tmux effectively: Use tmux as a backend for running commands that require more than simple I/O redirection, without micro_X having to reimplement complex terminal emulation or TUI management.

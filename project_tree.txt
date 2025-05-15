@@ -8,14 +8,17 @@ micro_X
 |   ├── user_command_categories.json
 |   └── user_config.json
 ├── docs/
+|   ├── ai_analysis_of_micro_X_2025_05_13.md
 |   ├── analysis_of_micro_X_2025_05_14-16_41_00.md
 |   ├── generate_snapshot.md
 |   ├── generate_tree.md
 |   ├── micro_X_User_Guide.md
+|   ├── micro_X_why_command_categories.txt
 |   └── micro_x_testing_plan.md
 ├── modules/
 |   ├── ai_handler.py
-|   └── category_manager.py
+|   ├── category_manager.py
+|   └── output_analyzer.py
 ├── utils/
 |   ├── generate_snapshot.py
 |   └── generate_tree.py
@@ -23,7 +26,6 @@ micro_X
 ├── .micro_x_history
 ├── LICENSE
 ├── README.md
-├── ai_analysis_of_micro_X_2025_05_13.md
 ├── main.py
 ├── micro_X-A_Technical_Whitepaper_2025_05_12.md
 ├── micro_X.desktop
