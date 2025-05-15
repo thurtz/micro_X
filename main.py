@@ -41,6 +41,7 @@ from modules.category_manager import (
 )
 
 from modules.output_analyzer import is_tui_like_output
+from modules.ollama_manager import ensure_ollama_service # New import for Ollama Manager
 
 # --- Configuration Constants (File Names & Static Values) ---
 LOG_DIR = "logs"
@@ -76,6 +77,7 @@ logger = logging.getLogger(__name__)
 config = {}
 DEFAULT_CONFIG_FILENAME = "default_config.json" # For general config
 USER_CONFIG_FILENAME = "user_config.json"       # For general config
+ollama_service_ready = False # Global flag for Ollama service status
 
 def merge_configs(base, override):
     """Recursively merges override dict into base dict."""
@@ -130,6 +132,13 @@ def load_configuration():
                 "system": "Translate the following user request into a single Linux command. Output only the command. Do not include any other text, explanations, or markdown formatting.",
                 "user_template": "Translate to a single Linux command: \"{human_input}\"."
             }
+        },
+        "ollama_service": { # New section for Ollama Manager
+            "executable_path": None, # or "" to force shutil.which
+            "auto_start_serve": True,
+            "startup_wait_seconds": 10, # Kept for reference, but logic uses retries*interval
+            "server_check_retries": 5,  # e.g., 5 retries
+            "server_check_interval_seconds": 2 # e.g., 2 seconds interval
         }
     }
     config = fallback_config.copy()
@@ -517,7 +526,7 @@ def display_general_help():
 
 # --- Command Handling Logic ---
 async def handle_input_async(user_input: str):
-    global current_directory, categorization_flow_active
+    global current_directory, categorization_flow_active, ollama_service_ready # Added ollama_service_ready
     if categorization_flow_active: logger.warning("Input ignored: categorization active."); return
     user_input_stripped = user_input.strip(); logger.info(f"Received input: '{user_input_stripped}'")
     if not user_input_stripped: return
@@ -541,6 +550,10 @@ async def handle_input_async(user_input: str):
         return
 
     if user_input_stripped.startswith("/ai "):
+        if not ollama_service_ready:
+            append_output("⚠️ Ollama service is not available. Cannot process /ai command.", style_class='warning')
+            logger.warning("Attempted /ai command while Ollama service is not ready.")
+            return
         human_query = user_input_stripped[len("/ai "):].strip()
         if not human_query: append_output("⚠️ AI query empty.", style_class='warning'); return 
         append_output(f"🤖 AI Query: {human_query}", style_class='ai-query') 
@@ -574,6 +587,13 @@ async def handle_input_async(user_input: str):
         await process_command(user_input_stripped, user_input_stripped, None, None)
     else: # Unknown command, try AI validation then translation
         logger.debug(f"Direct input '{user_input_stripped}' unknown. Validating with AI.")
+        
+        if not ollama_service_ready:
+            append_output(f"⚠️ Ollama service not available. Cannot validate '{user_input_stripped}' with AI. Attempting direct categorization.", style_class='warning')
+            logger.warning(f"Ollama service not ready. Skipping AI validation for '{user_input_stripped}'. Proceeding to categorization.")
+            await process_command(user_input_stripped, user_input_stripped, None, None) # Try to categorize without AI
+            return
+
         append_output(f"🔎 Validating '{user_input_stripped}' with AI...", style_class='info'); 
         if current_app.is_running: current_app.invalidate()
         
@@ -608,6 +628,13 @@ async def handle_input_async(user_input: str):
             logger.info(f"{log_msg} Treating as natural language."); append_output(ui_msg, style_class=ui_style)
             if current_app.is_running: current_app.invalidate()
             
+            if not ollama_service_ready: # Check again before translation
+                append_output("⚠️ Ollama service is not available. Cannot translate query.", style_class='warning')
+                logger.warning("Ollama service not ready. Skipping NL translation.")
+                # Fallback: try to process the original input directly if translation fails due to no Ollama
+                await process_command(user_input_stripped, user_input_stripped, None, None)
+                return
+
             # Use the new ai_handler function
             linux_command, ai_raw_candidate = await get_validated_ai_command(user_input_stripped, config, append_output, get_app)
             if linux_command:
@@ -927,12 +954,25 @@ def execute_shell_command(command_to_execute: str, original_user_input_display: 
 # Their functionality is now accessed via the category_manager module.
 
 # --- Main Application Setup and Run ---
-def run_shell():
-    global output_field, input_field, key_help_field, app_instance, auto_scroll, current_directory
+async def main_async_runner(): # New async wrapper for startup tasks
+    global output_field, input_field, key_help_field, app_instance, auto_scroll, current_directory, ollama_service_ready
 
     # Initialize the category manager (this also loads categories)
     init_category_manager(SCRIPT_DIR, CONFIG_DIR, append_output)
     # The old load_and_merge_command_categories() call is no longer needed here.
+
+    # --- Ollama Service Check ---
+    # This needs to happen after config is loaded and append_output is available
+    # but before the app fully runs if AI is critical from the start.
+    # For now, we'll set the global flag.
+    ollama_service_ready = await ensure_ollama_service(config, append_output)
+    if not ollama_service_ready:
+        append_output("⚠️ Ollama service is not available or failed to start. AI-dependent features will be affected.", style_class='error')
+        logger.warning("Ollama service check failed or service could not be started. Continuing with AI features potentially disabled.")
+    else:
+        append_output("✅ Ollama service is active and ready.", style_class='success')
+        logger.info("Ollama service is active.")
+    # --- End Ollama Service Check ---
     
     history = FileHistory(HISTORY_FILE_PATH)
     home_dir = os.path.expanduser("~")
@@ -953,11 +993,18 @@ def run_shell():
         "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
     )
     
-    global output_buffer
-    output_buffer = [('class:welcome', initial_welcome_message)]
+    global output_buffer # Ensure output_buffer is accessible if not already appended to
+    # Prepend initial messages if output_buffer is empty, otherwise append
+    if not output_buffer or (len(output_buffer) == 1 and output_buffer[0][1] == initial_welcome_message): # Avoid duplicating welcome if already there
+        output_buffer = [('class:welcome', initial_welcome_message)]
+    else: # If ollama messages were added, append welcome after them
+        # This logic might need refinement if ollama messages should come *after* welcome.
+        # For now, ollama status messages will appear first.
+        output_buffer.append(('class:welcome', initial_welcome_message))
+
 
     output_field = TextArea(
-        text="".join([content for _, content in output_buffer]),
+        text="".join([content for _, content in output_buffer]), # Reconstruct text with all messages
         style='class:output-field', 
         scrollbar=True, 
         focusable=False, 
@@ -1035,10 +1082,25 @@ def run_shell():
     app_instance = Application(layout=layout, key_bindings=kb, style=final_style, full_screen=True, mouse_support=True)
     
     logger.info("micro_X Shell application starting.")
-    try: app_instance.run()
-    except (EOFError, KeyboardInterrupt): print("\nExiting micro_X Shell. 👋"); logger.info("Exiting due to EOF or KeyboardInterrupt at app level.")
-    except Exception as e: print(f"\nUnexpected critical error: {e}"); logger.critical("Critical error during app_instance.run()", exc_info=True)
-    finally: logger.info("micro_X Shell application stopped.")
+    # The app_instance.run() is blocking, so it should be the last thing in this async flow
+    # or run in a way that doesn't block other async tasks if there were any post-run.
+    # For prompt_toolkit, app.run() is typically the main blocking call.
+    await app_instance.run_async() # Use run_async for prompt_toolkit in an asyncio context
+
+
+def run_shell(): # This function now primarily sets up and runs the asyncio event loop
+    try:
+        asyncio.run(main_async_runner())
+    except (EOFError, KeyboardInterrupt): 
+        print("\nExiting micro_X Shell. 👋"); 
+        logger.info("Exiting due to EOF or KeyboardInterrupt at run_shell level.")
+    except Exception as e: 
+        print(f"\nUnexpected critical error during startup or runtime: {e}"); 
+        logger.critical("Critical error in run_shell or main_async_runner", exc_info=True)
+    finally: 
+        logger.info("micro_X Shell application stopped.")
+
 
 if __name__ == "__main__":
     run_shell()
+
