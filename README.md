@@ -19,14 +19,16 @@ micro\_X provides a text-based user interface (TUI) where you can:
 * **Natural Language to Command Translation:** Uses a configurable "primary\_translator" Ollama model for initial translation (default example: `llama3.2:3b`).
 * **Optional Secondary Direct Translator:** Can leverage a configurable "direct\_translator" model specialized in direct command output (default example: `vitali87/shell-commands-qwen2-1.5b`) as a fallback or alternative.
 * **AI-Powered Command Validation:** Employs a configurable "validator" Ollama model (default example: `herawen/lisa:latest`) to assess command validity.
-* **Command Categorization:**
+* **Command Categorization & Execution:**
     * `simple`: Direct execution, output captured in micro\_X.
-    * `semi_interactive`: Runs in a new `tmux` window, output captured after completion.
-    * `interactive_tui`: Runs fully interactively in a new `tmux` window.
+    * `semi_interactive`: Runs in a new `tmux` window. Output is typically captured after completion.
+        * **Smart Output Handling:** If a `semi_interactive` command produces output resembling a full-screen TUI application (e.g., many terminal control codes), micro\_X will avoid displaying the raw (often garbled) output. Instead, it provides a notification and suggests re-categorizing the command to `interactive_tui`.
+    * `interactive_tui`: Runs fully interactively in a new `tmux` window. No output is captured back into micro\_X.
     * Users can manage these categories via `/command` subcommands.
 * **Modular Architecture:**
     * `modules/ai_handler.py`: Manages all interactions with Ollama LLMs for translation and validation.
     * `modules/category_manager.py`: Handles the loading, merging, and modification of command categories.
+    * `modules/output_analyzer.py`: Contains logic to detect TUI-like output (e.g., high density of ANSI escape codes) from `semi_interactive` commands.
 * **Chained Command Support:** Capable of processing and executing commands linked by `&&`, `||`, `|`, etc.
 * **Interactive TUI:** Built with `prompt_toolkit` for a user-friendly experience.
 * **Shell-like Functionality:** Supports `cd`, history, and shell variable expansion.
@@ -147,7 +149,10 @@ micro\_X uses a hierarchical configuration system:
     * `config/default_config.json`: Defines default AI models, their prompts, timeouts, UI behavior, and paths.
         * `ai_models`: Specifies the Ollama models for `primary_translator`, `direct_translator`, and `validator`.
         * `prompts`: Contains system and user prompt templates for each AI model role.
-        * Other keys control timeouts, behavior, UI elements, etc.
+        * `behavior`: Includes settings like `input_field_height`, `default_category_for_unclassified`, AI retry attempts, and the TUI detection thresholds:
+            * `tui_detection_line_threshold_pct` (default: 30.0): Min percentage of lines with ANSI codes to flag as TUI.
+            * `tui_detection_char_threshold_pct` (default: 3.0): Min percentage of characters being ANSI codes to flag as TUI.
+        * Other keys control timeouts, UI elements, etc.
     * `config/default_command_categories.json`: Pre-populates commands into `simple`, `semi_interactive`, and `interactive_tui` categories.
 3.  **User Configuration Files (in `config/` directory - you create these to override defaults):**
     * `config/user_config.json`: Your overrides for any settings in `default_config.json`.
