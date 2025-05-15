@@ -18,7 +18,9 @@ FILES_TO_INCLUDE = [
     "project_tree.txt",
     "README.md",
     "micro_X.sh",                 # Added micro_X.sh
-    "micro_X.desktop"             # Added micro_X.desktop
+    "micro_X.desktop",             # Added micro_X.desktop
+    "modules/ai_handler.py",     # Added ai_handler.py
+    "modules/category_manager.py" # Added category_handler.py
 ]
 
 # Output directory and filename for the snapshot

@@ -8,10 +8,14 @@ micro_X
 |   ├── user_command_categories.json
 |   └── user_config.json
 ├── docs/
+|   ├── analysis_of_micro_X_2025_05_14-16_41_00.md
 |   ├── generate_snapshot.md
 |   ├── generate_tree.md
 |   ├── micro_X_User_Guide.md
 |   └── micro_x_testing_plan.md
+├── modules/
+|   ├── ai_handler.py
+|   └── category_manager.py
 ├── utils/
 |   ├── generate_snapshot.py
 |   └── generate_tree.py
