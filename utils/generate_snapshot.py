@@ -22,7 +22,7 @@ FILES_TO_INCLUDE = [
     "modules/ai_handler.py",     # Added ai_handler.py
     "modules/category_manager.py", # Added category_handler.py
     "modules/output_analyzer.py", # Added output_analyzer.py
-    "output_analyzer.py", # Added output_analyzer.py
+    "modules/ollama_manager.py", # Added ollama_manager.py
 ]
 
 # Output directory and filename for the snapshot

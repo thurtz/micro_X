@@ -9,6 +9,7 @@ micro_X
 |   └── user_config.json
 ├── docs/
 |   ├── ai_analysis_of_micro_X_2025_05_13.md
+|   ├── ai_analysis_of_micro_X_project_2025_05_14-23_30_00.md
 |   ├── analysis_of_micro_X_2025_05_14-16_41_00.md
 |   ├── generate_snapshot.md
 |   ├── generate_tree.md
@@ -17,7 +18,10 @@ micro_X
 |   └── micro_x_testing_plan.md
 ├── modules/
 |   ├── ai_handler.py
+|   ├── category_manager.old.py
 |   ├── category_manager.py
+|   ├── ollama_manager.old.py
+|   ├── ollama_manager.py
 |   └── output_analyzer.py
 ├── utils/
 |   ├── generate_snapshot.py

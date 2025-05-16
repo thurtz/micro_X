@@ -41,15 +41,7 @@ from modules.category_manager import (
 )
 
 from modules.output_analyzer import is_tui_like_output
-# --- Import functions from the ollama_manager module ---
-from modules.ollama_manager import (
-    ensure_ollama_service,
-    explicit_start_ollama_service,
-    explicit_stop_ollama_service,
-    explicit_restart_ollama_service,
-    get_ollama_status_info
-)
-
+from modules.ollama_manager import ensure_ollama_service # New import for Ollama Manager
 
 # --- Configuration Constants (File Names & Static Values) ---
 LOG_DIR = "logs"
@@ -84,7 +76,7 @@ logger = logging.getLogger(__name__)
 # --- Global Configuration ---
 config = {}
 DEFAULT_CONFIG_FILENAME = "default_config.json" # For general config
-USER_CONFIG_FILENAME = "user_config.json"      # For general config
+USER_CONFIG_FILENAME = "user_config.json"       # For general config
 ollama_service_ready = False # Global flag for Ollama service status
 
 def merge_configs(base, override):
@@ -507,8 +499,6 @@ def display_general_help():
         ('class:help-example', "                          Example: /ai list all text files in current folder\n"),
         ('class:help-command', "  /command <subcommand>   "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
         ('class:help-example', "                          Type '/command help' for detailed options.\n"),
-        ('class:help-command', "  /ollama <subcommand>    "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"), # New help line
-        ('class:help-example', "                          Type '/ollama help' for detailed options.\n"), # New help line
         ('class:help-command', "  /utils <script> [args]  "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
         ('class:help-example', "                          Type '/utils list' or '/utils help' for available scripts.\n"),
         ('class:help-command', "  /update                 "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
@@ -533,77 +523,6 @@ def display_general_help():
     
     append_output(help_output_string, style_class='help-base') 
     logger.info("Displayed general help.")
-
-# --- Ollama Command Helper ---
-def display_ollama_help():
-    """Displays help for the /ollama command."""
-    help_text = [
-        ("class:help-title", "Ollama Service Management - Help\n"),
-        ("class:help-text", "Use these commands to manage the Ollama service used by micro_X.\n"),
-        ("class:help-header", "\nAvailable /ollama Subcommands:\n"),
-        ("class:help-command", "  /ollama start       "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
-        ("class:help-command", "  /ollama stop        "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
-        ("class:help-command", "  /ollama restart     "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"),
-        ("class:help-command", "  /ollama status      "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
-        ("class:help-command", "  /ollama help        "), ("class:help-description", "- Displays this help message.\n"),
-        ("class:help-text", "\nNote: These commands primarily interact with an Ollama instance managed by micro_X in a tmux session. ")
-    ]
-    help_output_string = "".join([text for _, text in help_text])
-    append_output(help_output_string, style_class='help-base')
-    logger.info("Displayed Ollama command help.")
-
-async def handle_ollama_command_async(user_input_parts: list):
-    """Handles /ollama subcommands."""
-    global ollama_service_ready # We might update this based on actions
-    logger.info(f"Handling /ollama command: {user_input_parts}")
-
-    if len(user_input_parts) < 2:
-        display_ollama_help()
-        return
-
-    subcommand = user_input_parts[1].lower()
-
-    if subcommand == "start":
-        append_output("⚙️ Attempting to start Ollama service...", style_class='info')
-        # Ensure ollama_manager has the latest config and append_output
-        # explicit_start_ollama_service itself calls _initialize_manager_if_needed
-        success = await explicit_start_ollama_service(config, append_output)
-        if success:
-            append_output("✅ Ollama service start process initiated. Check status shortly.", style_class='success')
-            ollama_service_ready = await ensure_ollama_service(config, append_output) # Re-check readiness
-        else:
-            append_output("❌ Ollama service start process failed. See logs for details.", style_class='error')
-            ollama_service_ready = False # Assume not ready if start failed
-    elif subcommand == "stop":
-        append_output("⚙️ Attempting to stop Ollama service...", style_class='info')
-        success = await explicit_stop_ollama_service(config, append_output)
-        if success:
-            append_output("✅ Ollama service stop process initiated.", style_class='success')
-        else:
-            append_output("❌ Ollama service stop process failed. See logs for details.", style_class='error')
-        ollama_service_ready = False # Assume not ready after a stop attempt
-    elif subcommand == "restart":
-        append_output("⚙️ Attempting to restart Ollama service...", style_class='info')
-        success = await explicit_restart_ollama_service(config, append_output)
-        if success:
-            append_output("✅ Ollama service restart process initiated. Check status shortly.", style_class='success')
-            ollama_service_ready = await ensure_ollama_service(config, append_output) # Re-check readiness
-        else:
-            append_output("❌ Ollama service restart process failed. See logs for details.", style_class='error')
-            ollama_service_ready = False # Assume not ready if restart failed
-    elif subcommand == "status":
-        await get_ollama_status_info(config, append_output)
-        # Optionally re-check and update ollama_service_ready if status shows it's up
-        # current_status_is_ready = await is_ollama_server_running() # is_ollama_server_running is in ollama_manager
-        # if ollama_service_ready != current_status_is_ready:
-        #    logger.info(f"Ollama service readiness updated by status check: {current_status_is_ready}")
-        #    ollama_service_ready = current_status_is_ready
-    elif subcommand == "help":
-        display_ollama_help()
-    else:
-        append_output(f"❌ Unknown /ollama subcommand: '{subcommand}'. Type '/ollama help' for options.", style_class='error')
-        logger.warning(f"Unknown /ollama subcommand: {subcommand}")
-
 
 # --- Command Handling Logic ---
 async def handle_input_async(user_input: str):
@@ -630,22 +549,9 @@ async def handle_input_async(user_input: str):
         await handle_utils_command_async(user_input_stripped)
         return
 
-    # --- START: Ollama Management Command Handling ---
-    if user_input_stripped.startswith("/ollama"):
-        try:
-            # Using simple split for /ollama as arguments are not complex
-            parts = user_input_stripped.split()
-            await handle_ollama_command_async(parts)
-        except Exception as e: # Catch any unexpected errors during /ollama command handling
-            append_output(f"❌ Error processing /ollama command: {e}", style_class='error')
-            logger.error(f"Error in /ollama command '{user_input_stripped}': {e}", exc_info=True)
-        return
-    # --- END: Ollama Management Command Handling ---
-
     if user_input_stripped.startswith("/ai "):
         if not ollama_service_ready:
             append_output("⚠️ Ollama service is not available. Cannot process /ai command.", style_class='warning')
-            append_output("   Try '/ollama status' or '/ollama start'.", style_class='info')
             logger.warning("Attempted /ai command while Ollama service is not ready.")
             return
         human_query = user_input_stripped[len("/ai "):].strip()
@@ -683,8 +589,7 @@ async def handle_input_async(user_input: str):
         logger.debug(f"Direct input '{user_input_stripped}' unknown. Validating with AI.")
         
         if not ollama_service_ready:
-            append_output(f"⚠️ Ollama service not available. Cannot validate '{user_input_stripped}' with AI.", style_class='warning')
-            append_output(f"   Attempting direct categorization or try '/ollama status' or '/ollama start'.", style_class='info')
+            append_output(f"⚠️ Ollama service not available. Cannot validate '{user_input_stripped}' with AI. Attempting direct categorization.", style_class='warning')
             logger.warning(f"Ollama service not ready. Skipping AI validation for '{user_input_stripped}'. Proceeding to categorization.")
             await process_command(user_input_stripped, user_input_stripped, None, None) # Try to categorize without AI
             return
@@ -725,7 +630,6 @@ async def handle_input_async(user_input: str):
             
             if not ollama_service_ready: # Check again before translation
                 append_output("⚠️ Ollama service is not available. Cannot translate query.", style_class='warning')
-                append_output("   Try '/ollama status' or '/ollama start'.", style_class='info')
                 logger.warning("Ollama service not ready. Skipping NL translation.")
                 # Fallback: try to process the original input directly if translation fails due to no Ollama
                 await process_command(user_input_stripped, user_input_stripped, None, None)
@@ -838,8 +742,8 @@ def _ask_step_1_main_action():
     # Use CM_CATEGORY_DESCRIPTIONS
     append_output(f"How to categorize this command?\n"
                   f"  1: simple            ({CM_CATEGORY_DESCRIPTIONS['simple']})\n" 
-                  f"  2: semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n" 
-                  f"  3: interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})\n" 
+                  f"  2: semi_interactive    ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n" 
+                  f"  3: interactive_tui     ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})\n" 
                   f"  M: Modify command before categorizing\n"
                   f"  D: Execute as default '{default_cat_name}' (once, no save)\n"
                   f"  C: Cancel categorization & execution", style_class='categorize-prompt') 
@@ -883,8 +787,8 @@ def _ask_step_4_5_category_for_modified():
     append_output(f"\nCategory for command: '{cmd_to_categorize}'", style_class='categorize-info') 
     # Use CM_CATEGORY_DESCRIPTIONS
     append_output(f"  1: simple            ({CM_CATEGORY_DESCRIPTIONS['simple']})\n" 
-                  f"  2: semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n" 
-                  f"  3: interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})", style_class='categorize-prompt') 
+                  f"  2: semi_interactive    ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n" 
+                  f"  3: interactive_tui     ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})", style_class='categorize-prompt') 
     if input_field: input_field.prompt = "[Categorize] Category (1-3): "; input_field.buffer.reset(); input_field.buffer.accept_handler = _handle_step_4_5_response; current_app.invalidate()
 
 def _handle_step_4_5_response(buff):
@@ -1064,7 +968,6 @@ async def main_async_runner(): # New async wrapper for startup tasks
     ollama_service_ready = await ensure_ollama_service(config, append_output)
     if not ollama_service_ready:
         append_output("⚠️ Ollama service is not available or failed to start. AI-dependent features will be affected.", style_class='error')
-        append_output("   You can try '/ollama help' for manual control options.", style_class='info')
         logger.warning("Ollama service check failed or service could not be started. Continuing with AI features potentially disabled.")
     else:
         append_output("✅ Ollama service is active and ready.", style_class='success')
@@ -1088,7 +991,6 @@ async def main_async_runner(): # New async wrapper for startup tasks
         "Type a Linux command, or try '/ai your query' (e.g., /ai list text files).\n"
         "Key shortcuts are shown below. For more help, type '/help'.\n"
         "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
-        "Use '/ollama help' to manage the Ollama service.\n" # Added info about /ollama
     )
     
     global output_buffer # Ensure output_buffer is accessible if not already appended to
@@ -1142,10 +1044,10 @@ async def main_async_runner(): # New async wrapper for startup tasks
         'info-item-empty': 'italic #5c6370',
         'success': '#98c379',         
         'error': '#e06c75',         
-        'warning': '#d19a66',     
+        'warning': '#d19a66',       
         'security-critical': 'bold #e06c75 bg:#5c0000', 
         'security-warning': '#e06c75', 
-        'ai-query': '#c678dd',     
+        'ai-query': '#c678dd',       
         'ai-thinking': 'italic #56b6c2', 
         'ai-thinking-detail': 'italic #4b8e97', 
         'ai-response': '#56b6c2',   
