@@ -24,6 +24,10 @@ FILES_TO_INCLUDE = [
     "modules/output_analyzer.py", # Added output_analyzer.py
     "modules/ollama_manager.py", # Added ollama_manager.py
     "setup_micro_x_mint.sh", # Added setup_micro_x_mint.sh
+    "test/test_ai_handler.py", # Added test_ai_handler.py
+    "test/test_category_manager.py", # Added test_category_manager.py
+    "test/test_conftest.py" # Added test_conftest.py
+    "pytest_results/pytest_results.txt"
 ]
 
 # Output directory and filename for the snapshot
