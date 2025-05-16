@@ -23,6 +23,7 @@ FILES_TO_INCLUDE = [
     "modules/category_manager.py", # Added category_handler.py
     "modules/output_analyzer.py", # Added output_analyzer.py
     "modules/ollama_manager.py", # Added ollama_manager.py
+    "setup_micro_x_mint.sh", # Added setup_micro_x_mint.sh
 ]
 
 # Output directory and filename for the snapshot
