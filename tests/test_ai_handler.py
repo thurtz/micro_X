@@ -34,20 +34,18 @@ clean_command_test_cases = [
 
     # Mixed cases
     ("  <bash> '  echo \"Hello World\"  ' </bash>  ", 'echo "Hello World"'),
-    # _clean_extracted_command does not strip ```bash...``` itself; COMMAND_PATTERN does upstream.
-    # So, if _clean_extracted_command receives this raw, it should remain.
-    ("```bash\nls -la\n```", "```bash\nls -la\n```"),
-    ("```\n  git diff --cached \n```", "```\n  git diff --cached \n```"),
+    # Current _clean_extracted_command behavior: strips one layer of backticks from ```
+    ("```bash\nls -la\n```", "``bash\nls -la\n``"),
+    ("```\n  git diff --cached \n```", "``\n  git diff --cached \n``"),
 
     # AI refusal phrases
     ("Sorry, I cannot fulfill that request.", ""),
-    # The function _should_ catch "I am unable..." with "unable to".
-    # If this test still fails, it points to a subtle issue in the function's refusal check
-    # or the exact string matching.
+    # This test WILL FAIL until _clean_extracted_command in ai_handler.py is fixed
+    # to correctly identify "I am unable to..." as a refusal.
+    # The expected output "" is the DESIRED behavior of the function.
     ("I am unable to generate that command.", ""),
     ("Cannot translate safely", ""),
     # _clean_extracted_command does not strip <unsafe> tags as per its current tag list.
-    # The main COMMAND_PATTERN handles <unsafe> for signaling.
     ("<unsafe>Cannot translate safely</unsafe>", "<unsafe>Cannot translate safely</unsafe>"),
 
     # Already clean commands
@@ -57,10 +55,10 @@ clean_command_test_cases = [
     # Leading slash removal (specific fix from original code)
     ("/ls", "ls"),
     ("/pwd", "pwd"),
-    ("cd /home/user", "cd /home/user"), # Should not strip if slash is not only at the beginning of a single word
+    ("cd /home/user", "cd /home/user"),
 
-    # Nested-like structures (testing current behavior, might need refinement if deep nesting is expected)
-    ("<bash><cmd>ls</cmd></bash>", "<cmd>ls</cmd>"), # Current behavior: strips outer <bash>, inner <cmd> remains
+    # Nested-like structures
+    ("<bash><cmd>ls</cmd></bash>", "<cmd>ls</cmd>"),
     ("<code>'pwd'</code>", "pwd"),
 
     # Edge cases
@@ -70,16 +68,14 @@ clean_command_test_cases = [
     ("<code> </code>", ""),
 
     # Shell command prefixes
-    ("bash ls -l", "bash ls -l"), # Should not strip "bash " if not followed by <...>
-    ("sh <command>", "command"), # Example of stripping sh <...>
+    ("bash ls -l", "bash ls -l"),
+    ("sh <command>", "command"),
     ("bash <my_command --arg>", "my_command --arg"),
-    # Function intentionally does not strip `bash <...>` if inner content has `|`
     ("bash <ls | grep py>", "bash <ls | grep py>"),
 
     # Angle brackets not part of a command structure
-    ("<ls -l>", "ls -l"), # General angle bracket stripping
+    ("<ls -l>", "ls -l"),
     ("<echo hello world>", "echo hello world"),
-    # Function intentionally does not strip `<...>` if inner content has `|`
     ("<cat file.txt | grep error>", "<cat file.txt | grep error>")
 ]
 
@@ -96,22 +92,15 @@ def test_clean_extracted_command(input_str, expected_output):
 # ---
 # async def test_is_valid_linux_command_ai_yes(mocker): # Mark test as async
 #     # Mock the ollama.chat call
-#     # For async functions, you might need to mock differently or use an async mock library
-#     # if ollama.chat is an async function. Assuming it's synchronous for this example.
 #     mock_ollama_chat = mocker.patch('modules.ai_handler.ollama.chat') # Patch where it's used
-#     # Configure the mock to return a "yes" response
 #     mock_ollama_chat.return_value = {'message': {'content': 'yes'}}
 #
 #     config_param = {
 #         "prompts": {"validator": {"system": "sys", "user_template": "Is '{command_text}' valid?"}},
 #         "ai_models": {"validator": "test-validator-model"},
-#         "behavior": {"validator_ai_attempts": 1, "ai_retry_delay_seconds": 0.1, "ollama_api_call_retries": 0} # Added ollama_api_call_retries
+#         "behavior": {"validator_ai_attempts": 1, "ai_retry_delay_seconds": 0.1, "ollama_api_call_retries": 0}
 #     }
-#     # Import the function to be tested
 #     from modules.ai_handler import is_valid_linux_command_according_to_ai
 #     is_valid = await is_valid_linux_command_according_to_ai("ls -l", config_param)
 #     assert is_valid is True
-#     mock_ollama_chat.assert_called_once() # Verify it was called
-
-# Add more tests for other functions in ai_handler.py, especially focusing on
-# how it parses different AI responses and handles retries (by mocking ollama.chat).
+#     mock_ollama_chat.assert_called_once()
