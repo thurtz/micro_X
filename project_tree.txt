@@ -11,6 +11,7 @@ micro_X
 |   ├── ai_analysis_of_micro_X_2025_05_13.md
 |   ├── ai_analysis_of_micro_X_project_2025_05_14-23_30_00.md
 |   ├── analysis_of_micro_X_2025_05_14-16_41_00.md
+|   ├── analysis_of_micro_X_project_20250515_203802.md
 |   ├── generate_snapshot.md
 |   ├── generate_tree.md
 |   ├── micro_X_User_Guide.md
@@ -23,6 +24,13 @@ micro_X
 |   ├── ollama_manager.old.py
 |   ├── ollama_manager.py
 |   └── output_analyzer.py
+├── pytest_results/
+|   └── pytest_results.txt
+├── tests/
+|   ├── conftest.py
+|   ├── test_ai_handler.py
+|   ├── test_category_manager.py
+|   └── tests.md
 ├── utils/
 |   ├── generate_snapshot.py
 |   └── generate_tree.py
