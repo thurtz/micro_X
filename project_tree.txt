@@ -5,6 +5,7 @@ micro_X
 |   ├── .tmux.conf
 |   ├── default_command_categories.json
 |   ├── default_config.json
+|   ├── default_config.old.json
 |   ├── user_command_categories.json
 |   └── user_config.json
 ├── docs/
@@ -16,8 +17,10 @@ micro_X
 |   ├── generate_tree.md
 |   ├── micro_X_User_Guide.md
 |   ├── micro_X_why_command_categories.txt
-|   └── micro_x_testing_plan.md
+|   ├── micro_x_testing_plan.md
+|   └── review_of_micro_X_project_20250516_220000.md
 ├── modules/
+|   ├── ai_handler.old.py
 |   ├── ai_handler.py
 |   ├── category_manager.old.py
 |   ├── category_manager.py
