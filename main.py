@@ -4,12 +4,11 @@ from prompt_toolkit import Application
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout import Layout, HSplit, Window
 from prompt_toolkit.widgets import TextArea
-from prompt_toolkit.styles import Style # Removed merge_styles as it wasn't used
+from prompt_toolkit.styles import Style 
 from prompt_toolkit.document import Document
 from prompt_toolkit.layout.controls import FormattedTextControl
-from prompt_toolkit.application import get_app # Explicitly import get_app
+from prompt_toolkit.application import get_app 
 from prompt_toolkit.history import FileHistory
-# Removed D as it wasn't used: from prompt_toolkit.layout.dimension import D
 from prompt_toolkit.formatted_text import FormattedText
 
 import asyncio
@@ -17,27 +16,26 @@ import subprocess
 import uuid
 import shlex
 import os
-import re # Keep re for non-AI parts if any, or remove if fully encapsulated
-# Removed ollama import as it's handled by ai_handler
+import re 
 import logging
 import json
 import time
 import shutil
-import hashlib # For checking file changes
-import sys # Added for /utils command to use the current Python interpreter
+import hashlib 
+import sys 
 
 # --- Import functions from the new ai_handler module ---
-from modules.ai_handler import get_validated_ai_command, is_valid_linux_command_according_to_ai
+from modules.ai_handler import get_validated_ai_command, is_valid_linux_command_according_to_ai, explain_linux_command_with_ai # Added explain_linux_command_with_ai
 
 # --- Import from the new category_manager module ---
 from modules.category_manager import (
     init_category_manager,
     classify_command,
-    add_command_to_category as cm_add_command_to_category, # Renamed to avoid conflict if used directly
+    add_command_to_category as cm_add_command_to_category, 
     handle_command_subsystem_input,
     UNKNOWN_CATEGORY_SENTINEL,
-    CATEGORY_MAP as CM_CATEGORY_MAP, # Aliased to avoid conflict
-    CATEGORY_DESCRIPTIONS as CM_CATEGORY_DESCRIPTIONS # Aliased
+    CATEGORY_MAP as CM_CATEGORY_MAP, 
+    CATEGORY_DESCRIPTIONS as CM_CATEGORY_DESCRIPTIONS 
 )
 
 from modules.output_analyzer import is_tui_like_output
@@ -54,18 +52,15 @@ from modules.ollama_manager import (
 # --- Configuration Constants (File Names & Static Values) ---
 LOG_DIR = "logs"
 CONFIG_DIR = "config"
-# DEFAULT_CATEGORY_FILENAME and USER_CATEGORY_FILENAME are now managed by category_manager
 HISTORY_FILENAME = ".micro_x_history"
 REQUIREMENTS_FILENAME = "requirements.txt"
-# UNKNOWN_CATEGORY_SENTINEL is now imported from category_manager
 UTILS_DIR_NAME = "utils"
 
 # --- Path Setup ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 os.makedirs(os.path.join(SCRIPT_DIR, LOG_DIR), exist_ok=True)
-os.makedirs(os.path.join(SCRIPT_DIR, CONFIG_DIR), exist_ok=True) # Ensures config dir exists
+os.makedirs(os.path.join(SCRIPT_DIR, CONFIG_DIR), exist_ok=True) 
 LOG_FILE = os.path.join(SCRIPT_DIR, LOG_DIR, "micro_x.log")
-# DEFAULT_CATEGORY_PATH and USER_CATEGORY_PATH are now managed by category_manager
 HISTORY_FILE_PATH = os.path.join(SCRIPT_DIR, HISTORY_FILENAME)
 REQUIREMENTS_FILE_PATH = os.path.join(SCRIPT_DIR, REQUIREMENTS_FILENAME)
 UTILS_DIR_PATH = os.path.join(SCRIPT_DIR, UTILS_DIR_NAME)
@@ -83,9 +78,9 @@ logger = logging.getLogger(__name__)
 
 # --- Global Configuration ---
 config = {}
-DEFAULT_CONFIG_FILENAME = "default_config.json" # For general config
-USER_CONFIG_FILENAME = "user_config.json"      # For general config
-ollama_service_ready = False # Global flag for Ollama service status
+DEFAULT_CONFIG_FILENAME = "default_config.json" 
+USER_CONFIG_FILENAME = "user_config.json"     
+ollama_service_ready = False 
 
 def merge_configs(base, override):
     """Recursively merges override dict into base dict."""
@@ -103,11 +98,13 @@ def load_configuration():
     default_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, DEFAULT_CONFIG_FILENAME)
     user_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, USER_CONFIG_FILENAME)
 
+    # Fallback config now includes explainer model and prompts
     fallback_config = {
         "ai_models": {
             "primary_translator": "llama3.2:3b",
             "direct_translator": "vitali87/shell-commands-qwen2-1.5b",
-            "validator": "herawen/lisa:latest"
+            "validator": "herawen/lisa:latest",
+            "explainer": "llama3.2:3b" # Default explainer
         },
         "timeouts": {
             "tmux_poll_seconds": 300,
@@ -139,14 +136,18 @@ def load_configuration():
             "direct_translator": {
                 "system": "Translate the following user request into a single Linux command. Output only the command. Do not include any other text, explanations, or markdown formatting.",
                 "user_template": "Translate to a single Linux command: \"{human_input}\"."
+            },
+            "explainer": { # New explainer prompts
+              "system": "You are a helpful assistant that explains Linux commands in simple, clear terms. Describe what the command does, its main arguments/options shown, and any significant side effects or risks. Be concise. If the command is trivial, a very short explanation is fine. If it seems dangerous or complex, highlight that.",
+              "user_template": "Explain the following Linux command: '{command_text}'"
             }
         },
-        "ollama_service": { # New section for Ollama Manager
-            "executable_path": None, # or "" to force shutil.which
+        "ollama_service": { 
+            "executable_path": None, 
             "auto_start_serve": True,
-            "startup_wait_seconds": 10, # Kept for reference, but logic uses retries*interval
-            "server_check_retries": 5,  # e.g., 5 retries
-            "server_check_interval_seconds": 2 # e.g., 2 seconds interval
+            "startup_wait_seconds": 10, 
+            "server_check_retries": 5,  
+            "server_check_interval_seconds": 2 
         }
     }
     config = fallback_config.copy()
@@ -165,7 +166,7 @@ def load_configuration():
         try:
             os.makedirs(os.path.dirname(default_config_path), exist_ok=True)
             with open(default_config_path, 'w') as f:
-                json.dump(fallback_config, f, indent=2)
+                json.dump(fallback_config, f, indent=2) # Save the full fallback if creating
             logger.info(f"Created default general configuration file at {default_config_path} with fallback values.")
         except Exception as e:
             logger.error(f"Could not create default general configuration file at {default_config_path}: {e}", exc_info=True)
@@ -183,27 +184,28 @@ def load_configuration():
 
 load_configuration()
 
-# --- Command Category Mapping (Constants are now imported from category_manager) ---
-# CATEGORY_MAP and CATEGORY_DESCRIPTIONS are now CM_CATEGORY_MAP and CM_CATEGORY_DESCRIPTIONS from category_manager
 
 # --- Global Variables ---
 output_buffer = []
 output_field = None
 input_field = None
 key_help_field = None
-app_instance = None # Renamed 'app' to 'app_instance' to avoid conflict if 'app' is imported
+app_instance = None 
 auto_scroll = True
 current_directory = os.getcwd()
 categorization_flow_active = False
 categorization_flow_state = {}
-# _CURRENTLY_LOADED_CATEGORIES is now managed by category_manager
+# --- New global variables for command confirmation flow ---
+confirmation_flow_active = False
+confirmation_flow_state = {}
+
 
 # --- Keybindings ---
 kb = KeyBindings()
 @kb.add('c-c')
 @kb.add('c-d')
 def _handle_exit_or_cancel(event):
-    global categorization_flow_active, categorization_flow_state
+    global categorization_flow_active, categorization_flow_state, confirmation_flow_active, confirmation_flow_state
     if categorization_flow_active:
         append_output("\n⚠️ Categorization cancelled by user.", style_class='warning')
         logger.info("Categorization flow cancelled by Ctrl+C/D.")
@@ -212,13 +214,21 @@ def _handle_exit_or_cancel(event):
             categorization_flow_state['future'].set_result({'action': 'cancel_execution'})
         restore_normal_input_handler()
         event.app.invalidate()
+    elif confirmation_flow_active: # Handle cancellation for the new confirmation flow
+        append_output("\n⚠️ Command confirmation cancelled by user.", style_class='warning')
+        logger.info("Confirmation flow cancelled by Ctrl+C/D.")
+        confirmation_flow_active = False
+        if 'future' in confirmation_flow_state and not confirmation_flow_state['future'].done():
+            confirmation_flow_state['future'].set_result({'action': 'cancel'}) 
+        restore_normal_input_handler()
+        event.app.invalidate()
     else:
         logger.info("Exit keybinding triggered.")
         event.app.exit()
 
 @kb.add('c-n')
 def _handle_newline(event):
-    if not categorization_flow_active:
+    if not categorization_flow_active and not confirmation_flow_active: # Also check confirmation_flow_active
         event.current_buffer.insert_text('\n')
 
 @kb.add('enter')
@@ -230,7 +240,7 @@ def _handle_enter(event):
 def _handle_tab(event):
     buff = event.current_buffer
     if buff.complete_state:
-        event.app.current_buffer.complete_next() # Use event.app consistently
+        event.app.current_buffer.complete_next() 
     else:
         event.current_buffer.insert_text('    ')
 
@@ -248,19 +258,19 @@ def _handle_pagedown(event):
 
 @kb.add('c-up')
 def _handle_ctrl_up(event):
-    if not categorization_flow_active:
+    if not categorization_flow_active and not confirmation_flow_active:
         event.current_buffer.cursor_up(count=1)
 
 @kb.add('c-down')
 def _handle_ctrl_down(event):
-    if not categorization_flow_active:
+    if not categorization_flow_active and not confirmation_flow_active:
         event.current_buffer.cursor_down(count=1)
 
 @kb.add('up')
 def _handle_up_arrow(event):
     buff = event.current_buffer
     doc = buff.document
-    if not categorization_flow_active:
+    if not categorization_flow_active and not confirmation_flow_active:
         if doc.cursor_position_row == 0:
             if buff.history_backward():
                 buff.document = Document(text=buff.text, cursor_position=len(buff.text))
@@ -272,7 +282,7 @@ def _handle_up_arrow(event):
 def _handle_down_arrow(event):
     buff = event.current_buffer
     doc = buff.document
-    if not categorization_flow_active:
+    if not categorization_flow_active and not confirmation_flow_active:
         if doc.cursor_position_row == doc.line_count - 1:
             if buff.history_forward():
                 buff.document = Document(text=buff.text, cursor_position=len(buff.text))
@@ -286,22 +296,22 @@ def append_output(text: str, style_class: str = 'default'):
     if not text.endswith('\n'):
         text += '\n'
     
-    output_buffer.append((style_class, text)) # Keep storing styled tuples if needed elsewhere
+    output_buffer.append((style_class, text)) 
     
     if output_field:
-        plain_text_output = "".join([content for _, content in output_buffer]) # Reconstruct for TextArea
+        plain_text_output = "".join([content for _, content in output_buffer]) 
         
         buffer = output_field.buffer
         current_cursor_pos = buffer.cursor_position
         
         buffer.set_document(Document(plain_text_output, cursor_position=len(plain_text_output)), bypass_readonly=True)
 
-        if auto_scroll or categorization_flow_active:
+        if auto_scroll or categorization_flow_active or confirmation_flow_active: # Added confirmation_flow_active
             buffer.cursor_position = len(plain_text_output)
         else:
             buffer.cursor_position = min(current_cursor_pos, len(plain_text_output))
             
-        current_app = get_app() # Use the imported get_app
+        current_app = get_app() 
         if current_app.is_running:
             current_app.invalidate()
         else:
@@ -323,8 +333,9 @@ def normal_input_accept_handler(buff):
     asyncio.create_task(handle_input_async(buff.text))
 
 def restore_normal_input_handler():
-    global input_field, current_directory, categorization_flow_active
+    global input_field, current_directory, categorization_flow_active, confirmation_flow_active # Added confirmation_flow_active
     categorization_flow_active = False
+    confirmation_flow_active = False # Reset confirmation flow flag as well
     if input_field:
         home_dir = os.path.expanduser("~")
         max_prompt_len = config.get('ui', {}).get('max_prompt_length', 20) 
@@ -349,9 +360,8 @@ def restore_normal_input_handler():
         
         input_field.prompt = f"({dir_for_prompt}) > "
         input_field.buffer.accept_handler = normal_input_accept_handler
-        input_field.multiline = True
+        input_field.multiline = config.get('behavior', {}).get('input_field_height', 3) > 1 # Restore based on config
 
-# --- AI Command Validation and Translation are now in ai_handler.py ---
 
 # --- Update Command Helper ---
 def get_file_hash(filepath):
@@ -503,23 +513,24 @@ def display_general_help():
         ('class:help-title', "micro_X AI-Enhanced Shell - Help\n\n"),
         ('class:help-text', "Welcome to micro_X! An intelligent shell that blends traditional command execution with AI capabilities.\n"),
         ('class:help-header', "\nAvailable Commands:\n"),
-        ('class:help-command', "  /ai <query>             "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
-        ('class:help-example', "                          Example: /ai list all text files in current folder\n"),
-        ('class:help-command', "  /command <subcommand>   "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
-        ('class:help-example', "                          Type '/command help' for detailed options.\n"),
-        ('class:help-command', "  /ollama <subcommand>    "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"), # New help line
-        ('class:help-example', "                          Type '/ollama help' for detailed options.\n"), # New help line
-        ('class:help-command', "  /utils <script> [args]  "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
-        ('class:help-example', "                          Type '/utils list' or '/utils help' for available scripts.\n"),
-        ('class:help-command', "  /update                 "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
-        ('class:help-command', "  /help                   "), ('class:help-description', "- Display this help message.\n"),
-        ('class:help-command', "  exit | quit             "), ('class:help-description', "- Exit the micro_X shell.\n"),
+        ('class:help-command', "  /ai <query>              "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
+        ('class:help-example', "                           Example: /ai list all text files in current folder\n"),
+        ('class:help-command', "  /command <subcommand>    "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
+        ('class:help-example', "                           Type '/command help' for detailed options.\n"),
+        ('class:help-command', "  /ollama <subcommand>     "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"), 
+        ('class:help-example', "                           Type '/ollama help' for detailed options.\n"), 
+        ('class:help-command', "  /utils <script> [args]   "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
+        ('class:help-example', "                           Type '/utils list' or '/utils help' for available scripts.\n"),
+        ('class:help-command', "  /update                  "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
+        ('class:help-command', "  /help                    "), ('class:help-description', "- Display this help message.\n"),
+        ('class:help-command', "  exit | quit              "), ('class:help-description', "- Exit the micro_X shell.\n"),
         ('class:help-header', "\nDirect Commands:\n"),
         ('class:help-text', "  You can type standard Linux commands directly (e.g., 'ls -l', 'cd my_folder').\n"),
         ('class:help-text', "  Unknown commands will trigger an interactive categorization flow.\n"),
+        ('class:help-text', "  AI-generated commands will prompt for confirmation before execution.\n"), # Added note about confirmation
         ('class:help-header', "\nKeybindings:\n"),
         ('class:help-text', "  Common keybindings are displayed at the bottom of the screen.\n"),
-        ('class:help-text', "  Ctrl+C / Ctrl+D: Exit micro_X or cancel current categorization.\n"),
+        ('class:help-text', "  Ctrl+C / Ctrl+D: Exit micro_X or cancel current categorization/confirmation.\n"), # Updated
         ('class:help-text', "  Ctrl+N: Insert a newline in the input field.\n"),
         ('class:help-header', "\nConfiguration:\n"),
         ('class:help-text', "  AI models and some behaviors can be customized in 'config/user_config.json'.\n"),
@@ -541,11 +552,11 @@ def display_ollama_help():
         ("class:help-title", "Ollama Service Management - Help\n"),
         ("class:help-text", "Use these commands to manage the Ollama service used by micro_X.\n"),
         ("class:help-header", "\nAvailable /ollama Subcommands:\n"),
-        ("class:help-command", "  /ollama start       "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
-        ("class:help-command", "  /ollama stop        "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
-        ("class:help-command", "  /ollama restart     "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"),
-        ("class:help-command", "  /ollama status      "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
-        ("class:help-command", "  /ollama help        "), ("class:help-description", "- Displays this help message.\n"),
+        ("class:help-command", "  /ollama start        "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
+        ("class:help-command", "  /ollama stop         "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
+        ("class:help-command", "  /ollama restart      "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"),
+        ("class:help-command", "  /ollama status       "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
+        ("class:help-command", "  /ollama help         "), ("class:help-description", "- Displays this help message.\n"),
         ("class:help-text", "\nNote: These commands primarily interact with an Ollama instance managed by micro_X in a tmux session. ")
     ]
     help_output_string = "".join([text for _, text in help_text])
@@ -554,7 +565,7 @@ def display_ollama_help():
 
 async def handle_ollama_command_async(user_input_parts: list):
     """Handles /ollama subcommands."""
-    global ollama_service_ready # We might update this based on actions
+    global ollama_service_ready 
     logger.info(f"Handling /ollama command: {user_input_parts}")
 
     if len(user_input_parts) < 2:
@@ -565,15 +576,13 @@ async def handle_ollama_command_async(user_input_parts: list):
 
     if subcommand == "start":
         append_output("⚙️ Attempting to start Ollama service...", style_class='info')
-        # Ensure ollama_manager has the latest config and append_output
-        # explicit_start_ollama_service itself calls _initialize_manager_if_needed
         success = await explicit_start_ollama_service(config, append_output)
         if success:
             append_output("✅ Ollama service start process initiated. Check status shortly.", style_class='success')
-            ollama_service_ready = await ensure_ollama_service(config, append_output) # Re-check readiness
+            ollama_service_ready = await ensure_ollama_service(config, append_output) 
         else:
             append_output("❌ Ollama service start process failed. See logs for details.", style_class='error')
-            ollama_service_ready = False # Assume not ready if start failed
+            ollama_service_ready = False 
     elif subcommand == "stop":
         append_output("⚙️ Attempting to stop Ollama service...", style_class='info')
         success = await explicit_stop_ollama_service(config, append_output)
@@ -581,23 +590,18 @@ async def handle_ollama_command_async(user_input_parts: list):
             append_output("✅ Ollama service stop process initiated.", style_class='success')
         else:
             append_output("❌ Ollama service stop process failed. See logs for details.", style_class='error')
-        ollama_service_ready = False # Assume not ready after a stop attempt
+        ollama_service_ready = False 
     elif subcommand == "restart":
         append_output("⚙️ Attempting to restart Ollama service...", style_class='info')
         success = await explicit_restart_ollama_service(config, append_output)
         if success:
             append_output("✅ Ollama service restart process initiated. Check status shortly.", style_class='success')
-            ollama_service_ready = await ensure_ollama_service(config, append_output) # Re-check readiness
+            ollama_service_ready = await ensure_ollama_service(config, append_output) 
         else:
             append_output("❌ Ollama service restart process failed. See logs for details.", style_class='error')
-            ollama_service_ready = False # Assume not ready if restart failed
+            ollama_service_ready = False 
     elif subcommand == "status":
         await get_ollama_status_info(config, append_output)
-        # Optionally re-check and update ollama_service_ready if status shows it's up
-        # current_status_is_ready = await is_ollama_server_running() # is_ollama_server_running is in ollama_manager
-        # if ollama_service_ready != current_status_is_ready:
-        #    logger.info(f"Ollama service readiness updated by status check: {current_status_is_ready}")
-        #    ollama_service_ready = current_status_is_ready
     elif subcommand == "help":
         display_ollama_help()
     else:
@@ -607,12 +611,14 @@ async def handle_ollama_command_async(user_input_parts: list):
 
 # --- Command Handling Logic ---
 async def handle_input_async(user_input: str):
-    global current_directory, categorization_flow_active, ollama_service_ready # Added ollama_service_ready
-    if categorization_flow_active: logger.warning("Input ignored: categorization active."); return
+    global current_directory, categorization_flow_active, ollama_service_ready, confirmation_flow_active 
+    if categorization_flow_active or confirmation_flow_active: # Added confirmation_flow_active
+        logger.warning("Input ignored: categorization or confirmation flow active.")
+        return
     user_input_stripped = user_input.strip(); logger.info(f"Received input: '{user_input_stripped}'")
     if not user_input_stripped: return
 
-    current_app = get_app() # Get app instance for UI updates
+    current_app = get_app() 
 
     if user_input_stripped.lower() in {"/help", "help"}:
         display_general_help()
@@ -630,22 +636,19 @@ async def handle_input_async(user_input: str):
         await handle_utils_command_async(user_input_stripped)
         return
 
-    # --- START: Ollama Management Command Handling ---
     if user_input_stripped.startswith("/ollama"):
         try:
-            # Using simple split for /ollama as arguments are not complex
             parts = user_input_stripped.split()
             await handle_ollama_command_async(parts)
-        except Exception as e: # Catch any unexpected errors during /ollama command handling
+        except Exception as e: 
             append_output(f"❌ Error processing /ollama command: {e}", style_class='error')
             logger.error(f"Error in /ollama command '{user_input_stripped}': {e}", exc_info=True)
         return
-    # --- END: Ollama Management Command Handling ---
 
     if user_input_stripped.startswith("/ai "):
         if not ollama_service_ready:
             append_output("⚠️ Ollama service is not available. Cannot process /ai command.", style_class='warning')
-            append_output("   Try '/ollama status' or '/ollama start'.", style_class='info')
+            append_output("    Try '/ollama status' or '/ollama start'.", style_class='info')
             logger.warning("Attempted /ai command while Ollama service is not ready.")
             return
         human_query = user_input_stripped[len("/ai "):].strip()
@@ -653,49 +656,46 @@ async def handle_input_async(user_input: str):
         append_output(f"🤖 AI Query: {human_query}", style_class='ai-query') 
         append_output(f"🧠 Thinking...", style_class='ai-thinking') 
         if current_app.is_running: current_app.invalidate()
-        # Use the new ai_handler functions, passing necessary parameters
         linux_command, ai_raw_candidate = await get_validated_ai_command(human_query, config, append_output, get_app)
         if linux_command:
             append_output(f"🤖 AI Suggests (validated): {linux_command}", style_class='ai-response') 
-            await process_command(linux_command, f"/ai {human_query} -> {linux_command}", ai_raw_candidate, None)
+            # Pass is_ai_generated=True
+            await process_command(linux_command, f"/ai {human_query} -> {linux_command}", ai_raw_candidate, None, is_ai_generated=True)
         else: append_output("🤔 AI could not produce a validated command.", style_class='warning') 
         return
     
     if user_input_stripped.startswith("/command"):  
-        # handle_command_subsystem_input now returns a dict if it's a 'run' command
         command_action = handle_command_subsystem_input(user_input_stripped) 
         if isinstance(command_action, dict) and command_action.get('action') == 'force_run':
             cmd_to_run = command_action['command']
             forced_cat = command_action['category']
             display_input = f"/command run {forced_cat} \"{cmd_to_run}\""
             append_output(f"⚡ Forcing execution of '{cmd_to_run}' as '{forced_cat}'...", style_class='info')
-            await process_command(cmd_to_run, display_input, None, None, forced_category=forced_cat)
-        # If not a 'force_run' dict, it means it was handled internally by category_manager (e.g., list, help)
-        # or an error was printed by it, so no further action here.
+            # is_ai_generated is False here as it's a direct /command run
+            await process_command(cmd_to_run, display_input, None, None, forced_category=forced_cat, is_ai_generated=False)
         return
     
-    # Use classify_command from category_manager
     category = classify_command(user_input_stripped) 
-    if category != UNKNOWN_CATEGORY_SENTINEL: # UNKNOWN_CATEGORY_SENTINEL from category_manager
+    if category != UNKNOWN_CATEGORY_SENTINEL: 
         logger.debug(f"Direct input '{user_input_stripped}' is known: '{category}'.")
-        await process_command(user_input_stripped, user_input_stripped, None, None)
-    else: # Unknown command, try AI validation then translation
+        # is_ai_generated is False for direct known commands
+        await process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
+    else: 
         logger.debug(f"Direct input '{user_input_stripped}' unknown. Validating with AI.")
         
         if not ollama_service_ready:
             append_output(f"⚠️ Ollama service not available. Cannot validate '{user_input_stripped}' with AI.", style_class='warning')
-            append_output(f"   Attempting direct categorization or try '/ollama status' or '/ollama start'.", style_class='info')
+            append_output(f"    Attempting direct categorization or try '/ollama status' or '/ollama start'.", style_class='info')
             logger.warning(f"Ollama service not ready. Skipping AI validation for '{user_input_stripped}'. Proceeding to categorization.")
-            await process_command(user_input_stripped, user_input_stripped, None, None) # Try to categorize without AI
+            # is_ai_generated is False as AI validation was skipped
+            await process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False) 
             return
 
         append_output(f"🔎 Validating '{user_input_stripped}' with AI...", style_class='info'); 
         if current_app.is_running: current_app.invalidate()
         
-        # Use the new ai_handler function
         is_cmd_ai_says = await is_valid_linux_command_according_to_ai(user_input_stripped, config)
         
-        # Heuristics (same as before)
         has_space = ' ' in user_input_stripped; is_path_indicator = user_input_stripped.startswith(('/', './', '../'))
         has_double_hyphen = '--' in user_input_stripped; has_single_hyphen_option = bool(re.search(r'(?:^|\s)-\w', user_input_stripped))
         is_problematic_leading_dollar = False
@@ -714,8 +714,9 @@ async def handle_input_async(user_input: str):
         if is_cmd_ai_says is True and not user_input_looks_like_phrase:
             append_output(f"✅ AI believes '{user_input_stripped}' is direct command. Categorizing.", style_class='success') 
             logger.info(f"Validator AI confirmed '{user_input_stripped}' as command (not phrase).")
-            await process_command(user_input_stripped, user_input_stripped, None, None)
-        else: # AI says not a command, or heuristic overrides, or AI inconclusive -> try translation
+            # is_ai_generated is False as it's treated as direct command after AI validation
+            await process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
+        else: 
             log_msg = ""; ui_msg = ""; ui_style = 'ai-thinking' 
             if is_cmd_ai_says is False: log_msg = f"Validator AI suggests '{user_input_stripped}' not command."; ui_msg = f"💬 AI suggests '{user_input_stripped}' not direct command. Trying as NL query..."
             elif is_cmd_ai_says is True and user_input_looks_like_phrase: log_msg = f"Validator AI confirmed '{user_input_stripped}' as command, but heuristic overrides."; ui_msg = f"💬 AI validated '{user_input_stripped}' as command, but looks like phrase. Trying as NL query..."
@@ -723,47 +724,83 @@ async def handle_input_async(user_input: str):
             logger.info(f"{log_msg} Treating as natural language."); append_output(ui_msg, style_class=ui_style)
             if current_app.is_running: current_app.invalidate()
             
-            if not ollama_service_ready: # Check again before translation
+            if not ollama_service_ready: 
                 append_output("⚠️ Ollama service is not available. Cannot translate query.", style_class='warning')
-                append_output("   Try '/ollama status' or '/ollama start'.", style_class='info')
+                append_output("    Try '/ollama status' or '/ollama start'.", style_class='info')
                 logger.warning("Ollama service not ready. Skipping NL translation.")
-                # Fallback: try to process the original input directly if translation fails due to no Ollama
-                await process_command(user_input_stripped, user_input_stripped, None, None)
+                # is_ai_generated is False as translation is skipped
+                await process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
                 return
 
-            # Use the new ai_handler function
             linux_command, ai_raw_candidate = await get_validated_ai_command(user_input_stripped, config, append_output, get_app)
             if linux_command:
                 append_output(f"🤖 AI Translated & Validated to: {linux_command}", style_class='ai-response') 
                 original_direct_for_prompt = user_input_stripped if linux_command != user_input_stripped else None
-                await process_command(linux_command, f"'{user_input_stripped}' -> {linux_command}", ai_raw_candidate, original_direct_for_prompt)
-            else: # Translation failed
+                # Pass is_ai_generated=True
+                await process_command(linux_command, f"'{user_input_stripped}' -> {linux_command}", ai_raw_candidate, original_direct_for_prompt, is_ai_generated=True)
+            else: 
                 append_output(f"🤔 AI could not produce validated command for '{user_input_stripped}'. Trying original as direct command.", style_class='warning') 
                 logger.info(f"Validated AI translation failed for '{user_input_stripped}'. Categorizing original input.")
-                await process_command(user_input_stripped, user_input_stripped, ai_raw_candidate, None) # Pass original and raw candidate
+                # is_ai_generated is False as translation failed, processing original
+                await process_command(user_input_stripped, user_input_stripped, ai_raw_candidate, None, is_ai_generated=False) 
 
 # --- process_command and categorization flow ---
 async def process_command(command_str_original: str, original_user_input_for_display: str,
                           ai_raw_candidate: str | None = None,
                           original_direct_input_if_different: str | None = None,
-                          forced_category: str | None = None): # New parameter
-    global current_directory
-    current_app = get_app() # Get app instance
+                          forced_category: str | None = None,
+                          is_ai_generated: bool = False): # New parameter
+    global current_directory, confirmation_flow_active, confirmation_flow_state, categorization_flow_active, categorization_flow_state, input_field
 
-    if not forced_category and command_str_original.strip().startswith("cd "): # cd is not force-runnable this way
+    current_app = get_app()
+
+    # --- START: New Confirmation Flow for AI-generated commands ---
+    if is_ai_generated and not forced_category: 
+        logger.info(f"AI generated command '{command_str_original}'. Initiating confirmation flow.")
+        # Ensure no other flow is active
+        if categorization_flow_active:
+            logger.warning("Confirmation flow for AI command preempted by active categorization flow. This should ideally not happen.")
+            # Decide how to handle: cancel categorization, or skip confirmation? For now, let confirmation take precedence if it's called.
+            # Or, ensure `handle_input_async` doesn't call `process_command` with `is_ai_generated=True` if categorization is already active.
+
+        confirmation_result = await prompt_for_command_confirmation(command_str_original, original_user_input_for_display)
+        
+        action = confirmation_result.get('action')
+        confirmed_command = confirmation_result.get('command', command_str_original) 
+
+        if action == 'execute':
+            append_output(f"✅ User confirmed execution of: {confirmed_command}", style_class='success')
+            command_str_original = confirmed_command 
+            # Fall through to existing logic
+        elif action == 'edit_handled_externally':
+            append_output("⌨️ Command loaded into input field for editing. Press Enter to submit.", style_class='info')
+            # Normal input handler will pick it up after user edits and presses Enter.
+            # No further processing of this command in this `process_command` call.
+            return 
+        elif action == 'cancel':
+            append_output(f"❌ Execution of '{command_str_original}' cancelled by user.", style_class='info')
+            logger.info(f"User cancelled execution of AI command: {command_str_original}")
+            return
+        else: 
+            append_output(f"Internal error in confirmation flow ({action}). Aborting.", style_class='error')
+            logger.error(f"Internal error in confirmation flow. Action: {action}")
+            return
+    # --- END: New Confirmation Flow ---
+
+    if not forced_category and command_str_original.strip().startswith("cd "): 
         handle_cd_command(command_str_original)
         return
     
-    category = forced_category # Use forced_category if provided
+    category = forced_category 
     command_for_classification = command_str_original
     command_to_be_added_if_new = command_for_classification 
     
-    if not category: # If not forced, proceed with normal classification/categorization
-        # Use classify_command from category_manager
+    if not category: 
         category = classify_command(command_for_classification) 
         
-        if category == UNKNOWN_CATEGORY_SENTINEL: # UNKNOWN_CATEGORY_SENTINEL from category_manager
+        if category == UNKNOWN_CATEGORY_SENTINEL: 
             logger.info(f"Command '{command_for_classification}' uncategorized. Starting interactive flow.")
+            # Pass is_ai_generated to categorization prompt if you want to customize its messages
             categorization_result = await prompt_for_categorization(command_for_classification, ai_raw_candidate, original_direct_input_if_different)
             
             if categorization_result.get('action') == 'cancel_execution':
@@ -771,29 +808,26 @@ async def process_command(command_str_original: str, original_user_input_for_dis
             elif categorization_result.get('action') == 'categorize_and_execute':
                 command_to_be_added_if_new = categorization_result['command'] 
                 chosen_cat_for_json = categorization_result['category']
-                # Use add_command_to_category from category_manager (aliased as cm_add_command_to_category)
                 cm_add_command_to_category(command_to_be_added_if_new, chosen_cat_for_json) 
                 category = chosen_cat_for_json 
                 logger.info(f"Command '{command_to_be_added_if_new}' categorized as '{category}'.")
                 if command_to_be_added_if_new != command_str_original: 
                     logger.info(f"Using '{command_to_be_added_if_new}' for execution, overriding '{command_str_original}'.")
                     command_str_original = command_to_be_added_if_new 
-            else: # Default action if flow doesn't return specific action (e.g. 'execute_as_default')
+            else: 
                 category = config['behavior']['default_category_for_unclassified']
                 append_output(f"Executing '{command_for_classification}' as default '{category}'.", style_class='info'); logger.info(f"Command '{command_for_classification}' executed with default category '{category}'.") 
     
     command_to_execute_expanded = expand_shell_variables(command_str_original, current_directory)
     if command_str_original != command_to_execute_expanded:
         logger.info(f"Expanded command: '{command_to_execute_expanded}' (original: '{command_str_original}')")
-        # Only show expansion if it's different from what was classified or added
         if command_to_execute_expanded != command_for_classification and command_to_execute_expanded != command_to_be_added_if_new:
-               append_output(f"Expanded for execution: {command_to_execute_expanded}", style_class='info') 
+                append_output(f"Expanded for execution: {command_to_execute_expanded}", style_class='info') 
     
     command_to_execute_sanitized = sanitize_and_validate(command_to_execute_expanded, original_user_input_for_display)
     if not command_to_execute_sanitized:
         append_output(f"Command '{command_to_execute_expanded}' blocked by sanitization.", style_class='security-warning'); logger.warning(f"Command '{command_to_execute_expanded}' blocked."); return 
     
-    # Use CM_CATEGORY_DESCRIPTIONS from category_manager
     logger.info(f"Final command: '{command_to_execute_sanitized}', Category: '{category}'"); 
     
     exec_message_prefix = "Forced execution" if forced_category else "Executing"
@@ -802,14 +836,175 @@ async def process_command(command_str_original: str, original_user_input_for_dis
     if category == "simple": execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
     else: execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category)
 
+
+# --- New Confirmation Flow TUI Functions ---
+async def prompt_for_command_confirmation(command_to_confirm: str, display_source: str) -> dict:
+    global confirmation_flow_active, confirmation_flow_state, input_field, config # Added config
+    
+    confirmation_flow_active = True
+    confirmation_flow_state = {
+        'command_to_confirm': command_to_confirm,
+        'original_command': command_to_confirm, 
+        'display_source': display_source, 
+        'step': 'ask_main_choice', 
+        'future': asyncio.Future()
+    }
+
+    if input_field:
+        input_field.multiline = False 
+
+    _ask_confirmation_main_choice() 
+
+    try:
+        return await confirmation_flow_state['future']
+    finally:
+        confirmation_flow_active = False
+        # confirmation_flow_state = {} # Clearing state here might be too soon if an async task (explain) is ongoing
+                                   # It's better to clear it when the flow truly ends or a new one starts.
+                                   # For now, let's rely on the flow setting its own future.
+        if input_field: 
+            # Restore multiline based on config, not just True
+            input_field.multiline = config.get('behavior', {}).get('input_field_height', 3) > 1
+            restore_normal_input_handler() 
+
+def _ask_confirmation_main_choice():
+    global confirmation_flow_state, input_field
+    cmd = confirmation_flow_state['command_to_confirm']
+    source = confirmation_flow_state['display_source']
+
+    append_output(f"\n🤖 AI proposed command (from: {source}):", style_class='ai-query')
+    append_output(f"   👉 {cmd}", style_class='executing') 
+    append_output(
+        "Action: [Y]es (Execute) | [E]xplain | [M]odify | [C]ancel execution?",
+        style_class='categorize-prompt' 
+    )
+    
+    if input_field:
+        input_field.prompt = "[Confirm AI Cmd] Choice (Y/E/M/C): "
+        input_field.buffer.reset()
+        input_field.buffer.accept_handler = _handle_confirmation_main_choice_response
+        app = get_app()
+        if app.is_running: app.invalidate()
+
+
+def _handle_confirmation_main_choice_response(buff):
+    global confirmation_flow_state, input_field
+    response = buff.text.strip().lower()
+    
+    valid_choice_made = False
+    if response in ['y', 'yes']:
+        confirmation_flow_state['future'].set_result({
+            'action': 'execute', 
+            'command': confirmation_flow_state['command_to_confirm']
+        })
+        valid_choice_made = True
+    elif response in ['e', 'explain']:
+        confirmation_flow_state['step'] = 'explain'
+        asyncio.create_task(_handle_explain_command_async())
+        valid_choice_made = True # The flow continues asynchronously
+    elif response in ['m', 'modify']:
+        if input_field:
+            input_field.buffer.text = confirmation_flow_state['command_to_confirm']
+            input_field.buffer.cursor_position = len(input_field.buffer.text)
+        confirmation_flow_state['future'].set_result({'action': 'edit_handled_externally'})
+        valid_choice_made = True
+    elif response in ['c', 'cancel', 'n', 'no']:
+        confirmation_flow_state['future'].set_result({'action': 'cancel'})
+        valid_choice_made = True
+    else:
+        append_output("Invalid choice. Please enter Y, E, M, or C.", style_class='error')
+        _ask_confirmation_main_choice() 
+        # Do not reset buffer yet, let user try again
+        return 
+
+    if valid_choice_made and input_field: 
+         input_field.buffer.reset()
+
+
+async def _handle_explain_command_async():
+    global confirmation_flow_state, input_field, config # Ensure config is accessible
+
+    command_to_explain = confirmation_flow_state['command_to_confirm']
+    append_output(f"\n🧠 Asking AI to explain: {command_to_explain}", style_class='ai-thinking')
+    app = get_app()
+    if app.is_running: app.invalidate()
+
+    explanation = await explain_linux_command_with_ai(command_to_explain, config, append_output)
+
+    if explanation:
+        append_output("\n💡 AI Explanation:", style_class='info-header')
+        append_output(explanation, style_class='info') 
+    else:
+        append_output("⚠️ AI could not provide an explanation.", style_class='warning')
+    
+    _ask_confirmation_after_explain()
+
+
+def _ask_confirmation_after_explain():
+    global confirmation_flow_state, input_field
+    cmd = confirmation_flow_state['command_to_confirm']
+    
+    append_output(f"\nCommand to consider: {cmd}", style_class='executing')
+    append_output(
+        "Action: [Y]es (Execute) | [M]odify | [C]ancel execution?",
+        style_class='categorize-prompt'
+    )
+    
+    if input_field:
+        input_field.prompt = "[Confirm AI Cmd] Choice (Y/M/C): "
+        input_field.buffer.reset()
+        input_field.buffer.accept_handler = _handle_confirmation_after_explain_response
+        app = get_app()
+        if app.is_running: app.invalidate()
+
+def _handle_confirmation_after_explain_response(buff):
+    global confirmation_flow_state, input_field
+    response = buff.text.strip().lower()
+    valid_choice_made = False
+
+    if response in ['y', 'yes']:
+        confirmation_flow_state['future'].set_result({
+            'action': 'execute',
+            'command': confirmation_flow_state['command_to_confirm']
+        })
+        valid_choice_made = True
+    elif response in ['m', 'modify']:
+        if input_field:
+            input_field.buffer.text = confirmation_flow_state['command_to_confirm']
+            input_field.buffer.cursor_position = len(input_field.buffer.text)
+        confirmation_flow_state['future'].set_result({'action': 'edit_handled_externally'})
+        valid_choice_made = True
+    elif response in ['c', 'cancel', 'n', 'no']:
+        confirmation_flow_state['future'].set_result({'action': 'cancel'})
+        valid_choice_made = True
+    else:
+        append_output("Invalid choice. Please enter Y, M, or C.", style_class='error')
+        _ask_confirmation_after_explain() 
+        return
+        
+    if valid_choice_made and input_field:
+         input_field.buffer.reset()
+# --- End of New Confirmation Flow TUI Functions ---
+
+
 async def prompt_for_categorization(command_initially_proposed: str, ai_raw_candidate_for_suggestions: str | None, original_direct_input_if_different: str | None) -> dict:
     global categorization_flow_active, categorization_flow_state, input_field
     categorization_flow_active = True; categorization_flow_state = {'command_initially_proposed': command_initially_proposed, 'ai_raw_candidate': ai_raw_candidate_for_suggestions,'original_direct_input': original_direct_input_if_different, 'command_to_add_final': command_initially_proposed, 'step': 0.5}
     flow_completion_future = asyncio.Future(); categorization_flow_state['future'] = flow_completion_future
     if input_field: input_field.multiline = False 
-    _ask_step_0_5_confirm_command_base() # Initial call to start the flow
+    _ask_step_0_5_confirm_command_base() 
     try: return await flow_completion_future
-    finally: restore_normal_input_handler(); logger.debug("Categorization flow ended.")
+    finally: 
+        categorization_flow_active = False # Moved from restore_normal_input_handler to here
+        # categorization_flow_state = {} # Avoid clearing state too early if other async tasks depend on it briefly
+        if input_field:
+            input_field.multiline = config.get('behavior', {}).get('input_field_height', 3) > 1
+            # restore_normal_input_handler() # This is called by prompt_for_command_confirmation if that's the outer flow
+            # If categorization is the outermost flow, it should restore.
+            if not confirmation_flow_active: # Only restore if not nested in confirmation
+                 restore_normal_input_handler()
+        logger.debug("Categorization flow ended.")
+
 
 def _ask_step_0_5_confirm_command_base():
     global categorization_flow_state; proposed = categorization_flow_state['command_initially_proposed']; original = categorization_flow_state['original_direct_input']
@@ -818,7 +1013,7 @@ def _ask_step_0_5_confirm_command_base():
         append_output(f"\nSystem processed to: '{proposed}'\nOriginal input was: '{original}'", style_class='categorize-info') 
         append_output(f"Which version to categorize?\n  1: Processed ('{proposed}')\n  2: Original ('{original}')\n  3: Modify/Enter new command\n  4: Cancel categorization", style_class='categorize-prompt') 
         if input_field: input_field.prompt = "[Categorize] Choice (1-4): "; input_field.buffer.accept_handler = _handle_step_0_5_response; current_app.invalidate()
-    else: # No difference or no original, proceed to categorize the proposed command
+    else: 
         categorization_flow_state['command_to_add_final'] = proposed; categorization_flow_state['step'] = 1; _ask_step_1_main_action()
 
 def _handle_step_0_5_response(buff):
@@ -835,11 +1030,10 @@ def _ask_step_1_main_action():
     global categorization_flow_state, input_field; cmd_display = categorization_flow_state['command_to_add_final']; default_cat_name = config['behavior']['default_category_for_unclassified']
     current_app = get_app()
     append_output(f"\nCommand to categorize: '{cmd_display}'", style_class='categorize-info') 
-    # Use CM_CATEGORY_DESCRIPTIONS
     append_output(f"How to categorize this command?\n"
-                  f"  1: simple            ({CM_CATEGORY_DESCRIPTIONS['simple']})\n" 
-                  f"  2: semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n" 
-                  f"  3: interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})\n" 
+                  f"  1: simple             ({CM_CATEGORY_DESCRIPTIONS['simple']})\n" 
+                  f"  2: semi_interactive    ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n" 
+                  f"  3: interactive_tui     ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})\n" 
                   f"  M: Modify command before categorizing\n"
                   f"  D: Execute as default '{default_cat_name}' (once, no save)\n"
                   f"  C: Cancel categorization & execution", style_class='categorize-prompt') 
@@ -847,7 +1041,6 @@ def _ask_step_1_main_action():
 
 def _handle_step_1_main_action_response(buff):
     global categorization_flow_state; response = buff.text.strip().lower(); cmd_to_add = categorization_flow_state['command_to_add_final']
-    # Use CM_CATEGORY_MAP
     if response in ['1', '2', '3']: chosen_category = CM_CATEGORY_MAP.get(response); categorization_flow_state.get('future').set_result({'action': 'categorize_and_execute', 'command': cmd_to_add, 'category': chosen_category})
     elif response == 'm': categorization_flow_state['step'] = 4; _ask_step_4_enter_modified_command(base_command=cmd_to_add)
     elif response == 'd': categorization_flow_state.get('future').set_result({'action': 'execute_as_default'})
@@ -881,15 +1074,13 @@ def _ask_step_4_5_category_for_modified():
     global categorization_flow_state, input_field; cmd_to_categorize = categorization_flow_state['command_to_add_final']
     current_app = get_app()
     append_output(f"\nCategory for command: '{cmd_to_categorize}'", style_class='categorize-info') 
-    # Use CM_CATEGORY_DESCRIPTIONS
-    append_output(f"  1: simple            ({CM_CATEGORY_DESCRIPTIONS['simple']})\n" 
-                  f"  2: semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n" 
-                  f"  3: interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})", style_class='categorize-prompt') 
+    append_output(f"  1: simple             ({CM_CATEGORY_DESCRIPTIONS['simple']})\n" 
+                  f"  2: semi_interactive    ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n" 
+                  f"  3: interactive_tui     ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})", style_class='categorize-prompt') 
     if input_field: input_field.prompt = "[Categorize] Category (1-3): "; input_field.buffer.reset(); input_field.buffer.accept_handler = _handle_step_4_5_response; current_app.invalidate()
 
 def _handle_step_4_5_response(buff):
     global categorization_flow_state; response = buff.text.strip()
-    # Use CM_CATEGORY_MAP
     chosen_category = CM_CATEGORY_MAP.get(response)
     if chosen_category: categorization_flow_state.get('future').set_result({'action': 'categorize_and_execute', 'command': categorization_flow_state['command_to_add_final'], 'category': chosen_category})
     else: append_output("Invalid category. Please enter 1, 2, or 3.", style_class='error'); _ask_step_4_5_category_for_modified() 
@@ -964,11 +1155,7 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
                     logger.warning(f"Error checking tmux windows (assuming closed or command done): {tmux_err}")
                     window_closed_or_cmd_done = True
                     break
-                
-                # Removed the 'pass' here as it's not strictly needed for the logic flow
-                # if os.path.exists(log_path) and os.path.getsize(log_path) > 0:
-                #     pass
-
+            
             if not window_closed_or_cmd_done: append_output(f"⚠️ Tmux window '{window_name}' poll timed out. Output might be incomplete or command still running.", style_class='warning'); logger.warning(f"Tmux poll for '{window_name}' timed out.")
 
             if os.path.exists(log_path):
@@ -976,30 +1163,26 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
                     with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
                         output_content = f.read().strip()
 
-                    # *** MODIFIED SECTION START ***
-                    # Get TUI detection thresholds from config, with defaults
-                    # These keys would ideally be added to default_config.json
                     tui_line_threshold = config.get('behavior', {}).get('tui_detection_line_threshold_pct', 30.0)
                     tui_char_threshold = config.get('behavior', {}).get('tui_detection_char_threshold_pct', 3.0)
 
                     if output_content and is_tui_like_output(output_content, tui_line_threshold, tui_char_threshold):
                         logger.info(f"Output from '{original_user_input_display}' determined to be TUI-like. Not displaying raw content.")
-                        suggestion_command = f'/command move "{command_to_execute}" interactive_tui' # Use the command that was actually executed
+                        suggestion_command = f'/command move "{command_to_execute}" interactive_tui' 
                         append_output(
                             f"Output from '{original_user_input_display}':\n"
                             f"[Semi-interactive session output appears TUI-specific and was not displayed directly.]\n"
                             f"💡 Tip: This command might work better if categorized as 'interactive_tui'.\n"
                             f"    You can try: {suggestion_command}",
                             style_class='info'
-                        )                       
-                        output_captured = True # Mark as captured, even if not displayed raw
-                    elif output_content: # If not TUI-like and has content
+                        )       
+                        output_captured = True 
+                    elif output_content: 
                         append_output(f"Output from '{original_user_input_display}':\n{output_content}")
                         output_captured = True
-                    elif window_closed_or_cmd_done: # No output, but window closed/command done
+                    elif window_closed_or_cmd_done: 
                         append_output(f"Output from '{original_user_input_display}': (No output captured)", style_class='info')
                         output_captured = True
-                    # *** MODIFIED SECTION END ***
 
                 except Exception as e:
                     logger.error(f"Error reading or analyzing tmux log {log_path}: {e}", exc_info=True)
@@ -1009,7 +1192,7 @@ def execute_command_in_tmux(command_to_execute: str, original_user_input_display
                         os.remove(log_path)
                     except OSError as e_del:
                         logger.error(f"Error deleting tmux log {log_path}: {e_del}")
-            elif window_closed_or_cmd_done: # Log file didn't exist, but window closed
+            elif window_closed_or_cmd_done: 
                 append_output(f"Output from '{original_user_input_display}': (Tmux window closed, no log found)", style_class='info')
 
             if not output_captured and not window_closed_or_cmd_done:
@@ -1042,34 +1225,19 @@ def execute_shell_command(command_to_execute: str, original_user_input_display: 
     except FileNotFoundError: append_output(f"❌ Shell (bash) not found. Cannot execute command.", style_class='error'); logger.error(f"Shell (bash) not found for: {command_to_execute}") 
     except Exception as e: append_output(f"❌ Error executing '{command_to_execute}': {e}", style_class='error'); logger.exception(f"Error executing shell command: {e}") 
 
-# --- Command Categorization Subsystem (Now handled by category_manager.py) ---
-# Functions like _load_single_category_file, load_and_merge_command_categories,
-# classify_command (the old one), _save_user_command_categories, add_command_to_category (the old one),
-# remove_command_from_category, list_categorized_commands, move_command_category,
-# and handle_command_subsystem_input (the old one) have been removed.
-# Their functionality is now accessed via the category_manager module.
-
-# --- Main Application Setup and Run ---
-async def main_async_runner(): # New async wrapper for startup tasks
+async def main_async_runner(): 
     global output_field, input_field, key_help_field, app_instance, auto_scroll, current_directory, ollama_service_ready
 
-    # Initialize the category manager (this also loads categories)
     init_category_manager(SCRIPT_DIR, CONFIG_DIR, append_output)
-    # The old load_and_merge_command_categories() call is no longer needed here.
-
-    # --- Ollama Service Check ---
-    # This needs to happen after config is loaded and append_output is available
-    # but before the app fully runs if AI is critical from the start.
-    # For now, we'll set the global flag.
+    
     ollama_service_ready = await ensure_ollama_service(config, append_output)
     if not ollama_service_ready:
         append_output("⚠️ Ollama service is not available or failed to start. AI-dependent features will be affected.", style_class='error')
-        append_output("   You can try '/ollama help' for manual control options.", style_class='info')
+        append_output("    You can try '/ollama help' for manual control options.", style_class='info')
         logger.warning("Ollama service check failed or service could not be started. Continuing with AI features potentially disabled.")
     else:
         append_output("✅ Ollama service is active and ready.", style_class='success')
         logger.info("Ollama service is active.")
-    # --- End Ollama Service Check ---
     
     history = FileHistory(HISTORY_FILE_PATH)
     home_dir = os.path.expanduser("~")
@@ -1088,21 +1256,18 @@ async def main_async_runner(): # New async wrapper for startup tasks
         "Type a Linux command, or try '/ai your query' (e.g., /ai list text files).\n"
         "Key shortcuts are shown below. For more help, type '/help'.\n"
         "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
-        "Use '/ollama help' to manage the Ollama service.\n" # Added info about /ollama
+        "Use '/ollama help' to manage the Ollama service.\n" 
     )
     
-    global output_buffer # Ensure output_buffer is accessible if not already appended to
-    # Prepend initial messages if output_buffer is empty, otherwise append
-    if not output_buffer or (len(output_buffer) == 1 and output_buffer[0][1] == initial_welcome_message): # Avoid duplicating welcome if already there
+    global output_buffer 
+    if not output_buffer or (len(output_buffer) == 1 and output_buffer[0][1] == initial_welcome_message): 
         output_buffer = [('class:welcome', initial_welcome_message)]
-    else: # If ollama messages were added, append welcome after them
-        # This logic might need refinement if ollama messages should come *after* welcome.
-        # For now, ollama status messages will appear first.
+    else: 
         output_buffer.append(('class:welcome', initial_welcome_message))
 
 
     output_field = TextArea(
-        text="".join([content for _, content in output_buffer]), # Reconstruct text with all messages
+        text="".join([content for _, content in output_buffer]), 
         style='class:output-field', 
         scrollbar=True, 
         focusable=False, 
@@ -1113,7 +1278,7 @@ async def main_async_runner(): # New async wrapper for startup tasks
     input_field = TextArea(
         prompt=f"({initial_prompt_dir}) > ", 
         style='class:input-field', 
-        multiline=True, 
+        multiline=config.get('behavior', {}).get('input_field_height', 3) > 1, # Use config for initial multiline
         wrap_lines=False, 
         history=history, 
         accept_handler=normal_input_accept_handler, 
@@ -1135,13 +1300,13 @@ async def main_async_runner(): # New async wrapper for startup tasks
         'scrollbar.button': 'bg:#3e4451',
         'default': '#abb2bf', 
         'welcome': 'bold #86c07c', 
-        'info': '#61afef',         
+        'info': '#61afef',        
         'info-header': 'bold #61afef',
         'info-subheader': 'underline #61afef',
         'info-item': '#abb2bf',
         'info-item-empty': 'italic #5c6370',
-        'success': '#98c379',         
-        'error': '#e06c75',         
+        'success': '#98c379',        
+        'error': '#e06c75',        
         'warning': '#d19a66',     
         'security-critical': 'bold #e06c75 bg:#5c0000', 
         'security-warning': '#e06c75', 
@@ -1164,8 +1329,8 @@ async def main_async_runner(): # New async wrapper for startup tasks
     final_style = base_style
     
     def on_output_cursor_pos_changed(_=None):
-        global auto_scroll, categorization_flow_active
-        if categorization_flow_active: 
+        global auto_scroll, categorization_flow_active, confirmation_flow_active # Added confirmation_flow_active
+        if categorization_flow_active or confirmation_flow_active: # Added confirmation_flow_active
             if output_field and output_field.buffer: output_field.buffer.cursor_position = len(output_field.buffer.text)
             return
         if not (output_field and output_field.window and output_field.window.render_info): return
@@ -1180,13 +1345,10 @@ async def main_async_runner(): # New async wrapper for startup tasks
     app_instance = Application(layout=layout, key_bindings=kb, style=final_style, full_screen=True, mouse_support=True)
     
     logger.info("micro_X Shell application starting.")
-    # The app_instance.run() is blocking, so it should be the last thing in this async flow
-    # or run in a way that doesn't block other async tasks if there were any post-run.
-    # For prompt_toolkit, app.run() is typically the main blocking call.
-    await app_instance.run_async() # Use run_async for prompt_toolkit in an asyncio context
+    await app_instance.run_async() 
 
 
-def run_shell(): # This function now primarily sets up and runs the asyncio event loop
+def run_shell(): 
     try:
         asyncio.run(main_async_runner())
     except (EOFError, KeyboardInterrupt): 
@@ -1201,4 +1363,3 @@ def run_shell(): # This function now primarily sets up and runs the asyncio even
 
 if __name__ == "__main__":
     run_shell()
-
