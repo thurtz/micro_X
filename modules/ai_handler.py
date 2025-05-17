@@ -98,7 +98,9 @@ def _clean_extracted_command(extracted_candidate: str) -> str:
     logger.debug(f"After cleaning: '{original_for_log}' -> '{cleaned_linux_command}'")
 
     # Discard common AI refusal phrases
-    if cleaned_linux_command and not cleaned_linux_command.lower().startswith(("sorry", "i cannot", "unable to", "cannot translate")):
+    # MODIFIED: Added "i am unable to" to the list of refusal prefixes.
+    refusal_prefixes = ("sorry", "i cannot", "unable to", "cannot translate", "i am unable to")
+    if cleaned_linux_command and not cleaned_linux_command.lower().startswith(refusal_prefixes):
         return cleaned_linux_command
     else:
         if cleaned_linux_command: # Log if it was a refusal phrase
@@ -208,7 +210,7 @@ async def _interpret_and_clean_tagged_ai_output(human_input: str, config_param: 
                 for group_index in _COMMAND_EXTRACT_GROUPS:
                     if COMMAND_PATTERN.groups >= group_index and (extracted_candidate := match.group(group_index)) is not None:
                         if raw_candidate_from_regex is None: # Store the first non-None raw candidate
-                             raw_candidate_from_regex = extracted_candidate.strip()
+                            raw_candidate_from_regex = extracted_candidate.strip()
                         cleaned_linux_command = _clean_extracted_command(extracted_candidate)
                         if cleaned_linux_command:
                             logger.debug(f"_interpret_and_clean_tagged_ai_output returning: Cleaned='{cleaned_linux_command}', Raw='{raw_candidate_from_regex}'")
@@ -409,7 +411,7 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
             # Return the last *cleaned* command attempt (even if unvalidated) and the most relevant raw candidate
             final_raw_candidate = last_raw_candidate_secondary if last_raw_candidate_secondary is not None else last_raw_candidate_primary
             if last_cleaned_command_attempt:
-                 append_output_func(f"ℹ️ Offering last unvalidated attempt for categorization: '{last_cleaned_command_attempt}'", style_class='info')
+                append_output_func(f"ℹ️ Offering last unvalidated attempt for categorization: '{last_cleaned_command_attempt}'", style_class='info')
             return last_cleaned_command_attempt, final_raw_candidate
 
     return None, None # Should be covered by the loop's else, but as a fallback
