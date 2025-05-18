@@ -2,7 +2,7 @@
 
 **micro\_X** is an intelligent, interactive shell environment designed to bridge the gap between natural language and executable Linux commands. It leverages local large language models (LLMs) via Ollama to translate your queries, validate commands, explain their functionality, and streamline your command-line workflow.
 
-GitHub Repository: https://github.com/thurtz/micro\_X.git  
+GitHub Repository: https://github.com/thurtz/micro_X.git  
 Detailed User Guide: docs/micro\_X\_User\_Guide.md
 
 ## **Overview**
