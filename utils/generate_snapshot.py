@@ -28,7 +28,9 @@ FILES_TO_INCLUDE = [
     "tests/test_category_manager.py", # Added test_category_manager.py
     "tests/conftest.py", # Added test_conftest.py
     "pytest_results/pytest_results.txt", # Added pytest_results.txt
-    "modules/ui_manager.py" # Added ui_manager.py
+    "modules/ui_manager.py", # Added ui_manager.py
+    "docs/micro_X_User_Guide.md", # Added micro_X_User_Guide.md
+    "docs/review_of_micro_X_project.md" # Added review_of_micro_X_project_20250518_090500.md
 ]
 
 # Output directory and filename for the snapshot
