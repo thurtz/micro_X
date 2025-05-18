@@ -27,7 +27,8 @@ FILES_TO_INCLUDE = [
     "tests/test_ai_handler.py", # Added test_ai_handler.py
     "tests/test_category_manager.py", # Added test_category_manager.py
     "tests/conftest.py", # Added test_conftest.py
-    "pytest_results/pytest_results.txt"
+    "pytest_results/pytest_results.txt", # Added pytest_results.txt
+    "modules/ui_manager.py" # Added ui_manager.py
 ]
 
 # Output directory and filename for the snapshot

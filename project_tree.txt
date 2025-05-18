@@ -13,11 +13,11 @@ micro_X
 |   ├── ai_analysis_of_micro_X_project_2025_05_14-23_30_00.md
 |   ├── analysis_of_micro_X_2025_05_14-16_41_00.md
 |   ├── analysis_of_micro_X_project_20250515_203802.md
+|   ├── analysis_of_micro_X_project_2025_05_17_120000.md
 |   ├── generate_snapshot.md
 |   ├── generate_tree.md
 |   ├── micro_X_User_Guide.md
 |   ├── micro_X_why_command_categories.txt
-|   ├── micro_x_testing_plan.md
 |   └── review_of_micro_X_project_20250516_220000.md
 ├── modules/
 |   ├── ai_handler.old.py
@@ -26,7 +26,9 @@ micro_X
 |   ├── category_manager.py
 |   ├── ollama_manager.old.py
 |   ├── ollama_manager.py
-|   └── output_analyzer.py
+|   ├── output_analyzer.py
+|   ├── ui_manager.old.py
+|   └── ui_manager.py
 ├── pytest_results/
 |   └── pytest_results.txt
 ├── tests/
