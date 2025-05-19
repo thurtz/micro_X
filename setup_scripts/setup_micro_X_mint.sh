@@ -1,8 +1,19 @@
 #!/bin/bash
 
 # Script to set up the micro_X environment on Linux Mint
+# MODIFIED to be called from a root setup.sh and accept PROJECT_ROOT
 
-echo "--- micro_X Setup Script for Linux Mint ---"
+echo "--- micro_X Setup Script for Linux Mint (OS-Specific) ---"
+echo ""
+
+# --- Accept PROJECT_ROOT as the first argument ---
+if [ -z "$1" ]; then
+    echo "ERROR: This script expects PROJECT_ROOT as its first argument."
+    echo "Please run it via the main setup.sh script in the project root."
+    exit 1
+fi
+PROJECT_ROOT="$1"
+echo "Using Project Root: $PROJECT_ROOT"
 echo ""
 
 # Function to check if a command exists

@@ -2,6 +2,7 @@
 
 # Script to set up the micro_X environment within WSL (Windows Subsystem for Linux)
 # This script assumes Ollama is installed and running on the WINDOWS HOST.
+# MODIFIED to be called from a root setup.sh and accept PROJECT_ROOT
 
 echo "--- micro_X Setup Script for WSL ---"
 echo ""
@@ -9,6 +10,16 @@ echo "IMPORTANT ASSUMPTIONS:"
 echo "1. You are running this script INSIDE your WSL (e.g., Ubuntu) environment."
 echo "2. Ollama is (or will be) installed and RUNNING on your WINDOWS HOST machine."
 echo "3. This script is located in the root of the cloned micro_X directory."
+echo ""
+
+# --- Accept PROJECT_ROOT as the first argument ---
+if [ -z "$1" ]; then
+    echo "ERROR: This script expects PROJECT_ROOT as its first argument."
+    echo "Please run it via the main setup.sh script in the project root."
+    exit 1
+fi
+PROJECT_ROOT="$1"
+echo "Using Project Root: $PROJECT_ROOT"
 echo ""
 
 # Function to check if a command exists
