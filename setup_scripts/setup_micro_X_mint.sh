@@ -16,14 +16,11 @@ PROJECT_ROOT="$1"
 echo "Using Project Root: $PROJECT_ROOT"
 echo ""
 
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
-
-# Get the absolute path to the directory where this script is located
-# This assumes setup.sh, main.py, micro_X.sh, and micro_X.desktop are in the same directory.
-SCRIPT_ABS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # --- 1. Prerequisites ---
 echo "--- Checking Prerequisites ---"
@@ -86,7 +83,7 @@ else
     if ! systemctl is-active --quiet ollama; then
         echo "Ollama service is not active. Attempting to start (may require sudo)..."
         sudo systemctl start ollama
-        sleep 5
+        sleep 5 # Give it a moment to start
         if ! systemctl is-active --quiet ollama; then
             echo "WARNING: Could not start Ollama service. Please ensure it's running manually before using micro_X."
         else
@@ -109,10 +106,11 @@ if command_exists ollama; then
     for model in "${MODELS[@]}"; do
         echo "Pulling Ollama model: $model ..."
         ollama pull "$model"
-        if ollama list | grep -q "${model%%:*}"; then
-             echo "$model pulled successfully or already exists."
+        # Basic check if model is listed (name before ':')
+        if ollama list | grep -q "${model%%:*}"; then # Check for the base model name
+            echo "$model pulled successfully or already exists."
         else
-             echo "WARNING: Failed to pull $model or could not verify. Please check manually."
+            echo "WARNING: Failed to pull $model or could not verify. Please check manually."
         fi
     done
 else
@@ -123,15 +121,15 @@ echo ""
 # --- 3. Setting up micro_X Python Environment ---
 echo "--- Setting up Python Environment for micro_X ---"
 
-# Check if main.py exists in the current directory
-if [ ! -f "$SCRIPT_ABS_DIR/main.py" ]; then
-    echo "ERROR: main.py not found in the current directory ($SCRIPT_ABS_DIR)."
-    echo "Please run this script from the same directory where main.py and other micro_X files are located."
+# Check if main.py exists in the PROJECT_ROOT
+if [ ! -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
+    echo "ERROR: main.py not found in the project root ($PROJECT_ROOT)."
+    echo "Please ensure the main setup.sh script is run from the correct project root."
     exit 1
 fi
 
-# Create a Virtual Environment
-VENV_DIR="$SCRIPT_ABS_DIR/.venv" # Use absolute path for venv dir
+# Create a Virtual Environment in PROJECT_ROOT
+VENV_DIR="$PROJECT_ROOT/.venv" # MODIFIED
 if [ -d "$VENV_DIR" ]; then
     echo "Virtual environment '$VENV_DIR' already exists. Skipping creation."
 else
@@ -144,8 +142,8 @@ else
     echo "Virtual environment created."
 fi
 
-# Create requirements.txt if it doesn't exist
-REQUIREMENTS_FILE="$SCRIPT_ABS_DIR/requirements.txt" # Use absolute path
+# Create requirements.txt if it doesn't exist in PROJECT_ROOT
+REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt" # MODIFIED
 if [ ! -f "$REQUIREMENTS_FILE" ]; then
     echo "Creating $REQUIREMENTS_FILE..."
     cat <<EOF > "$REQUIREMENTS_FILE"
@@ -159,11 +157,10 @@ fi
 
 # Install Python Dependencies into the virtual environment
 echo "Installing Python dependencies from $REQUIREMENTS_FILE into $VENV_DIR..."
-# MODIFIED: Use 'pip' instead of 'pip3' for the venv's pip
-"$VENV_DIR/bin/pip" install -r "$REQUIREMENTS_FILE"
+"$VENV_DIR/bin/pip" install -r "$REQUIREMENTS_FILE" # Use pip from venv
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to install Python dependencies."
-    echo "Try activating the virtual environment manually ('source $VENV_DIR/bin/activate') and then run 'pip3 install -r $REQUIREMENTS_FILE'."
+    echo "Try activating the virtual environment manually ('source $VENV_DIR/bin/activate') and then run 'pip install -r $REQUIREMENTS_FILE'."
     exit 1
 fi
 echo "Python dependencies installed."
@@ -171,14 +168,14 @@ echo ""
 
 # --- 4. Make Scripts Executable & Handle Desktop File ---
 echo "--- Finalizing Scripts & Desktop Entry ---"
-if [ -f "$SCRIPT_ABS_DIR/main.py" ]; then
-    chmod +x "$SCRIPT_ABS_DIR/main.py"
+if [ -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
+    chmod +x "$PROJECT_ROOT/main.py" # MODIFIED
     echo "main.py is now executable."
 else
     echo "WARNING: main.py not found, cannot make executable."
 fi
 
-MICRO_X_LAUNCHER_SH="$SCRIPT_ABS_DIR/micro_X.sh"
+MICRO_X_LAUNCHER_SH="$PROJECT_ROOT/micro_X.sh" # MODIFIED
 if [ -f "$MICRO_X_LAUNCHER_SH" ]; then
     chmod +x "$MICRO_X_LAUNCHER_SH"
     echo "micro_X.sh is now executable."
@@ -186,7 +183,7 @@ else
     echo "INFO: micro_X.sh (launch script) not found. If you have one, ensure it's executable."
 fi
 
-DESKTOP_FILE_SOURCE="$SCRIPT_ABS_DIR/micro_X.desktop"
+DESKTOP_FILE_SOURCE="$PROJECT_ROOT/micro_X.desktop" # MODIFIED
 if [ -f "$DESKTOP_FILE_SOURCE" ]; then
     echo "Found $DESKTOP_FILE_SOURCE."
 
@@ -198,16 +195,20 @@ if [ -f "$DESKTOP_FILE_SOURCE" ]; then
         TEMP_DESKTOP_FILE=$(mktemp)
         cp "$DESKTOP_FILE_SOURCE" "$TEMP_DESKTOP_FILE"
 
-        ESCAPED_LAUNCHER_PATH=$(echo "$MICRO_X_LAUNCHER_SH" | sed 's/\//\\\//g')
+        # Ensure Exec path in .desktop file points to micro_X.sh in PROJECT_ROOT
+        ESCAPED_LAUNCHER_PATH=$(echo "$MICRO_X_LAUNCHER_SH" | sed 's/\//\\\//g') # Escape slashes for sed
         sed -i "s/^Exec=.*/Exec=\"$ESCAPED_LAUNCHER_PATH\"/" "$TEMP_DESKTOP_FILE"
         
-        # Example for updating Icon path if it's relative:
-        # Assuming Icon=micro_x_icon.png and the icon is in $SCRIPT_ABS_DIR
-        # Check if Icon line exists and is relative
-        # if grep -q "^Icon=[^/]" "$TEMP_DESKTOP_FILE"; then
-        #    ESCAPED_SCRIPT_DIR=$(echo "$SCRIPT_ABS_DIR" | sed 's/\//\\\//g')
-        #    sed -i "s/^Icon=\(.*\)/Icon=$ESCAPED_SCRIPT_DIR\/\1/" "$TEMP_DESKTOP_FILE"
-        #    echo "Updated Icon path in .desktop file to be absolute."
+        # Example for updating Icon path if it's relative and icon is in PROJECT_ROOT
+        # Assuming Icon=some_icon.png and the icon is in $PROJECT_ROOT/assets/some_icon.png
+        # This part needs to be adapted if you have an icon and know its relative path
+        # For now, we assume Exec is the main thing to fix.
+        # If Icon line exists and is relative (does not start with / or ~)
+        # if grep -q "^Icon=[^/~]" "$TEMP_DESKTOP_FILE"; then
+        #    ICON_NAME=$(grep "^Icon=" "$TEMP_DESKTOP_FILE" | cut -d'=' -f2)
+        #    ESCAPED_PROJECT_ROOT_ICON_PATH=$(echo "$PROJECT_ROOT/$ICON_NAME" | sed 's/\//\\\//g')
+        #    sed -i "s/^Icon=.*/Icon=$ESCAPED_PROJECT_ROOT_ICON_PATH/" "$TEMP_DESKTOP_FILE"
+        #    echo "Updated Icon path in .desktop file to be absolute: $PROJECT_ROOT/$ICON_NAME"
         # fi
 
 
@@ -238,10 +239,11 @@ if [ -f "$DESKTOP_FILE_SOURCE" ] && [[ "$install_desktop_choice" =~ ^[Yy]$ ]]; t
     echo "   (It might take a few moments or a logout/login for it to appear)."
 fi
 echo "2. Alternatively, from the terminal:"
-echo "   If you have micro_X.sh in the current directory ($SCRIPT_ABS_DIR): ./micro_X.sh"
+echo "   If you have micro_X.sh in the project root ($PROJECT_ROOT):" # MODIFIED
+echo "     cd \"$PROJECT_ROOT\" && ./micro_X.sh" # MODIFIED
 echo ""
 echo "   If running main.py directly (micro_X.sh usually handles this):"
-echo "   a. Navigate to the script directory: cd \"$SCRIPT_ABS_DIR\""
+echo "   a. Navigate to the project directory: cd \"$PROJECT_ROOT\"" # MODIFIED
 echo "   b. Activate the virtual environment: source $VENV_DIR/bin/activate"
 echo "   c. Run the main Python script: ./main.py (or python3 main.py)"
 echo ""
