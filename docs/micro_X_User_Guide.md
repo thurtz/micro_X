@@ -15,6 +15,7 @@ micro\_X is an AI-enhanced shell designed to make your command-line experience m
 
 ### **2\. Getting Started**
 
+* **Installation and Setup:** Before using micro\_X, ensure it has been properly installed and configured. Please refer to the main README.md file in the project root or run the ./setup.sh script (also in the project root) for detailed setup instructions tailored to your operating system.  
 * **Launching micro\_X:**  
   * Recommended Method (./micro\_X.sh):  
     From the terminal, navigate to the micro\_X directory and run ./micro\_X.sh. This script is the preferred way to launch micro\_X as it:  
@@ -159,8 +160,6 @@ micro\_X uses tmux (a terminal multiplexer) to run commands categorized as semi\
 * **semi\_interactive commands (e.g., ping google.com):**  
   * These run in a tmux window, usually in the background relative to your main micro\_X interface.  
   * Output is captured and displayed in micro\_X after completion or timeout.
-
-**(Sections 5.1 to 5.3 on Basic tmux Interaction, Killing Windows, and Handling Lock-ups remain largely the same as the previous version of the guide, which is generally good.)**
 
 #### **5.1. Basic tmux Interaction (If you need to manually intervene)**
 
