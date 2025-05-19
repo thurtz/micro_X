@@ -37,8 +37,8 @@ FILES_TO_INCLUDE = [
     "docs/setup_micro_X_mint.md", # Added setup_micro_x_mint.sh
     "docs/setup_micro_X_termux.md", # Added setup_micro_x_termux.sh
     "docs/setup_micro_X_wsl.md", # Added setup_micro_x_wsl.sh
-    "docs/review_of_micro_X_project.md" # Added review_of_micro_X_project.md
-
+    "docs/review_of_micro_X_project.md", # Added review_of_micro_X_project.md
+    "setup.sh" # Added setup.sh
 ]
 
 # Output directory and filename for the snapshot
