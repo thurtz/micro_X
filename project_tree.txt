@@ -5,13 +5,40 @@ micro_X
 |   ├── .tmux.conf
 |   ├── default_command_categories.json
 |   ├── default_config.json
+|   ├── default_config.old.json
 |   ├── user_command_categories.json
 |   └── user_config.json
 ├── docs/
 |   ├── generate_snapshot.md
 |   ├── generate_tree.md
 |   ├── micro_X_User_Guide.md
-|   └── micro_x_testing_plan.md
+|   ├── review_of_micro_X_project.md
+|   ├── setup_micro_X_mac.md
+|   ├── setup_micro_X_mint.md
+|   ├── setup_micro_X_termux.md
+|   └── setup_micro_X_wsl.md
+├── modules/
+|   ├── ai_handler.old.py
+|   ├── ai_handler.py
+|   ├── category_manager.old.py
+|   ├── category_manager.py
+|   ├── ollama_manager.old.py
+|   ├── ollama_manager.py
+|   ├── output_analyzer.py
+|   ├── ui_manager.old.py
+|   └── ui_manager.py
+├── pytest_results/
+|   └── pytest_results.txt
+├── setup_scripts/
+|   ├── setup_micro_X_mac.sh
+|   ├── setup_micro_X_mint.sh
+|   ├── setup_micro_X_termux.sh
+|   └── setup_micro_X_wsl.sh
+├── tests/
+|   ├── conftest.py
+|   ├── test_ai_handler.py
+|   ├── test_category_manager.py
+|   └── tests.md
 ├── utils/
 |   ├── generate_snapshot.py
 |   └── generate_tree.py
@@ -19,17 +46,9 @@ micro_X
 ├── .micro_x_history
 ├── LICENSE
 ├── README.md
-├── ai_analysis_of_micro_X_2025_05_13.md
 ├── main.py
 ├── micro_X-A_Technical_Whitepaper_2025_05_12.md
 ├── micro_X.desktop
 ├── micro_X.sh
 ├── requirements.txt
-├── setup_micro_x_mac.md
-├── setup_micro_x_mac.sh
-├── setup_micro_x_mint.md
-├── setup_micro_x_mint.sh
-├── setup_micro_x_termux.md
-├── setup_micro_x_termux.sh
-├── setup_micro_x_wsl.md
-└── setup_micro_x_wsl.sh
+└── setup.sh
