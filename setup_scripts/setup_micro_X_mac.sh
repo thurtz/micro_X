@@ -1,19 +1,25 @@
 #!/bin/bash
 
 # Script to set up the micro_X environment on macOS
+# MODIFIED to be called from a root setup.sh and accept PROJECT_ROOT
 
-echo "--- micro_X Setup Script for macOS ---"
+echo "--- micro_X Setup Script for macOS (OS-Specific) ---"
 echo ""
-echo "NOTE: This script assumes it is run from within the cloned micro_X directory."
+
+# --- Accept PROJECT_ROOT as the first argument ---
+if [ -z "$1" ]; then
+    echo "ERROR: This script expects PROJECT_ROOT as its first argument."
+    echo "Please run it via the main setup.sh script in the project root."
+    exit 1
+fi
+PROJECT_ROOT="$1"
+echo "Using Project Root: $PROJECT_ROOT"
 echo ""
 
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
-
-# Get the absolute path to the directory where this script is located
-SCRIPT_ABS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # --- 1. Install Homebrew (if not installed) ---
 echo "--- Checking for Homebrew ---"
@@ -27,14 +33,12 @@ if ! command_exists brew; then
         exit 1
     fi
     echo "Homebrew installed successfully."
-    # Attempt to add Homebrew to PATH for the current session if the script added it to .zprofile or .bash_profile
-    # This is a common step for new Homebrew installs on Apple Silicon
-    if [ -f "$HOME/.zprofile" ] && grep -q 'eval "$(/opt/homebrew/bin/brew shellenv)"' "$HOME/.zprofile"; then
+    # Attempt to add Homebrew to PATH for the current session
+    if [ -x "/opt/homebrew/bin/brew" ]; then # Apple Silicon
         eval "$(/opt/homebrew/bin/brew shellenv)"
-    elif [ -f "/usr/local/bin/brew" ] && [ -f "$HOME/.zprofile" ] && grep -q 'eval "$(/usr/local/bin/brew shellenv)"' "$HOME/.zprofile"; then # Intel Macs
+    elif [ -x "/usr/local/bin/brew" ]; then # Intel Macs
         eval "$(/usr/local/bin/brew shellenv)"
     fi
-
 else
     echo "Homebrew is already installed."
 fi
@@ -43,16 +47,14 @@ echo ""
 # --- 2. Install Prerequisites using Homebrew ---
 echo "--- Installing/Checking Prerequisites via Homebrew ---"
 
-# Python 3 (e.g., python@3.11 or python@3.12 - brew will pick a recent stable one)
+# Python 3
 echo "Checking for Homebrew Python 3..."
-# Check for a Homebrew-installed python3. We prefer this over system Python.
-# 'brew list python@3.x' can be slow. A simpler check is for the command.
-if ! command_exists python3 || ! (python3 --version 2>&1 | grep -q "Python 3\.[1-9][0-9]\+"); then
-    echo "A suitable Homebrew Python 3 not found or system Python is default. Attempting to install/upgrade..."
+if ! command_exists python3 || ! (python3 --version 2>&1 | grep -q "Python 3\.[8-9]\|Python 3\.1[0-9]"); then
+    echo "A suitable Homebrew Python 3 (3.8+) not found or system Python is default. Attempting to install/upgrade..."
     brew install python
-    if ! command_exists python3 || ! (python3 --version 2>&1 | grep -q "Python 3\.[1-9][0-9]\+"); then
+    if ! command_exists python3 || ! (python3 --version 2>&1 | grep -q "Python 3\.[8-9]\|Python 3\.1[0-9]"); then
         echo "ERROR: Failed to install Homebrew Python 3."
-        echo "Please ensure Homebrew Python is installed and in your PATH."
+        echo "Please ensure Homebrew Python (3.8+) is installed and in your PATH."
         exit 1
     fi
     echo "Homebrew Python 3 installed/updated."
@@ -64,7 +66,6 @@ if ! python3 -m pip --version >/dev/null 2>&1; then
     echo "pip for Homebrew Python3 not found. This is unusual. Please check your Python installation."
     exit 1
 fi
-
 
 # tmux
 echo "Checking for tmux..."
@@ -95,7 +96,7 @@ if ! command_exists ollama; then
         echo "Ollama command still not found. Please ensure it's in your PATH (usually added by the installer) and the app is running."
         exit 1
     else
-         echo "Ollama confirmed by user. Make sure the Ollama application is running."
+        echo "Ollama confirmed by user. Make sure the Ollama application is running."
     fi
 else
     echo "Ollama command is available. Ensure the Ollama application is running."
@@ -117,9 +118,9 @@ if command_exists ollama; then
             echo "Pulling Ollama model: $model ..."
             ollama pull "$model"
             if ollama list | grep -q "${model%%:*}"; then
-                 echo "$model pulled successfully or already exists."
+                echo "$model pulled successfully or already exists."
             else
-                 echo "WARNING: Failed to pull $model or could not verify. Please check manually. Ensure the Ollama application is running."
+                echo "WARNING: Failed to pull $model or could not verify. Please check manually. Ensure the Ollama application is running."
             fi
         done
     else
@@ -133,15 +134,15 @@ echo ""
 # --- 5. Setting up micro_X Python Environment ---
 echo "--- Setting up Python Environment for micro_X ---"
 
-# Check if main.py exists in the current directory
-if [ ! -f "$SCRIPT_ABS_DIR/main.py" ]; then
-    echo "ERROR: main.py not found in the script directory ($SCRIPT_ABS_DIR)."
-    echo "This script should be run from the root of the micro_X project directory."
+# Check if main.py exists in the PROJECT_ROOT
+if [ ! -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
+    echo "ERROR: main.py not found in the project root ($PROJECT_ROOT)."
+    echo "Please ensure the main setup.sh script is run from the correct project root."
     exit 1
 fi
 
-# Create a Virtual Environment
-VENV_DIR="$SCRIPT_ABS_DIR/.venv"
+# Create a Virtual Environment in PROJECT_ROOT
+VENV_DIR="$PROJECT_ROOT/.venv" # MODIFIED
 if [ -d "$VENV_DIR" ]; then
     echo "Python virtual environment '$VENV_DIR' already exists. Skipping creation."
 else
@@ -154,8 +155,8 @@ else
     echo "Virtual environment created."
 fi
 
-# Create requirements.txt if it doesn't exist
-REQUIREMENTS_FILE="$SCRIPT_ABS_DIR/requirements.txt"
+# Create requirements.txt if it doesn't exist in PROJECT_ROOT
+REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt" # MODIFIED
 if [ ! -f "$REQUIREMENTS_FILE" ]; then
     echo "Creating $REQUIREMENTS_FILE..."
     cat <<EOF > "$REQUIREMENTS_FILE"
@@ -182,12 +183,12 @@ echo ""
 
 # --- 6. Make Scripts Executable ---
 echo "--- Making Scripts Executable ---"
-if [ -f "$SCRIPT_ABS_DIR/main.py" ]; then
-    chmod +x "$SCRIPT_ABS_DIR/main.py"
+if [ -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
+    chmod +x "$PROJECT_ROOT/main.py" # MODIFIED
     echo "main.py is now executable."
 fi
 
-MICRO_X_LAUNCHER_SH="$SCRIPT_ABS_DIR/micro_X.sh"
+MICRO_X_LAUNCHER_SH="$PROJECT_ROOT/micro_X.sh" # MODIFIED
 if [ -f "$MICRO_X_LAUNCHER_SH" ]; then
     chmod +x "$MICRO_X_LAUNCHER_SH"
     echo "micro_X.sh is now executable."
@@ -202,17 +203,17 @@ echo ""
 echo "IMPORTANT NEXT STEPS:"
 echo "1. Ensure the Ollama macOS application is running."
 echo ""
-echo "2. To run micro_X (from the micro_X directory: cd \"$SCRIPT_ABS_DIR\"):"
+echo "2. To run micro_X (from the micro_X directory: cd \"$PROJECT_ROOT\"):" # MODIFIED
 echo "   If you have micro_X.sh (recommended):"
-echo "      ./micro_X.sh"
-echo "      (This script should activate the virtual environment and start micro_X in tmux)."
+echo "     ./micro_X.sh"
+echo "     (This script should activate the virtual environment and start micro_X in tmux)."
 echo ""
 echo "   If running main.py directly:"
-echo "      source .venv/bin/activate"
-echo "      ./main.py  # or python3 main.py"
+echo "     source .venv/bin/activate"
+echo "     ./main.py  # or python3 main.py"
 echo ""
 echo "Consider creating a shell alias for easier launching, e.g., in your ~/.zshrc:"
-echo "  alias microx='cd \"$SCRIPT_ABS_DIR\" && ./micro_X.sh'"
+echo "  alias microx='cd \"$PROJECT_ROOT\" && ./micro_X.sh'" # MODIFIED
 echo "Then run 'source ~/.zshrc' and you can start micro_X by typing 'microx'."
 echo ""
 echo "If you skipped model pulling, ensure you pull them with 'ollama pull <model_name>' while the Ollama app is running."

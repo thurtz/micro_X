@@ -18,7 +18,27 @@ FILES_TO_INCLUDE = [
     "project_tree.txt",
     "README.md",
     "micro_X.sh",                 # Added micro_X.sh
-    "micro_X.desktop"             # Added micro_X.desktop
+    "micro_X.desktop",             # Added micro_X.desktop
+    "modules/ai_handler.py",     # Added ai_handler.py
+    "modules/category_manager.py", # Added category_handler.py
+    "modules/output_analyzer.py", # Added output_analyzer.py
+    "modules/ollama_manager.py", # Added ollama_manager.py
+    "setup_scripts/setup_micro_X_mac.sh", # Added setup_micro_x_mac.sh
+    "setup_scripts/setup_micro_X_mint.sh", # Added setup_micro_x_mint.sh
+    "setup_scripts/setup_micro_X_termux.sh", # Added setup_micro_x_termux.sh
+    "setup_scripts/setup_micro_X_wsl.sh", # Added setup_micro_x_wsl.sh
+    "tests/test_ai_handler.py", # Added test_ai_handler.py
+    "tests/test_category_manager.py", # Added test_category_manager.py
+    "tests/conftest.py", # Added test_conftest.py
+    "pytest_results/pytest_results.txt", # Added pytest_results.txt
+    "modules/ui_manager.py", # Added ui_manager.py
+    "docs/micro_X_User_Guide.md", # Added micro_X_User_Guide.md
+    "docs/setup_micro_X_mac.md", # Added setup_micro_x_mac.sh
+    "docs/setup_micro_X_mint.md", # Added setup_micro_x_mint.sh
+    "docs/setup_micro_X_termux.md", # Added setup_micro_x_termux.sh
+    "docs/setup_micro_X_wsl.md", # Added setup_micro_x_wsl.sh
+    "docs/review_of_micro_X_project.md", # Added review_of_micro_X_project.md
+    "setup.sh" # Added setup.sh
 ]
 
 # Output directory and filename for the snapshot
