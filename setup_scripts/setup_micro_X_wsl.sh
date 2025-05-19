@@ -4,12 +4,11 @@
 # This script assumes Ollama is installed and running on the WINDOWS HOST.
 # MODIFIED to be called from a root setup.sh and accept PROJECT_ROOT
 
-echo "--- micro_X Setup Script for WSL ---"
+echo "--- micro_X Setup Script for WSL (OS-Specific) ---"
 echo ""
 echo "IMPORTANT ASSUMPTIONS:"
 echo "1. You are running this script INSIDE your WSL (e.g., Ubuntu) environment."
 echo "2. Ollama is (or will be) installed and RUNNING on your WINDOWS HOST machine."
-echo "3. This script is located in the root of the cloned micro_X directory."
 echo ""
 
 # --- Accept PROJECT_ROOT as the first argument ---
@@ -27,9 +26,6 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Get the absolute path to the directory where this script is located
-SCRIPT_ABS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-
 # --- 1. Prerequisites for WSL Environment ---
 echo "--- Checking WSL Prerequisites ---"
 
@@ -43,20 +39,24 @@ echo "Checking for Python 3, PIP, and venv..."
 PACKAGES_TO_INSTALL=""
 if ! command_exists python3; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL python3"; fi
 if ! command_exists pip3; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL python3-pip"; fi
-if ! dpkg -s python3-venv >/dev/null 2>&1; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL python3-venv"; fi
+# Check for python3-venv specifically, as just python3-pip might not install it.
+if ! dpkg -s python3-venv >/dev/null 2>&1 && ! python3 -m venv --help >/dev/null 2>&1; then
+    PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL python3-venv"
+fi
+
 
 if [ -n "$PACKAGES_TO_INSTALL" ]; then
     echo "The following Python-related packages are missing or not fully installed: $PACKAGES_TO_INSTALL"
     echo "Attempting to install..."
     sudo apt install -y $PACKAGES_TO_INSTALL
     # Verify again
-    if ! command_exists python3 || ! command_exists pip3 || ! dpkg -s python3-venv >/dev/null 2>&1; then
+    if ! command_exists python3 || ! command_exists pip3 || (! dpkg -s python3-venv >/dev/null 2>&1 && ! python3 -m venv --help >/dev/null 2>&1); then
         echo "ERROR: Failed to install all required Python packages. Please install them manually and re-run."
         exit 1
     fi
     echo "Python packages installed."
 else
-    echo "Python 3, PIP3, and python3-venv are already installed."
+    echo "Python 3, PIP3, and python3-venv (or equivalent) are already installed."
 fi
 
 # tmux
@@ -117,15 +117,15 @@ echo ""
 # --- 4. Setting up micro_X Python Environment in WSL ---
 echo "--- Setting up Python Environment for micro_X (in WSL) ---"
 
-# Check if main.py exists
-if [ ! -f "$SCRIPT_ABS_DIR/main.py" ]; then
-    echo "ERROR: main.py not found in the script directory ($SCRIPT_ABS_DIR)."
-    echo "This script should be run from the root of the micro_X project directory."
+# Check if main.py exists in PROJECT_ROOT
+if [ ! -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
+    echo "ERROR: main.py not found in the project root ($PROJECT_ROOT)."
+    echo "Please ensure the main setup.sh script is run from the correct project root."
     exit 1
 fi
 
-# Create a Virtual Environment
-VENV_DIR="$SCRIPT_ABS_DIR/.venv"
+# Create a Virtual Environment in PROJECT_ROOT
+VENV_DIR="$PROJECT_ROOT/.venv" # MODIFIED
 if [ -d "$VENV_DIR" ]; then
     echo "Python virtual environment '$VENV_DIR' already exists. Skipping creation."
 else
@@ -138,8 +138,8 @@ else
     echo "Virtual environment created."
 fi
 
-# Create requirements.txt if it doesn't exist
-REQUIREMENTS_FILE="$SCRIPT_ABS_DIR/requirements.txt"
+# Create requirements.txt if it doesn't exist in PROJECT_ROOT
+REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt" # MODIFIED
 if [ ! -f "$REQUIREMENTS_FILE" ]; then
     echo "Creating $REQUIREMENTS_FILE..."
     cat <<EOF > "$REQUIREMENTS_FILE"
@@ -166,12 +166,12 @@ echo ""
 
 # --- 5. Make Scripts Executable ---
 echo "--- Making Scripts Executable (in WSL) ---"
-if [ -f "$SCRIPT_ABS_DIR/main.py" ]; then
-    chmod +x "$SCRIPT_ABS_DIR/main.py"
+if [ -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
+    chmod +x "$PROJECT_ROOT/main.py" # MODIFIED
     echo "main.py is now executable."
 fi
 
-MICRO_X_LAUNCHER_SH="$SCRIPT_ABS_DIR/micro_X.sh"
+MICRO_X_LAUNCHER_SH="$PROJECT_ROOT/micro_X.sh" # MODIFIED
 if [ -f "$MICRO_X_LAUNCHER_SH" ]; then
     chmod +x "$MICRO_X_LAUNCHER_SH"
     echo "micro_X.sh is now executable."
@@ -187,14 +187,14 @@ echo "Typically, for WSL2, Ollama on Windows is accessible via http://localhost:
 echo ""
 echo "You can set this variable temporarily before running micro_X:"
 echo "  export OLLAMA_HOST=http://localhost:11434"
-echo "  ./micro_X.sh"
+echo "  cd \"$PROJECT_ROOT\" && ./micro_X.sh" # MODIFIED to show context
 echo ""
 echo "For a permanent setting, add the export line to your WSL shell's configuration file"
 echo "(e.g., ~/.bashrc if using bash, or ~/.zshrc if using zsh), then source it or open a new terminal:"
 echo "  echo 'export OLLAMA_HOST=http://localhost:11434' >> ~/.bashrc"
 echo "  source ~/.bashrc"
 echo ""
-echo "The micro_X.sh script might also be a good place to set this variable if it's not set globally."
+echo "The micro_X.sh script in '$PROJECT_ROOT' might also be a good place to set this variable if it's not set globally." # MODIFIED
 echo "Verify connectivity from WSL to Ollama on Windows with: curl http://localhost:11434"
 echo "(You may need to install curl: sudo apt install curl)"
 echo "Also, ensure your Windows Firewall is not blocking connections to port 11434 from WSL."
@@ -208,7 +208,7 @@ echo "To run micro_X:"
 echo "1. Ensure Ollama is installed and RUNNING on your WINDOWS host."
 echo "2. Ensure you have pulled the required Ollama models on your WINDOWS host."
 echo "3. Open your WSL terminal."
-echo "4. Navigate to the micro_X directory: cd \"$SCRIPT_ABS_DIR\""
+echo "4. Navigate to the micro_X directory: cd \"$PROJECT_ROOT\"" # MODIFIED
 echo "5. Set the OLLAMA_HOST environment variable if not already set permanently:"
 echo "   export OLLAMA_HOST=http://localhost:11434"
 echo "6. If you have micro_X.sh (recommended):"

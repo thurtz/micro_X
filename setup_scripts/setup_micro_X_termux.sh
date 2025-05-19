@@ -21,10 +21,6 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Get the absolute path to the directory where this script is located
-# This assumes setup.sh, main.py, micro_X.sh are in the same directory.
-SCRIPT_ABS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-
 # --- 1. Update Termux & Install Prerequisites ---
 echo "--- Updating Termux packages and Installing Prerequisites ---"
 pkg update -y && pkg upgrade -y
@@ -66,6 +62,8 @@ if ! command_exists ollama; then
     if [[ ! "$ollama_installed_choice" =~ ^[Yy]$ ]]; then
         echo "Ollama installation was skipped or not confirmed. micro_X requires Ollama to function."
         echo "Please install Ollama and then re-run this script or manually pull the models."
+        # Exit if Ollama is critical and not confirmed
+        # exit 1
     elif ! command_exists ollama; then
         echo "Ollama command still not found after manual installation steps. Please verify your installation."
         exit 1
@@ -108,9 +106,9 @@ if command_exists ollama; then
             ollama pull "$model"
             # Basic check
             if ollama list | grep -q "${model%%:*}"; then
-                 echo "$model pulled successfully or already exists."
+                echo "$model pulled successfully or already exists."
             else
-                 echo "WARNING: Failed to pull $model or could not verify. Please check manually. Ensure 'ollama serve' is running."
+                echo "WARNING: Failed to pull $model or could not verify. Please check manually. Ensure 'ollama serve' is running."
             fi
         done
     else
@@ -124,15 +122,15 @@ echo ""
 # --- 4. Setting up micro_X Python Environment ---
 echo "--- Setting up Python Environment for micro_X ---"
 
-# Check if main.py exists in the current directory
-if [ ! -f "$SCRIPT_ABS_DIR/main.py" ]; then
-    echo "ERROR: main.py not found in the script directory ($SCRIPT_ABS_DIR)."
-    echo "This script should be run from the root of the micro_X project directory."
+# Check if main.py exists in the PROJECT_ROOT
+if [ ! -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
+    echo "ERROR: main.py not found in the project root ($PROJECT_ROOT)."
+    echo "Please ensure the main setup.sh script is run from the correct project root."
     exit 1
 fi
 
-# Create a Virtual Environment
-VENV_DIR="$SCRIPT_ABS_DIR/.venv"
+# Create a Virtual Environment in PROJECT_ROOT
+VENV_DIR="$PROJECT_ROOT/.venv" # MODIFIED
 if [ -d "$VENV_DIR" ]; then
     echo "Python virtual environment '$VENV_DIR' already exists. Skipping creation."
 else
@@ -145,8 +143,8 @@ else
     echo "Virtual environment created."
 fi
 
-# Create requirements.txt if it doesn't exist
-REQUIREMENTS_FILE="$SCRIPT_ABS_DIR/requirements.txt"
+# Create requirements.txt if it doesn't exist in PROJECT_ROOT
+REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt" # MODIFIED
 if [ ! -f "$REQUIREMENTS_FILE" ]; then
     echo "Creating $REQUIREMENTS_FILE..."
     cat <<EOF > "$REQUIREMENTS_FILE"
@@ -173,12 +171,12 @@ echo ""
 
 # --- 5. Make Scripts Executable ---
 echo "--- Making Scripts Executable ---"
-if [ -f "$SCRIPT_ABS_DIR/main.py" ]; then
-    chmod +x "$SCRIPT_ABS_DIR/main.py"
+if [ -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
+    chmod +x "$PROJECT_ROOT/main.py" # MODIFIED
     echo "main.py is now executable."
 fi
 
-MICRO_X_LAUNCHER_SH="$SCRIPT_ABS_DIR/micro_X.sh"
+MICRO_X_LAUNCHER_SH="$PROJECT_ROOT/micro_X.sh" # MODIFIED
 if [ -f "$MICRO_X_LAUNCHER_SH" ]; then
     chmod +x "$MICRO_X_LAUNCHER_SH"
     echo "micro_X.sh is now executable."
@@ -197,14 +195,14 @@ echo "   Keep this session open while you use micro_X."
 echo ""
 echo "2. To run micro_X (in your original or another new Termux session):"
 echo "   a. Navigate to the micro_X directory:"
-echo "      cd \"$SCRIPT_ABS_DIR\""
+echo "     cd \"$PROJECT_ROOT\"" # MODIFIED
 echo "   b. If you have micro_X.sh, run it:"
-echo "      ./micro_X.sh"
-echo "      (This script should activate the virtual environment and start micro_X in tmux)."
+echo "     ./micro_X.sh"
+echo "     (This script should activate the virtual environment and start micro_X in tmux)."
 echo ""
 echo "   c. If running main.py directly (and micro_X.sh doesn't exist or you prefer manual):"
-echo "      source .venv/bin/activate"
-echo "      python main.py  # or ./main.py if executable bit is set"
+echo "     source .venv/bin/activate"
+echo "     python main.py  # or ./main.py if executable bit is set"
 echo ""
 echo "If you skipped model pulling, ensure you pull them with 'ollama pull <model_name>' while 'ollama serve' is active."
 echo "------------------------------------------"
