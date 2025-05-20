@@ -30,6 +30,7 @@ FILES_TO_INCLUDE = [
     "tests/test_ai_handler.py", # Added test_ai_handler.py
     "tests/test_category_manager.py", # Added test_category_manager.py
     "tests/conftest.py", # Added test_conftest.py
+    "tests/test_ui_manager.py", # Added test_ui_manager.py
     "pytest_results/pytest_results.txt", # Added pytest_results.txt
     "modules/ui_manager.py", # Added ui_manager.py
     "docs/micro_X_User_Guide.md", # Added micro_X_User_Guide.md
@@ -38,7 +39,8 @@ FILES_TO_INCLUDE = [
     "docs/setup_micro_X_termux.md", # Added setup_micro_x_termux.sh
     "docs/setup_micro_X_wsl.md", # Added setup_micro_x_wsl.sh
     "docs/review_of_micro_X_project.md", # Added review_of_micro_X_project.md
-    "setup.sh" # Added setup.sh
+    "setup.sh", # Added setup.sh
+    "docs/micro_X_testing_guide.md" # Added micro_X_testing_guide.md
 ]
 
 # Output directory and filename for the snapshot

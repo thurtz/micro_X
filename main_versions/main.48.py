@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from prompt_toolkit import Application
+from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.document import Document
 from prompt_toolkit.history import FileHistory
 
@@ -17,7 +18,7 @@ import shutil
 import hashlib
 import sys
 
-from modules.ai_handler import get_validated_ai_command, is_valid_linux_command_according_to_ai 
+from modules.ai_handler import get_validated_ai_command, is_valid_linux_command_according_to_ai # explain_linux_command_with_ai is now called by UIManager
 from modules.category_manager import (
     init_category_manager, classify_command,
     add_command_to_category as cm_add_command_to_category,
@@ -115,6 +116,109 @@ app_instance = None
 current_directory = os.getcwd()
 ui_manager_instance = None 
 
+kb = KeyBindings()
+@kb.add('c-c')
+@kb.add('c-d')
+def _handle_exit_or_cancel(event):
+    global ui_manager_instance 
+
+    is_cat_active = ui_manager_instance.categorization_flow_active if ui_manager_instance else False
+    is_conf_active = ui_manager_instance.confirmation_flow_active if ui_manager_instance else False # Now directly from UIManager
+
+    if is_cat_active:
+        if ui_manager_instance: ui_manager_instance.append_output("\n⚠️ Categorization cancelled by user.", style_class='warning')
+        logger.info("Categorization flow cancelled by Ctrl+C/D.")
+        if 'future' in ui_manager_instance.categorization_flow_state and \
+           not ui_manager_instance.categorization_flow_state['future'].done():
+            ui_manager_instance.categorization_flow_state['future'].set_result({'action': 'cancel_execution'})
+        restore_normal_input_handler() 
+        event.app.invalidate()
+    elif is_conf_active: 
+        if ui_manager_instance: ui_manager_instance.append_output("\n⚠️ Command confirmation cancelled by user.", style_class='warning')
+        logger.info("Confirmation flow cancelled by Ctrl+C/D.")
+        # UIManager's prompt_for_command_confirmation future should be resolved
+        if 'future' in ui_manager_instance.confirmation_flow_state and \
+           not ui_manager_instance.confirmation_flow_state['future'].done():
+            ui_manager_instance.confirmation_flow_state['future'].set_result({'action': 'cancel'})
+        restore_normal_input_handler()
+        event.app.invalidate()
+    else:
+        logger.info("Exit keybinding triggered.")
+        event.app.exit()
+
+@kb.add('c-n')
+def _handle_newline(event):
+    is_cat_active = ui_manager_instance.categorization_flow_active if ui_manager_instance else False
+    is_conf_active = ui_manager_instance.confirmation_flow_active if ui_manager_instance else False
+    if not is_cat_active and not is_conf_active:
+        event.current_buffer.insert_text('\n')
+
+@kb.add('enter')
+def _handle_enter(event):
+    buff = event.current_buffer
+    buff.validate_and_handle()
+
+@kb.add('tab')
+def _handle_tab(event):
+    buff = event.current_buffer
+    if buff.complete_state: 
+        event.app.current_buffer.complete_next()
+    else: 
+        event.current_buffer.insert_text('    ') 
+
+@kb.add('pageup')
+def _handle_pageup(event):
+    if ui_manager_instance and ui_manager_instance.output_field and ui_manager_instance.output_field.window.render_info:
+        ui_manager_instance.output_field.window._scroll_up()
+        event.app.invalidate()
+
+@kb.add('pagedown')
+def _handle_pagedown(event):
+    if ui_manager_instance and ui_manager_instance.output_field and ui_manager_instance.output_field.window.render_info:
+        ui_manager_instance.output_field.window._scroll_down()
+        event.app.invalidate()
+
+@kb.add('c-up')
+def _handle_ctrl_up(event):
+    is_cat_active = ui_manager_instance.categorization_flow_active if ui_manager_instance else False
+    is_conf_active = ui_manager_instance.confirmation_flow_active if ui_manager_instance else False
+    if not is_cat_active and not is_conf_active:
+        event.current_buffer.cursor_up(count=1)
+
+@kb.add('c-down')
+def _handle_ctrl_down(event):
+    is_cat_active = ui_manager_instance.categorization_flow_active if ui_manager_instance else False
+    is_conf_active = ui_manager_instance.confirmation_flow_active if ui_manager_instance else False
+    if not is_cat_active and not is_conf_active:
+        event.current_buffer.cursor_down(count=1)
+
+@kb.add('up')
+def _handle_up_arrow(event):
+    buff = event.current_buffer
+    doc = buff.document
+    is_cat_active = ui_manager_instance.categorization_flow_active if ui_manager_instance else False
+    is_conf_active = ui_manager_instance.confirmation_flow_active if ui_manager_instance else False
+    if not is_cat_active and not is_conf_active:
+        if doc.cursor_position_row == 0: 
+            if buff.history_backward(): 
+                buff.document = Document(text=buff.text, cursor_position=len(buff.text))
+                event.app.invalidate()
+        else: 
+            buff.cursor_up()
+
+@kb.add('down')
+def _handle_down_arrow(event):
+    buff = event.current_buffer
+    doc = buff.document
+    is_cat_active = ui_manager_instance.categorization_flow_active if ui_manager_instance else False
+    is_conf_active = ui_manager_instance.confirmation_flow_active if ui_manager_instance else False
+    if not is_cat_active and not is_conf_active:
+        if doc.cursor_position_row == doc.line_count - 1: 
+            if buff.history_forward(): 
+                buff.document = Document(text=buff.text, cursor_position=len(buff.text))
+                event.app.invalidate()
+        else: 
+            buff.cursor_down()
 
 def expand_shell_variables(command_string: str, current_pwd: str) -> str:
     pwd_placeholder = f"__MICRO_X_PWD_PLACEHOLDER_{uuid.uuid4().hex}__"
@@ -135,13 +239,6 @@ def restore_normal_input_handler():
         ui_manager_instance.set_normal_input_mode(normal_input_accept_handler, current_directory)
     else:
         logger.warning("restore_normal_input_handler: ui_manager_instance is None.")
-
-def _exit_app_main():
-    global app_instance
-    if app_instance and app_instance.is_running:
-        app_instance.exit()
-    else:
-        logger.warning("_exit_app_main called but app_instance not running or None.")
 
 def get_file_hash(filepath):
     if not os.path.exists(filepath): return None
@@ -271,7 +368,7 @@ def display_general_help():
         ('class:help-text', "  AI-generated commands will prompt for confirmation (with categorization options) before execution.\n"),
         ('class:help-header', "\nKeybindings:\n"),
         ('class:help-text', "  Common keybindings are displayed at the bottom of the screen.\n"),
-        ('class:help-text', "  Ctrl+C / Ctrl+D: Exit micro_X or cancel current categorization/confirmation/edit.\n"), # Updated help
+        ('class:help-text', "  Ctrl+C / Ctrl+D: Exit micro_X or cancel current categorization/confirmation.\n"),
         ('class:help-text', "  Ctrl+N: Insert a newline in the input field.\n"),
         ('class:help-header', "\nConfiguration:\n"),
         ('class:help-text', "  AI models and some behaviors can be customized in 'config/user_config.json'.\n"),
@@ -289,11 +386,11 @@ def display_ollama_help():
         ("class:help-title", "Ollama Service Management - Help\n"),
         ("class:help-text", "Use these commands to manage the Ollama service used by micro_X.\n"),
         ("class:help-header", "\nAvailable /ollama Subcommands:\n"),
-        ("class:help-command", "  /ollama start            "), ("class:help-description', '- Attempts to start the managed Ollama service if not already running.\n"),
-        ("class:help-command", "  /ollama stop             "), ("class:help-description', '- Attempts to stop the managed Ollama service.\n"),
-        ("class:help-command", "  /ollama restart          "), ("class:help-description', '- Attempts to restart the managed Ollama service.\n"),
-        ("class:help-command", "  /ollama status           "), ("class:help-description', '- Shows the current status of the Ollama service and managed session.\n"),
-        ("class:help-command", "  /ollama help             "), ("class:help-description', '- Displays this help message.\n"),
+        ("class:help-command", "  /ollama start            "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
+        ("class:help-command", "  /ollama stop             "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
+        ("class:help-command", "  /ollama restart          "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"),
+        ("class:help-command", "  /ollama status           "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
+        ("class:help-command", "  /ollama help             "), ("class:help-description", "- Displays this help message.\n"),
         ("class:help-text", "\nNote: These commands primarily interact with an Ollama instance managed by micro_X in a tmux session. ")
     ]
     help_output_string = "".join([text for _, text in help_text])
@@ -335,87 +432,54 @@ async def handle_ollama_command_async(user_input_parts: list):
 
 async def handle_input_async(user_input: str):
     global ui_manager_instance, current_directory, ollama_service_ready
-    if not ui_manager_instance: 
-        logger.error("handle_input_async: UIManager not initialized.")
-        return
+    if not ui_manager_instance: logger.error("handle_input_async: UIManager not initialized."); return
     append_output_func = ui_manager_instance.append_output
 
-    if ui_manager_instance.categorization_flow_active or \
-       ui_manager_instance.confirmation_flow_active or \
-       ui_manager_instance.is_in_edit_mode: # Check edit mode as well
-        logger.warning("Input ignored: a UI flow or edit mode is active in UIManager.")
+    is_cat_active = ui_manager_instance.categorization_flow_active
+    is_conf_active = ui_manager_instance.confirmation_flow_active 
+
+    if is_cat_active or is_conf_active: 
+        logger.warning("Input ignored: categorization or confirmation flow active in UIManager.")
         return
 
-    user_input_stripped = user_input.strip()
-    logger.info(f"Received input: '{user_input_stripped}'")
-    if not user_input_stripped: 
-        return
+    user_input_stripped = user_input.strip(); logger.info(f"Received input: '{user_input_stripped}'")
+    if not user_input_stripped: return
 
     current_app_inst = ui_manager_instance.get_app_instance()
 
-    if user_input_stripped.lower() in {"/help", "help"}: 
-        display_general_help()
-        return
+    if user_input_stripped.lower() in {"/help", "help"}: display_general_help(); return
     if user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
-        append_output_func("Exiting micro_X Shell 🚪", style_class='info')
-        logger.info("Exit command received.")
-        if current_app_inst and current_app_inst.is_running: 
-            if ui_manager_instance.main_exit_app_ref: # Use the callback
-                ui_manager_instance.main_exit_app_ref()
-            else:
-                current_app_inst.exit()
-        return
-    if user_input_stripped.lower() == "/update": 
-        await handle_update_command()
-        return
-    if user_input_stripped.startswith("/utils"): 
-        await handle_utils_command_async(user_input_stripped)
-        return
+        append_output_func("Exiting micro_X Shell 🚪", style_class='info'); logger.info("Exit command received.")
+        if current_app_inst and current_app_inst.is_running: current_app_inst.exit(); return
+    if user_input_stripped.lower() == "/update": await handle_update_command(); return
+    if user_input_stripped.startswith("/utils"): await handle_utils_command_async(user_input_stripped); return
     if user_input_stripped.startswith("/ollama"):
-        try: 
-            parts = user_input_stripped.split()
-            await handle_ollama_command_async(parts)
-        except Exception as e: 
-            append_output_func(f"❌ Error processing /ollama command: {e}", style_class='error')
-            logger.error(f"Error in /ollama command '{user_input_stripped}': {e}", exc_info=True)
+        try: parts = user_input_stripped.split(); await handle_ollama_command_async(parts)
+        except Exception as e: append_output_func(f"❌ Error processing /ollama command: {e}", style_class='error'); logger.error(f"Error in /ollama command '{user_input_stripped}': {e}", exc_info=True)
         return
-    
-    if user_input_stripped == "cd" or user_input_stripped.startswith("cd "):
-        logger.info(f"Handling 'cd' command directly: {user_input_stripped}")
-        handle_cd_command(user_input_stripped)
-        restore_normal_input_handler() 
-        return 
     
     if user_input_stripped.startswith("/ai "):
         if not ollama_service_ready:
-            append_output_func("⚠️ Ollama service is not available.", style_class='warning')
-            append_output_func("    Try '/ollama status' or '/ollama start'.", style_class='info')
-            logger.warning("Attempted /ai command while Ollama service is not ready.")
-            return
+            append_output_func("⚠️ Ollama service is not available.", style_class='warning'); append_output_func("    Try '/ollama status' or '/ollama start'.", style_class='info')
+            logger.warning("Attempted /ai command while Ollama service is not ready."); return
         human_query = user_input_stripped[len("/ai "):].strip()
-        if not human_query: 
-            append_output_func("⚠️ AI query empty.", style_class='warning')
-            return
+        if not human_query: append_output_func("⚠️ AI query empty.", style_class='warning'); return
         
-        append_output_func(f"🤖 AI Query: {human_query}", style_class='ai-query')
-        append_output_func(f"🧠 Thinking...", style_class='ai-thinking')
-        if current_app_inst and current_app_inst.is_running: 
-            current_app_inst.invalidate()
+        append_output_func(f"🤖 AI Query: {human_query}", style_class='ai-query'); append_output_func(f"🧠 Thinking...", style_class='ai-thinking')
+        if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
         
         app_getter = ui_manager_instance.get_app_instance 
         linux_command, ai_raw_candidate = await get_validated_ai_command(human_query, config, append_output_func, app_getter)
         if linux_command:
             append_output_func(f"🤖 AI Suggests (validated): {linux_command}", style_class='ai-response')
             await process_command(linux_command, f"/ai {human_query} -> {linux_command}", ai_raw_candidate, None, is_ai_generated=True)
-        else: 
-            append_output_func("🤔 AI could not produce a validated command.", style_class='warning')
+        else: append_output_func("🤔 AI could not produce a validated command.", style_class='warning')
         return
 
     if user_input_stripped.startswith("/command"):
         command_action = handle_command_subsystem_input(user_input_stripped) 
         if isinstance(command_action, dict) and command_action.get('action') == 'force_run':
-            cmd_to_run = command_action['command']
-            forced_cat = command_action['category']
+            cmd_to_run = command_action['command']; forced_cat = command_action['category']
             display_input = f"/command run {forced_cat} \"{cmd_to_run}\""
             append_output_func(f"⚡ Forcing execution of '{cmd_to_run}' as '{forced_cat}'...", style_class='info')
             await process_command(cmd_to_run, display_input, None, None, forced_category=forced_cat, is_ai_generated=False)
@@ -431,71 +495,42 @@ async def handle_input_async(user_input: str):
     else: 
         logger.debug(f"Direct input '{user_input_stripped}' unknown. Validating with AI.")
         if not ollama_service_ready:
-            append_output_func(f"⚠️ Ollama service not available for validation.", style_class='warning')
-            append_output_func(f"    Attempting direct categorization or try '/ollama status' or '/ollama start'.", style_class='info')
-            logger.warning(f"Ollama service not ready. Skipping AI validation for '{user_input_stripped}'.")
-            await process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
-            return
+            append_output_func(f"⚠️ Ollama service not available for validation.", style_class='warning'); append_output_func(f"    Attempting direct categorization or try '/ollama status' or '/ollama start'.", style_class='info')
+            logger.warning(f"Ollama service not ready. Skipping AI validation for '{user_input_stripped}'."); await process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False); return
 
         append_output_func(f"🔎 Validating '{user_input_stripped}' with AI...", style_class='info')
-        if current_app_inst and current_app_inst.is_running: 
-            current_app_inst.invalidate()
+        if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
         is_cmd_ai_says = await is_valid_linux_command_according_to_ai(user_input_stripped, config)
         
-        has_space = ' ' in user_input_stripped
-        is_path_indicator = user_input_stripped.startswith(('/', './', '../'))
-        has_double_hyphen = '--' in user_input_stripped
-        has_single_hyphen_option = bool(re.search(r'(?:^|\s)-\w', user_input_stripped))
-        is_problematic_leading_dollar = False
+        has_space = ' ' in user_input_stripped; is_path_indicator = user_input_stripped.startswith(('/', './', '../')); has_double_hyphen = '--' in user_input_stripped; has_single_hyphen_option = bool(re.search(r'(?:^|\s)-\w', user_input_stripped)); is_problematic_leading_dollar = False
         if user_input_stripped.startswith('$'):
             if len(user_input_stripped) == 1: is_problematic_leading_dollar = True 
-            elif len(user_input_stripped) > 1 and user_input_stripped[1].isalnum() and user_input_stripped[1] != '{': 
-                is_problematic_leading_dollar = True 
+            elif len(user_input_stripped) > 1 and user_input_stripped[1].isalnum() and user_input_stripped[1] != '{': is_problematic_leading_dollar = True 
         
-        is_command_syntax_present = is_path_indicator or has_double_hyphen or has_single_hyphen_option or \
-                                  ('$' in user_input_stripped and not is_problematic_leading_dollar)
+        is_command_syntax_present = is_path_indicator or has_double_hyphen or has_single_hyphen_option or ('$' in user_input_stripped and not is_problematic_leading_dollar)
         user_input_looks_like_phrase = False
-        if is_problematic_leading_dollar: 
-            user_input_looks_like_phrase = True
-        elif not has_space: 
-            user_input_looks_like_phrase = False 
-        elif is_command_syntax_present: 
-            user_input_looks_like_phrase = False 
-        else: 
-            user_input_looks_like_phrase = True 
+        if is_problematic_leading_dollar: user_input_looks_like_phrase = True
+        elif not has_space: user_input_looks_like_phrase = False 
+        elif is_command_syntax_present: user_input_looks_like_phrase = False 
+        else: user_input_looks_like_phrase = True 
 
         logger.debug(f"Input: '{user_input_stripped}', Validator AI: {is_cmd_ai_says}, Heuristic phrase: {user_input_looks_like_phrase}")
 
         if is_cmd_ai_says is True and not user_input_looks_like_phrase:
-            append_output_func(f"✅ AI believes '{user_input_stripped}' is direct command. Categorizing.", style_class='success')
-            logger.info(f"Validator AI confirmed '{user_input_stripped}' as command (not phrase).")
+            append_output_func(f"✅ AI believes '{user_input_stripped}' is direct command. Categorizing.", style_class='success'); logger.info(f"Validator AI confirmed '{user_input_stripped}' as command (not phrase).")
             await process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
         else: 
-            log_msg = ""
-            ui_msg = ""
-            ui_style = 'ai-thinking'
-            if is_cmd_ai_says is False: 
-                log_msg = f"Validator AI suggests '{user_input_stripped}' not command."
-                ui_msg = f"💬 AI suggests '{user_input_stripped}' not direct command. Trying as NL query..."
-            elif is_cmd_ai_says is True and user_input_looks_like_phrase: 
-                log_msg = f"Validator AI confirmed '{user_input_stripped}' as command, but heuristic overrides."
-                ui_msg = f"💬 AI validated '{user_input_stripped}' as command, but looks like phrase. Trying as NL query..."
-            else: 
-                log_msg = f"Validator AI for '{user_input_stripped}' inconclusive."
-                ui_msg = f"⚠️ AI validation for '{user_input_stripped}' inconclusive. Trying as NL query..."
-                ui_style = 'warning'
+            log_msg = ""; ui_msg = ""; ui_style = 'ai-thinking'
+            if is_cmd_ai_says is False: log_msg = f"Validator AI suggests '{user_input_stripped}' not command."; ui_msg = f"💬 AI suggests '{user_input_stripped}' not direct command. Trying as NL query..."
+            elif is_cmd_ai_says is True and user_input_looks_like_phrase: log_msg = f"Validator AI confirmed '{user_input_stripped}' as command, but heuristic overrides."; ui_msg = f"💬 AI validated '{user_input_stripped}' as command, but looks like phrase. Trying as NL query..."
+            else: log_msg = f"Validator AI for '{user_input_stripped}' inconclusive."; ui_msg = f"⚠️ AI validation for '{user_input_stripped}' inconclusive. Trying as NL query..."; ui_style = 'warning'
             
-            logger.info(f"{log_msg} Treating as natural language.")
-            append_output_func(ui_msg, style_class=ui_style)
-            if current_app_inst and current_app_inst.is_running: 
-                current_app_inst.invalidate()
+            logger.info(f"{log_msg} Treating as natural language."); append_output_func(ui_msg, style_class=ui_style)
+            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
 
             if not ollama_service_ready: 
-                append_output_func("⚠️ Ollama service not available for translation.", style_class='warning')
-                append_output_func("    Try '/ollama status' or '/ollama start'.", style_class='info')
-                logger.warning("Ollama service not ready. Skipping NL translation.")
-                await process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
-                return
+                append_output_func("⚠️ Ollama service not available for translation.", style_class='warning'); append_output_func("    Try '/ollama status' or '/ollama start'.", style_class='info')
+                logger.warning("Ollama service not ready. Skipping NL translation."); await process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False); return
 
             app_getter = ui_manager_instance.get_app_instance
             linux_command, ai_raw_candidate = await get_validated_ai_command(user_input_stripped, config, append_output_func, app_getter)
@@ -504,8 +539,7 @@ async def handle_input_async(user_input: str):
                 original_direct_for_prompt = user_input_stripped if linux_command != user_input_stripped else None
                 await process_command(linux_command, f"'{user_input_stripped}' -> {linux_command}", ai_raw_candidate, original_direct_for_prompt, is_ai_generated=True)
             else:
-                append_output_func(f"🤔 AI could not produce validated command for '{user_input_stripped}'. Trying original as direct command.", style_class='warning')
-                logger.info(f"Validated AI translation failed for '{user_input_stripped}'.")
+                append_output_func(f"🤔 AI could not produce validated command for '{user_input_stripped}'. Trying original as direct command.", style_class='warning'); logger.info(f"Validated AI translation failed for '{user_input_stripped}'.")
                 await process_command(user_input_stripped, user_input_stripped, ai_raw_candidate, None, is_ai_generated=False)
 
 
@@ -515,14 +549,13 @@ async def process_command(command_str_original: str, original_user_input_for_dis
                           forced_category: str | None = None,
                           is_ai_generated: bool = False):
     global ui_manager_instance, current_directory
-    if not ui_manager_instance: 
-        logger.error("process_command: UIManager not initialized.")
-        return
+    if not ui_manager_instance: logger.error("process_command: UIManager not initialized."); return
     append_output_func = ui_manager_instance.append_output
-    confirmation_result = None 
+    confirmation_result = None
 
     if is_ai_generated and not forced_category:
         logger.info(f"AI generated command '{command_str_original}'. Initiating confirmation flow via UIManager.")
+        # Pass the normal_input_accept_handler for UIManager to use if 'Modify' is chosen
         confirmation_result = await ui_manager_instance.prompt_for_command_confirmation(
             command_str_original, 
             original_user_input_for_display,
@@ -534,36 +567,33 @@ async def process_command(command_str_original: str, original_user_input_for_dis
         chosen_category_from_confirmation = confirmation_result.get('category')
 
         if action == 'edit_mode_engaged':
-            # UIManager has already set edit mode.
-            # The append_output is good for user feedback.
+            # UIManager's prompt_for_command_confirmation now handles calling set_edit_mode internally
+            # if the result of its future indicates this action.
+            # main.py's responsibility is to *not* proceed with execution here.
             append_output_func("⌨️ Command loaded into input field for editing. Press Enter to submit.", style_class='info')
+            # No need to call restore_normal_input_handler here, as UIManager's set_edit_mode takes over.
             return 
         
         if action == 'execute_and_categorize' and chosen_category_from_confirmation:
-            append_output_func(f"✅ User confirmed execution of: {confirmed_command} (as {chosen_category_from_confirmation})", style_class='success')
-            command_str_original = confirmed_command
+            append_output_func(f"✅ User confirmed execution of: {confirmed_command} (as {chosen_category_from_confirmation})", style_class='success'); command_str_original = confirmed_command
             logger.info(f"User chose to run '{command_str_original}' and categorize as '{chosen_category_from_confirmation}'.")
-            cm_add_command_to_category(command_str_original, chosen_category_from_confirmation)
-            forced_category = chosen_category_from_confirmation
+            cm_add_command_to_category(command_str_original, chosen_category_from_confirmation); forced_category = chosen_category_from_confirmation
         elif action == 'execute': 
-            append_output_func(f"✅ User confirmed execution of: {confirmed_command}", style_class='success')
-            command_str_original = confirmed_command
+            append_output_func(f"✅ User confirmed execution of: {confirmed_command}", style_class='success'); command_str_original = confirmed_command
         elif action == 'cancel': 
-            append_output_func(f"❌ Execution of '{command_str_original}' cancelled.", style_class='info')
-            logger.info(f"User cancelled execution of AI command: {command_str_original}")
-            restore_normal_input_handler() 
+            append_output_func(f"❌ Execution of '{command_str_original}' cancelled.", style_class='info'); logger.info(f"User cancelled execution of AI command: {command_str_original}");
+            restore_normal_input_handler() # Restore after cancellation
             return
         else: 
             if action is not None : 
-                append_output_func(f"Internal error or unexpected action in confirmation flow ({action}). Aborting.", style_class='error')
-                logger.error(f"Internal error in confirmation flow. Action: {action}")
-            restore_normal_input_handler() 
+                append_output_func(f"Internal error or unexpected action in confirmation flow ({action}). Aborting.", style_class='error'); logger.error(f"Internal error in confirmation flow. Action: {action}")
+            restore_normal_input_handler() # Restore if flow ended unexpectedly
             return 
+        # If execution is to proceed, restore_normal_input_handler will be called after command processing.
 
-    category = forced_category
-    command_for_classification = command_str_original
-    command_to_be_added_if_new = command_for_classification
-    
+    if not forced_category and command_str_original.strip().startswith("cd "): handle_cd_command(command_str_original); return
+
+    category = forced_category; command_for_classification = command_str_original; command_to_be_added_if_new = command_for_classification
     if not category: 
         logger.debug(f"process_command: Classifying command_for_classification: '{command_for_classification}' (is_ai_generated: {is_ai_generated})")
         category = classify_command(command_for_classification)
@@ -573,26 +603,14 @@ async def process_command(command_str_original: str, original_user_input_for_dis
             logger.info(f"Command '{command_for_classification}' uncategorized. Starting interactive flow via UIManager.")
             categorization_result = await prompt_for_categorization(command_for_classification, ai_raw_candidate, original_direct_input_if_different)
             
-            action_cat = categorization_result.get('action')
-            if action_cat == 'cancel_execution': 
-                # Message might be redundant if UIManager already sent one, but good for log.
-                append_output_func(f"Execution of '{command_for_classification}' cancelled.", style_class='info') 
-                logger.info(f"Execution of '{command_for_classification}' cancelled by user during categorization.")
-                # restore_normal_input_handler is called by prompt_for_categorization in this case
-                return 
-            elif action_cat == 'categorize_and_execute':
-                command_to_be_added_if_new = categorization_result['command']
-                chosen_cat_for_json = categorization_result['category']
-                cm_add_command_to_category(command_to_be_added_if_new, chosen_cat_for_json)
-                category = chosen_cat_for_json
+            if categorization_result.get('action') == 'cancel_execution': append_output_func(f"Execution of '{command_for_classification}' cancelled.", style_class='info'); logger.info(f"Execution of '{command_for_classification}' cancelled."); return # restore_normal_input_handler called by prompt_for_categorization
+            elif categorization_result.get('action') == 'categorize_and_execute':
+                command_to_be_added_if_new = categorization_result['command']; chosen_cat_for_json = categorization_result['category']
+                cm_add_command_to_category(command_to_be_added_if_new, chosen_cat_for_json); category = chosen_cat_for_json
                 logger.info(f"Command '{command_to_be_added_if_new}' categorized as '{category}'.")
-                if command_to_be_added_if_new != command_str_original: 
-                    logger.info(f"Using '{command_to_be_added_if_new}' for execution.")
-                    command_str_original = command_to_be_added_if_new 
-            else: # Includes 'execute_as_default' or other outcomes from categorization
-                category = config['behavior']['default_category_for_unclassified']
-                append_output_func(f"Executing '{command_for_classification}' as default '{category}'.", style_class='info')
-                logger.info(f"Command '{command_for_classification}' executed with default category '{category}'.")
+                if command_to_be_added_if_new != command_str_original: logger.info(f"Using '{command_to_be_added_if_new}' for execution."); command_str_original = command_to_be_added_if_new 
+            else: 
+                category = config['behavior']['default_category_for_unclassified']; append_output_func(f"Executing '{command_for_classification}' as default '{category}'.", style_class='info'); logger.info(f"Command '{command_for_classification}' executed with default category '{category}'.")
     
     command_to_execute_expanded = expand_shell_variables(command_str_original, current_directory)
     if command_str_original != command_to_execute_expanded:
@@ -601,29 +619,33 @@ async def process_command(command_str_original: str, original_user_input_for_dis
             append_output_func(f"Expanded for execution: {command_to_execute_expanded}", style_class='info')
 
     command_to_execute_sanitized = sanitize_and_validate(command_to_execute_expanded, original_user_input_for_display)
-    if not command_to_execute_sanitized: 
-        append_output_func(f"Command '{command_to_execute_expanded}' blocked.", style_class='security-warning')
-        logger.warning(f"Command '{command_to_execute_expanded}' blocked.")
-        restore_normal_input_handler()
-        return
+    if not command_to_execute_sanitized: append_output_func(f"Command '{command_to_execute_expanded}' blocked.", style_class='security-warning'); logger.warning(f"Command '{command_to_execute_expanded}' blocked."); restore_normal_input_handler(); return
 
     logger.info(f"Final command: '{command_to_execute_sanitized}', Category: '{category}'")
     exec_message_prefix = "Executing"
-    if forced_category: 
-        if confirmation_result and confirmation_result.get('action') == 'execute_and_categorize': 
-            exec_message_prefix = f"Executing (user categorized as {category})"
-        else: 
-            exec_message_prefix = "Forced execution" 
+    if forced_category:
+        if confirmation_result and confirmation_result.get('action') == 'execute_and_categorize': exec_message_prefix = f"Executing (user categorized as {category})"
+        else: exec_message_prefix = "Forced execution" 
     
     append_output_func(f"▶️ {exec_message_prefix} ({category} - {CM_CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style_class='executing')
     
-    if category == "simple": 
-        execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
-    else: 
-        execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category)
+    if category == "simple": execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
+    else: execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category)
     
-    if ui_manager_instance and not ui_manager_instance.categorization_flow_active and not ui_manager_instance.confirmation_flow_active and not ui_manager_instance.is_in_edit_mode:
+    # Restore normal input only if not in an active flow (e.g. if a command was executed directly)
+    # If coming from a flow that completed (like confirmation or categorization), that flow's
+    # finally block or subsequent logic should handle restoring normal input.
+    if not ui_manager_instance.categorization_flow_active and not ui_manager_instance.confirmation_flow_active:
         restore_normal_input_handler()
+
+
+# --- Command Confirmation Flow functions are MOVED to UIManager ---
+# async def prompt_for_command_confirmation(...): # MOVED
+# def _ask_confirmation_main_choice(): # MOVED
+# def _handle_confirmation_main_choice_response(buff): # MOVED
+# async def _handle_explain_command_async(): # MOVED
+# def _ask_confirmation_after_explain(): # MOVED
+# def _handle_confirmation_after_explain_response(buff): # MOVED
 
 
 async def prompt_for_categorization(command_initially_proposed: str,
@@ -642,11 +664,12 @@ async def prompt_for_categorization(command_initially_proposed: str,
     )
     logger.info(f"Main.py: Categorization flow result from UIManager: {result}")
 
-    if ui_manager_instance and not ui_manager_instance.confirmation_flow_active and not ui_manager_instance.is_in_edit_mode: 
-        logger.debug("Main.py: Restoring normal input handler after categorization flow (if not in conf or edit mode).")
+    # Restore normal input only if not in another active flow (like confirmation)
+    if not ui_manager_instance.confirmation_flow_active:
+        logger.debug("Main.py: Restoring normal input handler after categorization flow.")
         restore_normal_input_handler()
     else:
-        logger.debug("Main.py: Confirmation or Edit mode active, not restoring normal input after categorization.")
+        logger.debug("Main.py: Confirmation flow active, not restoring normal input after categorization.")
     return result
 
 
@@ -769,9 +792,6 @@ async def main_async_runner():
     global app_instance, current_directory, ollama_service_ready, ui_manager_instance
 
     ui_manager_instance = UIManager(config) 
-    ui_manager_instance.main_exit_app_ref = _exit_app_main
-    ui_manager_instance.main_restore_normal_input_ref = restore_normal_input_handler
-
     init_category_manager(SCRIPT_DIR, CONFIG_DIR, ui_manager_instance.append_output) 
     ollama_service_ready = await ensure_ollama_service(config, ui_manager_instance.append_output)
 
@@ -826,15 +846,11 @@ async def main_async_runner():
 
     app_instance = Application(
         layout=layout_from_ui_manager,
-        key_bindings=ui_manager_instance.get_key_bindings(), 
+        key_bindings=kb,
         style=ui_manager_instance.style, 
         full_screen=True,
         mouse_support=True
     )
-    if ui_manager_instance:
-        ui_manager_instance.app = app_instance
-
-
     logger.info("micro_X Shell application starting.")
     await app_instance.run_async()
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 from prompt_toolkit import Application
+# KeyBindings is now imported and managed by UIManager
+# from prompt_toolkit.key_binding import KeyBindings 
 from prompt_toolkit.document import Document
 from prompt_toolkit.history import FileHistory
 
@@ -114,7 +116,6 @@ load_configuration()
 app_instance = None 
 current_directory = os.getcwd()
 ui_manager_instance = None 
-
 
 def expand_shell_variables(command_string: str, current_pwd: str) -> str:
     pwd_placeholder = f"__MICRO_X_PWD_PLACEHOLDER_{uuid.uuid4().hex}__"
@@ -271,7 +272,7 @@ def display_general_help():
         ('class:help-text', "  AI-generated commands will prompt for confirmation (with categorization options) before execution.\n"),
         ('class:help-header', "\nKeybindings:\n"),
         ('class:help-text', "  Common keybindings are displayed at the bottom of the screen.\n"),
-        ('class:help-text', "  Ctrl+C / Ctrl+D: Exit micro_X or cancel current categorization/confirmation/edit.\n"), # Updated help
+        ('class:help-text', "  Ctrl+C / Ctrl+D: Exit micro_X or cancel current categorization/confirmation.\n"),
         ('class:help-text', "  Ctrl+N: Insert a newline in the input field.\n"),
         ('class:help-header', "\nConfiguration:\n"),
         ('class:help-text', "  AI models and some behaviors can be customized in 'config/user_config.json'.\n"),
@@ -340,10 +341,8 @@ async def handle_input_async(user_input: str):
         return
     append_output_func = ui_manager_instance.append_output
 
-    if ui_manager_instance.categorization_flow_active or \
-       ui_manager_instance.confirmation_flow_active or \
-       ui_manager_instance.is_in_edit_mode: # Check edit mode as well
-        logger.warning("Input ignored: a UI flow or edit mode is active in UIManager.")
+    if ui_manager_instance.categorization_flow_active or ui_manager_instance.confirmation_flow_active: 
+        logger.warning("Input ignored: categorization or confirmation flow active in UIManager.")
         return
 
     user_input_stripped = user_input.strip()
@@ -353,6 +352,7 @@ async def handle_input_async(user_input: str):
 
     current_app_inst = ui_manager_instance.get_app_instance()
 
+    # Handle built-in commands first
     if user_input_stripped.lower() in {"/help", "help"}: 
         display_general_help()
         return
@@ -360,10 +360,7 @@ async def handle_input_async(user_input: str):
         append_output_func("Exiting micro_X Shell 🚪", style_class='info')
         logger.info("Exit command received.")
         if current_app_inst and current_app_inst.is_running: 
-            if ui_manager_instance.main_exit_app_ref: # Use the callback
-                ui_manager_instance.main_exit_app_ref()
-            else:
-                current_app_inst.exit()
+            current_app_inst.exit() # This will eventually call UIManager's exit_app_ref
         return
     if user_input_stripped.lower() == "/update": 
         await handle_update_command()
@@ -380,12 +377,17 @@ async def handle_input_async(user_input: str):
             logger.error(f"Error in /ollama command '{user_input_stripped}': {e}", exc_info=True)
         return
     
+    # --- Special handling for 'cd' command ---
     if user_input_stripped == "cd" or user_input_stripped.startswith("cd "):
         logger.info(f"Handling 'cd' command directly: {user_input_stripped}")
         handle_cd_command(user_input_stripped)
+        # After cd, ensure the input mode is fully normal.
+        # handle_cd_command calls ui_manager_instance.update_input_prompt.
+        # restore_normal_input_handler ensures accept_handler is also reset.
         restore_normal_input_handler() 
-        return 
+        return # Crucial: exit handle_input_async after handling cd
     
+    # Handle AI query
     if user_input_stripped.startswith("/ai "):
         if not ollama_service_ready:
             append_output_func("⚠️ Ollama service is not available.", style_class='warning')
@@ -411,6 +413,7 @@ async def handle_input_async(user_input: str):
             append_output_func("🤔 AI could not produce a validated command.", style_class='warning')
         return
 
+    # Handle /command subsystem
     if user_input_stripped.startswith("/command"):
         command_action = handle_command_subsystem_input(user_input_stripped) 
         if isinstance(command_action, dict) and command_action.get('action') == 'force_run':
@@ -421,6 +424,7 @@ async def handle_input_async(user_input: str):
             await process_command(cmd_to_run, display_input, None, None, forced_category=forced_cat, is_ai_generated=False)
         return
 
+    # Process as direct command or potential natural language query
     logger.debug(f"handle_input_async: Classifying direct command: '{user_input_stripped}'")
     category = classify_command(user_input_stripped)
     logger.debug(f"handle_input_async: classify_command returned: '{category}' for command '{user_input_stripped}'")
@@ -534,8 +538,6 @@ async def process_command(command_str_original: str, original_user_input_for_dis
         chosen_category_from_confirmation = confirmation_result.get('category')
 
         if action == 'edit_mode_engaged':
-            # UIManager has already set edit mode.
-            # The append_output is good for user feedback.
             append_output_func("⌨️ Command loaded into input field for editing. Press Enter to submit.", style_class='info')
             return 
         
@@ -560,6 +562,13 @@ async def process_command(command_str_original: str, original_user_input_for_dis
             restore_normal_input_handler() 
             return 
 
+    # --- 'cd' command handling is now done in handle_input_async ---
+    # The following block for 'cd' in process_command is removed:
+    # cmd_stripped = command_str_original.strip()
+    # if not forced_category and (cmd_stripped == "cd" or cmd_stripped.startswith("cd ")):
+    #     handle_cd_command(command_str_original) 
+    #     return
+
     category = forced_category
     command_for_classification = command_str_original
     command_to_be_added_if_new = command_for_classification
@@ -575,10 +584,8 @@ async def process_command(command_str_original: str, original_user_input_for_dis
             
             action_cat = categorization_result.get('action')
             if action_cat == 'cancel_execution': 
-                # Message might be redundant if UIManager already sent one, but good for log.
                 append_output_func(f"Execution of '{command_for_classification}' cancelled.", style_class='info') 
                 logger.info(f"Execution of '{command_for_classification}' cancelled by user during categorization.")
-                # restore_normal_input_handler is called by prompt_for_categorization in this case
                 return 
             elif action_cat == 'categorize_and_execute':
                 command_to_be_added_if_new = categorization_result['command']
@@ -589,7 +596,7 @@ async def process_command(command_str_original: str, original_user_input_for_dis
                 if command_to_be_added_if_new != command_str_original: 
                     logger.info(f"Using '{command_to_be_added_if_new}' for execution.")
                     command_str_original = command_to_be_added_if_new 
-            else: # Includes 'execute_as_default' or other outcomes from categorization
+            else: 
                 category = config['behavior']['default_category_for_unclassified']
                 append_output_func(f"Executing '{command_for_classification}' as default '{category}'.", style_class='info')
                 logger.info(f"Command '{command_for_classification}' executed with default category '{category}'.")
@@ -622,7 +629,7 @@ async def process_command(command_str_original: str, original_user_input_for_dis
     else: 
         execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category)
     
-    if ui_manager_instance and not ui_manager_instance.categorization_flow_active and not ui_manager_instance.confirmation_flow_active and not ui_manager_instance.is_in_edit_mode:
+    if ui_manager_instance and not ui_manager_instance.categorization_flow_active and not ui_manager_instance.confirmation_flow_active:
         restore_normal_input_handler()
 
 
@@ -642,11 +649,11 @@ async def prompt_for_categorization(command_initially_proposed: str,
     )
     logger.info(f"Main.py: Categorization flow result from UIManager: {result}")
 
-    if ui_manager_instance and not ui_manager_instance.confirmation_flow_active and not ui_manager_instance.is_in_edit_mode: 
-        logger.debug("Main.py: Restoring normal input handler after categorization flow (if not in conf or edit mode).")
+    if ui_manager_instance and not ui_manager_instance.confirmation_flow_active: 
+        logger.debug("Main.py: Restoring normal input handler after categorization flow (if not in conf flow).")
         restore_normal_input_handler()
     else:
-        logger.debug("Main.py: Confirmation or Edit mode active, not restoring normal input after categorization.")
+        logger.debug("Main.py: Confirmation flow active, not restoring normal input after categorization.")
     return result
 
 
