@@ -23,6 +23,7 @@ FILES_TO_INCLUDE = [
     "modules/category_manager.py", # Added category_handler.py
     "modules/output_analyzer.py", # Added output_analyzer.py
     "modules/ollama_manager.py", # Added ollama_manager.py
+    "modules/shell_engine.py",   # Added shell_engine.py
     "setup_scripts/setup_micro_X_mac.sh", # Added setup_micro_x_mac.sh
     "setup_scripts/setup_micro_X_mint.sh", # Added setup_micro_x_mint.sh
     "setup_scripts/setup_micro_X_termux.sh", # Added setup_micro_x_termux.sh
@@ -31,6 +32,8 @@ FILES_TO_INCLUDE = [
     "tests/test_category_manager.py", # Added test_category_manager.py
     "tests/conftest.py", # Added test_conftest.py
     "tests/test_ui_manager.py", # Added test_ui_manager.py
+    "tests/test_shell_engine.py", # Added test_shell_engine.py
+    "tests/tests.md", # Added tests.md
     "pytest_results/pytest_results.txt", # Added pytest_results.txt
     "modules/ui_manager.py", # Added ui_manager.py
     "docs/micro_X_User_Guide.md", # Added micro_X_User_Guide.md

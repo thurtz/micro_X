@@ -26,6 +26,8 @@ micro_X
 |   ├── ollama_manager.old.py
 |   ├── ollama_manager.py
 |   ├── output_analyzer.py
+|   ├── shell_engine.old.py
+|   ├── shell_engine.py
 |   ├── ui_manager.old.py
 |   └── ui_manager.py
 ├── pytest_results/
@@ -39,6 +41,7 @@ micro_X
 |   ├── conftest.py
 |   ├── test_ai_handler.py
 |   ├── test_category_manager.py
+|   ├── test_shell_engine.py
 |   ├── test_ui_manager.py
 |   └── tests.md
 ├── utils/
