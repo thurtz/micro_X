@@ -5,7 +5,6 @@
     "ls -l",
     "ls -la",
     "pwd",
-    "cd",
     "echo",
     "date",
     "echo $SHELL",
