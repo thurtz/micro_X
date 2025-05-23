@@ -12,6 +12,7 @@ micro_X
 |   ├── generate_snapshot.md
 |   ├── generate_tree.md
 |   ├── micro_X_User_Guide.md
+|   ├── micro_X_testing_guide.md
 |   ├── review_of_micro_X_project.md
 |   ├── setup_micro_X_mac.md
 |   ├── setup_micro_X_mint.md
@@ -25,6 +26,8 @@ micro_X
 |   ├── ollama_manager.old.py
 |   ├── ollama_manager.py
 |   ├── output_analyzer.py
+|   ├── shell_engine.old.py
+|   ├── shell_engine.py
 |   ├── ui_manager.old.py
 |   └── ui_manager.py
 ├── pytest_results/
@@ -38,6 +41,8 @@ micro_X
 |   ├── conftest.py
 |   ├── test_ai_handler.py
 |   ├── test_category_manager.py
+|   ├── test_shell_engine.py
+|   ├── test_ui_manager.py
 |   └── tests.md
 ├── utils/
 |   ├── generate_snapshot.py
@@ -47,8 +52,9 @@ micro_X
 ├── LICENSE
 ├── README.md
 ├── main.py
-├── micro_X-A_Technical_Whitepaper_2025_05_12.md
+├── micro_X-A_Technical_Whitepaper_2025_05_18.md
 ├── micro_X.desktop
 ├── micro_X.sh
+├── pytest.ini
 ├── requirements.txt
 └── setup.sh
