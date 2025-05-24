@@ -180,4 +180,5 @@ micro_x_context_snapshot_*.txt
 
 # pytest results
 pytest_results.txt
+pytest_results/pytest_results_*.txt
 

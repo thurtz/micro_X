@@ -17,6 +17,7 @@ FILES_TO_INCLUDE = [
     "utils/generate_tree.py",
     "utils/generate_snapshot.py",
     "utils/install_requirements.py",
+    "utils/run_tests.py",
     "project_tree.txt",
     "README.md",
     "micro_X.sh",                 # Added micro_X.sh
