@@ -44,6 +44,7 @@ FILES_TO_INCLUDE = [
     "docs/setup_micro_X_termux.md", # Added setup_micro_x_termux.sh
     "docs/setup_micro_X_wsl.md", # Added setup_micro_x_wsl.sh
     "docs/review_of_micro_X_project.md", # Added review_of_micro_X_project.md
+    "docs/refactor_plan_micro_X_shell_engine.md", # Added refactor_plan_micro_X_shell_engine.md
     "setup.sh", # Added setup.sh
     "docs/micro_X_testing_guide.md" # Added micro_X_testing_guide.md
 ]
