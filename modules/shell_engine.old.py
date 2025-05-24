@@ -12,6 +12,7 @@ import shutil
 # Imports from other project modules will be added as needed.
 # For now, we might need ui_manager for append_output in sanitize_and_validate
 # from .ui_manager import UIManager # This will be an instance passed in
+from modules.output_analyzer import is_tui_like_output # Imported for tmux execution
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,9 @@ class ShellEngine:
             category_manager_module: Reference to the category_manager module or relevant functions.
             ai_handler_module: Reference to the ai_handler module or relevant functions.
             main_module_globals (dict, optional): A dictionary for accessing specific globals from main.py
-                                                 if direct passing is complex (e.g., for callbacks like
-                                                 normal_input_accept_handler, restore_normal_input_handler).
-                                                 Ideally, these are passed more directly or handled via UIManager.
+                                                  if direct passing is complex (e.g., for callbacks like
+                                                  normal_input_accept_handler, restore_normal_input_handler).
+                                                  Ideally, these are passed more directly or handled via UIManager.
         """
         self.config = config
         self.ui_manager = ui_manager
@@ -107,12 +108,39 @@ class ShellEngine:
                 return None
         return command
 
-    # --- Methods for Phase 2 (Command Execution) will be added below ---
+    async def handle_cd_command(self, full_cd_command: str):
+        """
+        Handles the 'cd' command, updating the shell's current directory.
+        This function was moved from main.py.
+        """
+        if not self.ui_manager:
+            logger.error("ShellEngine.handle_cd_command: UIManager not initialized."); return
+
+        append_output_func = self.ui_manager.append_output
+        try:
+            parts = full_cd_command.split(" ", 1); target_dir_str = parts[1].strip() if len(parts) > 1 else "~"
+            # expanduser and expandvars are fine here, abspath uses current_directory from shell_engine
+            expanded_dir_arg = os.path.expanduser(os.path.expandvars(target_dir_str))
+            new_dir_abs = os.path.abspath(os.path.join(self.current_directory, expanded_dir_arg)) if not os.path.isabs(expanded_dir_arg) else expanded_dir_arg
+
+            if os.path.isdir(new_dir_abs):
+                self.current_directory = new_dir_abs # Update ShellEngine's current_directory
+                self.ui_manager.update_input_prompt(self.current_directory)
+                append_output_func(f"📂 Changed directory to: {self.current_directory}", style_class='info'); logger.info(f"Directory changed to: {self.current_directory}")
+            else: append_output_func(f"❌ Error: Directory '{target_dir_str}' (resolved to '{new_dir_abs}') does not exist.", style_class='error'); logger.warning(f"Failed cd to '{new_dir_abs}'.")
+        except Exception as e: append_output_func(f"❌ Error processing 'cd' command: {e}", style_class='error'); logger.exception(f"Error in handle_cd_command for '{full_cd_command}'")
+        finally:
+            # After cd, always restore normal input mode.
+            # This calls the main restore_normal_input_ref, which will then call set_normal_input_mode on UIManager
+            if self.ui_manager.main_restore_normal_input_ref:
+                self.ui_manager.main_restore_normal_input_ref()
+
 
     async def execute_shell_command(self, command_to_execute: str, original_user_input_display: str):
         """
         Executes a 'simple' command directly using subprocess.Popen.
         Output is captured and appended to the UI.
+        This function was moved from main.py.
         """
         if not self.ui_manager:
             logger.error("ShellEngine.execute_shell_command: UIManager not available.")
@@ -123,11 +151,9 @@ class ShellEngine:
         try:
             if not command_to_execute.strip():
                 append_output_func("⚠️ Empty command cannot be executed.", style_class='warning')
-                logger.warning(f"Attempted to execute empty command from input: '{original_user_input_display}'")
+                logger.warning(f"Attempted to execute empty command: '{command_to_execute}' from input: '{original_user_input_display}'")
                 return
 
-            # Using Popen to allow for shell features like pipes if not explicitly handled by 'bash -c'
-            # However, for safety and clarity, 'bash -c' is often preferred for executing arbitrary strings.
             process = await asyncio.create_subprocess_shell(
                 command_to_execute,
                 stdout=asyncio.subprocess.PIPE,
@@ -161,11 +187,12 @@ class ShellEngine:
     async def execute_command_in_tmux(self, command_to_execute: str, original_user_input_display: str, category: str):
         """
         Executes a 'semi_interactive' or 'interactive_tui' command in a new tmux window.
+        This function was moved from main.py.
         """
         if not self.ui_manager:
             logger.error("ShellEngine.execute_command_in_tmux: UIManager not available.")
             return
-        
+
         append_output_func = self.ui_manager.append_output
         logger.info(f"Executing tmux command ({category}): '{command_to_execute}' in '{self.current_directory}'")
 
@@ -185,18 +212,18 @@ class ShellEngine:
             if category == "semi_interactive":
                 os.makedirs(tmux_log_base, exist_ok=True)
                 log_path = os.path.join(tmux_log_base, f"micro_x_output_{unique_id}.log")
-                
+
                 # Properly escape the command for bash -c ''
                 replacement_for_single_quote = "'\"'\"'" # bash trick: ' -> '\'' -> '"'"'
                 escaped_command_str = command_to_execute.replace("'", replacement_for_single_quote)
-                
+
                 # The wrapped command will execute the user's command, tee its output to a log, and then sleep.
                 wrapped_command = f"bash -c '{escaped_command_str}' |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
-                
+
                 tmux_cmd_list_launch = ["tmux", "new-window", "-d", "-n", window_name, wrapped_command] # -d for detached
-                
+
                 logger.info(f"Launching semi_interactive tmux: {' '.join(tmux_cmd_list_launch)} (log: {log_path})")
-                
+
                 process_launch = await asyncio.create_subprocess_exec(
                     *tmux_cmd_list_launch,
                     cwd=self.current_directory,
@@ -237,7 +264,7 @@ class ShellEngine:
                         logger.warning(f"Error checking tmux windows for '{window_name}': {tmux_err}")
                         window_closed_or_cmd_done = True # Assume closed if we can't check
                         break
-                
+
                 if not window_closed_or_cmd_done:
                     append_output_func(f"⚠️ Tmux window '{window_name}' poll timed out. Output might be incomplete or window still running.", style_class='warning')
                     logger.warning(f"Tmux poll for '{window_name}' timed out.")
@@ -247,12 +274,9 @@ class ShellEngine:
                     try:
                         with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
                             output_content = f.read().strip()
-                        
+
                         tui_line_threshold = self.config.get('behavior', {}).get('tui_detection_line_threshold_pct', 30.0)
                         tui_char_threshold = self.config.get('behavior', {}).get('tui_detection_char_threshold_pct', 3.0)
-                        
-                        # Dynamically import is_tui_like_output or ensure it's passed if ShellEngine is fully isolated
-                        from modules.output_analyzer import is_tui_like_output
 
                         if output_content and is_tui_like_output(output_content, tui_line_threshold, tui_char_threshold):
                             logger.info(f"Output from '{original_user_input_display}' (semi-interactive) detected as TUI-like.")
@@ -274,8 +298,8 @@ class ShellEngine:
                         except OSError as e_del:
                             logger.error(f"Error deleting tmux log {log_path}: {e_del}")
                 elif window_closed_or_cmd_done: # Window closed, no log file found
-                     append_output_func(f"Output from '{original_user_input_display}': (Tmux window closed, no log found)", style_class='info')
-                
+                    append_output_func(f"Output from '{original_user_input_display}': (Tmux window closed, no log found)", style_class='info')
+
                 if not output_captured_from_log and not window_closed_or_cmd_done: # Timed out, log didn't exist or was empty
                     append_output_func(f"Output from '{original_user_input_display}': (Tmux window may still be running or timed out without output)", style_class='warning')
 
@@ -317,5 +341,3 @@ class ShellEngine:
         except Exception as e:
             append_output_func(f"❌ Unexpected error interacting with tmux: {e}", style_class='error')
             logger.exception(f"Unexpected error during tmux interaction: {e}")
-
-

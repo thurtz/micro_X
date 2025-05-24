@@ -38,6 +38,7 @@ def mock_ui_manager_for_engine():
     manager.append_output = MagicMock()
     manager.update_input_prompt = MagicMock()
     manager.main_restore_normal_input_ref = MagicMock() # Mock the callback
+    manager.main_exit_app_ref = MagicMock() # Mock the exit callback
     manager.get_app_instance = MagicMock() # Mock app instance getter
     manager.get_app_instance.return_value.invalidate = MagicMock()
     manager.get_app_instance.return_value.is_running = True
@@ -49,8 +50,11 @@ def shell_engine(mock_config_for_engine, mock_ui_manager_for_engine):
     return ShellEngine(
         config=mock_config_for_engine,
         ui_manager=mock_ui_manager_for_engine,
-        category_manager_module=None, # Or MagicMock()
-        ai_handler_module=None # Or MagicMock()
+        category_manager_module=MagicMock(), # Use MagicMock for modules
+        ai_handler_module=MagicMock(), # Use MagicMock for modules
+        ollama_manager_module=MagicMock(), # Use MagicMock for modules
+        main_exit_app_ref=mock_ui_manager_for_engine.main_exit_app_ref, # Pass the mock
+        main_restore_normal_input_ref=mock_ui_manager_for_engine.main_restore_normal_input_ref # Pass the mock
     )
 
 # --- Tests for expand_shell_variables ---
@@ -159,7 +163,7 @@ async def test_handle_cd_command_valid_path(shell_engine):
         shell_engine.ui_manager.append_output.assert_called_once_with(
             f"📂 Changed directory to: {target_dir}", style_class='info'
         )
-        shell_engine.ui_manager.main_restore_normal_input_ref.assert_called_once()
+        shell_engine.main_restore_normal_input_ref.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_handle_cd_command_invalid_path(shell_engine):
@@ -177,7 +181,7 @@ async def test_handle_cd_command_invalid_path(shell_engine):
         shell_engine.ui_manager.update_input_prompt.assert_not_called()
         shell_engine.ui_manager.append_output.assert_called_once()
         assert "❌ Error: Directory" in shell_engine.ui_manager.append_output.call_args[0][0]
-        shell_engine.ui_manager.main_restore_normal_input_ref.assert_called_once()
+        shell_engine.main_restore_normal_input_ref.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_handle_cd_command_home_dir(shell_engine):
@@ -192,7 +196,7 @@ async def test_handle_cd_command_home_dir(shell_engine):
         
         assert shell_engine.current_directory == "/home/user"
         shell_engine.ui_manager.update_input_prompt.assert_called_once_with("/home/user")
-        shell_engine.ui_manager.main_restore_normal_input_ref.assert_called_once()
+        shell_engine.main_restore_normal_input_ref.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_execute_shell_command_success_with_output(shell_engine):
@@ -351,7 +355,6 @@ async def test_execute_command_in_tmux_interactive_tui_success(shell_engine):
             if kwargs.get('style_class') == 'info' and \
                expected_pattern.match(args[0]): # Use regex match
                 found_launch_message = True
-                break
         assert found_launch_message, "Launch message not found or malformed for interactive TUI"
 
         shell_engine.ui_manager.append_output.assert_any_call(
