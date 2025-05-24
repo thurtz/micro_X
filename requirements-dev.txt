@@ -1,0 +1,5 @@
+# Development and Testing Dependencies for micro_X
+-r requirements.txt # Include runtime dependencies
+pytest>=8.3.0
+pytest-mock>=3.0.0
+pytest-asyncio>=0.23.0

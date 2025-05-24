@@ -28,8 +28,7 @@ from modules.category_manager import (
     handle_command_subsystem_input, UNKNOWN_CATEGORY_SENTINEL,
     CATEGORY_MAP as CM_CATEGORY_MAP, CATEGORY_DESCRIPTIONS as CM_CATEGORY_DESCRIPTIONS
 )
-# output_analyzer is now imported directly within ShellEngine where needed
-# from modules.output_analyzer import is_tui_like_output # Potentially used by ShellEngine's tmux execution
+from modules.output_analyzer import is_tui_like_output # Potentially used by ShellEngine's tmux execution
 from modules.ollama_manager import (
     ensure_ollama_service, explicit_start_ollama_service, explicit_stop_ollama_service,
     explicit_restart_ollama_service, get_ollama_status_info
@@ -67,7 +66,7 @@ ollama_service_ready = False # This state might eventually move or be managed vi
 app_instance = None
 ui_manager_instance = None
 shell_engine_instance = None # New global for ShellEngine instance
-# current_directory is now managed by ShellEngine instance
+# current_directory will be managed by ShellEngine instance
 
 def merge_configs(base, override):
     merged = base.copy()
@@ -123,6 +122,9 @@ def load_configuration():
 
 load_configuration()
 
+# expand_shell_variables MOVED to ShellEngine
+# sanitize_and_validate MOVED to ShellEngine
+
 def normal_input_accept_handler(buff):
     """
     Handles normal user input submission.
@@ -134,7 +136,7 @@ def normal_input_accept_handler(buff):
 
 def restore_normal_input_handler():
     """ Restores the UI to normal input mode via UIManager. """
-    global ui_manager_instance, shell_engine_instance
+    global ui_manager_instance, shell_engine_instance # current_directory is now in shell_engine_instance
     if ui_manager_instance and shell_engine_instance:
         ui_manager_instance.set_normal_input_mode(normal_input_accept_handler, shell_engine_instance.current_directory)
     elif not ui_manager_instance:
@@ -270,17 +272,17 @@ def display_general_help():
         ('class:help-title', "micro_X AI-Enhanced Shell - Help\n\n"),
         ('class:help-text', "Welcome to micro_X! An intelligent shell that blends traditional command execution with AI capabilities.\n"),
         ('class:help-header', "\nAvailable Commands:\n"),
-        ('class:help-command', "  /ai <query>           "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
-        ('class:help-example', "                          Example: /ai list all text files in current folder\n"),
-        ('class:help-command', "  /command <subcommand>   "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
-        ('class:help-example', "                          Type '/command help' for detailed options.\n"),
-        ('class:help-command', "  /ollama <subcommand>    "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"),
-        ('class:help-example', "                          Type '/ollama help' for detailed options.\n"),
-        ('class:help-command', "  /utils <script> [args]  "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
-        ('class:help-example', "                          Type '/utils list' or '/utils help' for available scripts.\n"),
-        ('class:help-command', "  /update               "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
-        ('class:help-command', "  /help                 "), ('class:help-description', "- Display this help message.\n"),
-        ('class:help-command', "  exit | quit           "), ('class:help-description', "- Exit the micro_X shell.\n"),
+        ('class:help-command', "  /ai <query>                "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
+        ('class:help-example', "                               Example: /ai list all text files in current folder\n"),
+        ('class:help-command', "  /command <subcommand>      "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
+        ('class:help-example', "                               Type '/command help' for detailed options.\n"),
+        ('class:help-command', "  /ollama <subcommand>       "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"),
+        ('class:help-example', "                               Type '/ollama help' for detailed options.\n"),
+        ('class:help-command', "  /utils <script> [args]     "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
+        ('class:help-example', "                               Type '/utils list' or '/utils help' for available scripts.\n"),
+        ('class:help-command', "  /update                    "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
+        ('class:help-command', "  /help                      "), ('class:help-description', "- Display this help message.\n"),
+        ('class:help-command', "  exit | quit                "), ('class:help-description', "- Exit the micro_X shell.\n"),
         ('class:help-header', "\nDirect Commands:\n"),
         ('class:help-text', "  You can type standard Linux commands directly (e.g., 'ls -l', 'cd my_folder').\n"),
         ('class:help-text', "  Unknown commands will trigger an interactive categorization flow.\n"),
@@ -306,11 +308,11 @@ def display_ollama_help():
         ("class:help-title", "Ollama Service Management - Help\n"),
         ("class:help-text", "Use these commands to manage the Ollama service used by micro_X.\n"),
         ("class:help-header", "\nAvailable /ollama Subcommands:\n"),
-        ("class:help-command", "  /ollama start           "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
-        ("class:help-command", "  /ollama stop            "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
-        ("class:help-command", "  /ollama restart         "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"),
-        ("class:help-command", "  /ollama status          "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
-        ("class:help-command", "  /ollama help            "), ("class:help-description", "- Displays this help message.\n"),
+        ("class:help-command", "  /ollama start            "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
+        ("class:help-command", "  /ollama stop             "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
+        ("class:help-command", "  /ollama restart          "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"),
+        ("class:help-command", "  /ollama status           "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
+        ("class:help-command", "  /ollama help             "), ("class:help-description", "- Displays this help message.\n"),
         ("class:help-text", "\nNote: These commands primarily interact with an Ollama instance managed by micro_X in a tmux session. ")
     ]
     help_output_string = "".join([text for _, text in help_text])
@@ -357,7 +359,7 @@ async def handle_ollama_command_async(user_input_parts: list):
 # This is the main input processing logic. This will be significantly refactored
 # into ShellEngine.submit_input and ShellEngine.process_command_internal
 async def handle_input_async(user_input: str):
-    global ui_manager_instance, shell_engine_instance, ollama_service_ready
+    global ui_manager_instance, shell_engine_instance, ollama_service_ready # current_directory is in shell_engine_instance
     if not ui_manager_instance:
         logger.error("handle_input_async: UIManager not initialized.")
         return
@@ -409,8 +411,8 @@ async def handle_input_async(user_input: str):
     if user_input_stripped == "cd" or user_input_stripped.startswith("cd "):
         logger.info(f"Handling 'cd' command directly: {user_input_stripped}")
         # This will become: await shell_engine_instance.handle_cd_command(user_input_stripped)
-        await shell_engine_instance.handle_cd_command(user_input_stripped) # Call the new method in ShellEngine
-        # restore_normal_input_handler() is called by ShellEngine.handle_cd_command
+        handle_cd_command(user_input_stripped) # Call the old function for now
+        # restore_normal_input_handler() is called by handle_cd_command or ShellEngine.handle_cd_command
         return
 
     # AI query handling will move to ShellEngine
@@ -431,7 +433,7 @@ async def handle_input_async(user_input: str):
             current_app_inst.invalidate()
 
         app_getter = ui_manager_instance.get_app_instance
-        # This call to process_command will be internal to ShellEngine
+        # This call will be inside ShellEngine.process_command_internal
         linux_command, ai_raw_candidate = await get_validated_ai_command(human_query, config, append_output_func, app_getter)
         if linux_command:
             append_output_func(f"🤖 AI Suggests (validated): {linux_command}", style_class='ai-response')
@@ -550,11 +552,11 @@ async def handle_input_async(user_input: str):
 # This function is the core command processing pipeline.
 # It will be moved to ShellEngine as a primary method.
 async def process_command(command_str_original: str, original_user_input_for_display: str,
-                            ai_raw_candidate: str | None = None,
-                            original_direct_input_if_different: str | None = None,
-                            forced_category: str | None = None,
-                            is_ai_generated: bool = False):
-    global ui_manager_instance, shell_engine_instance
+                          ai_raw_candidate: str | None = None,
+                          original_direct_input_if_different: str | None = None,
+                          forced_category: str | None = None,
+                          is_ai_generated: bool = False):
+    global ui_manager_instance, shell_engine_instance # current_directory is in shell_engine_instance
     if not ui_manager_instance:
         logger.error("process_command: UIManager not initialized.")
         return
@@ -672,17 +674,134 @@ async def process_command(command_str_original: str, original_user_input_for_dis
 
     # execute_shell_command and execute_command_in_tmux will be shell_engine_instance methods
     if category == "simple":
-        await shell_engine_instance.execute_shell_command(command_to_execute_sanitized, original_user_input_for_display) # Call new method
+        execute_shell_command(command_to_execute_sanitized, original_user_input_for_display) # Call old for now
     else:
-        await shell_engine_instance.execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category) # Call new method
+        execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category) # Call old for now
 
     # Restore normal input if no other flow is active (UIManager might handle this more centrally later)
     if ui_manager_instance and not ui_manager_instance.categorization_flow_active and not ui_manager_instance.confirmation_flow_active and not ui_manager_instance.is_in_edit_mode:
         restore_normal_input_handler()
 
 
+# prompt_for_categorization was moved into UIManager.start_categorization_flow
+# This function can be removed from main.py after process_command is fully moved.
+
+
+# handle_cd_command will be moved to ShellEngine
+def handle_cd_command(full_cd_command: str):
+    global ui_manager_instance, shell_engine_instance # current_directory is in shell_engine_instance
+    if not ui_manager_instance: logger.error("handle_cd_command: UIManager not initialized."); return
+    if not shell_engine_instance: logger.error("handle_cd_command: ShellEngine not initialized."); return
+
+    append_output_func = ui_manager_instance.append_output
+    try:
+        parts = full_cd_command.split(" ", 1); target_dir_str = parts[1].strip() if len(parts) > 1 else "~"
+        # expanduser and expandvars are fine here, abspath uses current_directory from shell_engine
+        expanded_dir_arg = os.path.expanduser(os.path.expandvars(target_dir_str))
+        new_dir_abs = os.path.abspath(os.path.join(shell_engine_instance.current_directory, expanded_dir_arg)) if not os.path.isabs(expanded_dir_arg) else expanded_dir_arg
+
+        if os.path.isdir(new_dir_abs):
+            shell_engine_instance.current_directory = new_dir_abs # Update ShellEngine's current_directory
+            ui_manager_instance.update_input_prompt(shell_engine_instance.current_directory)
+            append_output_func(f"📂 Changed directory to: {shell_engine_instance.current_directory}", style_class='info'); logger.info(f"Directory changed to: {shell_engine_instance.current_directory}")
+        else: append_output_func(f"❌ Error: Directory '{target_dir_str}' (resolved to '{new_dir_abs}') does not exist.", style_class='error'); logger.warning(f"Failed cd to '{new_dir_abs}'.")
+    except Exception as e: append_output_func(f"❌ Error processing 'cd' command: {e}", style_class='error'); logger.exception(f"Error in handle_cd_command for '{full_cd_command}'")
+    finally:
+        # After cd, always restore normal input mode.
+        # This might be redundant if the calling context in handle_input_async already does it.
+        restore_normal_input_handler()
+
+
+# execute_command_in_tmux will be moved to ShellEngine
+def execute_command_in_tmux(command_to_execute: str, original_user_input_display: str, category: str):
+    global ui_manager_instance, shell_engine_instance, config # current_directory is in shell_engine_instance
+    if not ui_manager_instance: logger.error("execute_command_in_tmux: UIManager not initialized."); return
+    if not shell_engine_instance: logger.error("execute_command_in_tmux: ShellEngine not initialized."); return
+
+    append_output_func = ui_manager_instance.append_output
+    try:
+        unique_id = str(uuid.uuid4())[:8]; window_name = f"micro_x_{unique_id}"
+        if shutil.which("tmux") is None: append_output_func("❌ Error: tmux not found.", style_class='error'); logger.error("tmux not found."); return
+
+        tmux_poll_timeout = config['timeouts']['tmux_poll_seconds']; tmux_sleep_after = config['timeouts']['tmux_semi_interactive_sleep_seconds']; tmux_log_base = config.get('paths', {}).get('tmux_log_base_path', '/tmp')
+
+        if category == "semi_interactive":
+            os.makedirs(tmux_log_base, exist_ok=True); log_path = os.path.join(tmux_log_base, f"micro_x_output_{unique_id}.log")
+            replacement_for_single_quote = "'\"'\"'"; escaped_command_str = command_to_execute.replace("'", replacement_for_single_quote)
+            wrapped_command = f"bash -c '{escaped_command_str}' |& tee {log_path}; sleep {tmux_sleep_after}"
+            tmux_cmd_list_launch = ["tmux", "new-window", "-n", window_name, wrapped_command]
+            logger.info(f"Executing semi_interactive tmux: {tmux_cmd_list_launch} (log: {log_path})"); subprocess.run(tmux_cmd_list_launch, check=True, cwd=shell_engine_instance.current_directory)
+            append_output_func(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output (max {tmux_poll_timeout}s)...", style_class='info')
+
+            start_time = time.time(); output_captured = False; window_closed_or_cmd_done = False
+            while time.time() - start_time < tmux_poll_timeout:
+                time.sleep(1)
+                try:
+                    result = subprocess.run(["tmux", "list-windows", "-F", "#{window_name}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="ignore", check=True)
+                    if window_name not in result.stdout: logger.info(f"Tmux window '{window_name}' closed."); window_closed_or_cmd_done = True; break
+                except (subprocess.CalledProcessError, FileNotFoundError) as tmux_err: logger.warning(f"Error checking tmux windows: {tmux_err}"); window_closed_or_cmd_done = True; break
+
+            if not window_closed_or_cmd_done: append_output_func(f"⚠️ Tmux window '{window_name}' poll timed out.", style_class='warning'); logger.warning(f"Tmux poll for '{window_name}' timed out.")
+
+            if os.path.exists(log_path):
+                try:
+                    with open(log_path, "r", encoding="utf-8", errors="ignore") as f: output_content = f.read().strip()
+                    tui_line_threshold = config.get('behavior', {}).get('tui_detection_line_threshold_pct', 30.0)
+                    tui_char_threshold = config.get('behavior', {}).get('tui_detection_char_threshold_pct', 3.0)
+                    if output_content and is_tui_like_output(output_content, tui_line_threshold, tui_char_threshold):
+                        logger.info(f"Output from '{original_user_input_display}' TUI-like."); suggestion_command = f'/command move "{command_to_execute}" interactive_tui'
+                        append_output_func(f"Output from '{original_user_input_display}':\n[Semi-interactive TUI-like output not displayed directly.]\n💡 Tip: Try: {suggestion_command}", style_class='info'); output_captured = True
+                    elif output_content: append_output_func(f"Output from '{original_user_input_display}':\n{output_content}"); output_captured = True
+                    elif window_closed_or_cmd_done: append_output_func(f"Output from '{original_user_input_display}': (No output captured)", style_class='info'); output_captured = True
+                except Exception as e_read: logger.error(f"Error reading/analyzing tmux log {log_path}: {e_read}", exc_info=True); append_output_func(f"❌ Error reading/analyzing tmux log: {e_read}", style_class='error')
+                finally:
+                    try: os.remove(log_path)
+                    except OSError as e_del: logger.error(f"Error deleting tmux log {log_path}: {e_del}")
+            elif window_closed_or_cmd_done: append_output_func(f"Output from '{original_user_input_display}': (Tmux window closed, no log found)", style_class='info')
+
+            if not output_captured and not window_closed_or_cmd_done: append_output_func(f"Output from '{original_user_input_display}': (Tmux window may still be running or timed out)", style_class='warning')
+
+        else: # interactive_tui
+            tmux_cmd_list = ["tmux", "new-window", "-n", window_name, command_to_execute]
+            logger.info(f"Executing interactive_tui tmux: {tmux_cmd_list}"); append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait.", style_class='info')
+            try:
+                subprocess.run(tmux_cmd_list, check=True, cwd=shell_engine_instance.current_directory)
+                append_output_func(f"✅ Interactive tmux session for '{original_user_input_display}' ended.", style_class='success')
+            except subprocess.CalledProcessError as e: append_output_func(f"❌ Error or non-zero exit in tmux session '{window_name}': {e}", style_class='error'); logger.error(f"Error reported by tmux run for cmd '{command_to_execute}': {e}")
+            except FileNotFoundError: append_output_func("❌ Error: tmux not found.", style_class='error'); logger.error("tmux not found for interactive_tui.")
+            except Exception as e_run: append_output_func(f"❌ Unexpected error running interactive tmux: {e_run}", style_class='error'); logger.exception(f"Unexpected error running interactive tmux: {e_run}")
+
+    except subprocess.CalledProcessError as e: append_output_func(f"❌ Error setting up tmux: {e.stderr or e}", style_class='error'); logger.exception(f"CalledProcessError during tmux setup: {e}")
+    except Exception as e: append_output_func(f"❌ Unexpected error interacting with tmux: {e}", style_class='error'); logger.exception(f"Unexpected error during tmux interaction: {e}")
+
+
+# execute_shell_command will be moved to ShellEngine
+def execute_shell_command(command_to_execute: str, original_user_input_display: str):
+    global ui_manager_instance, shell_engine_instance # current_directory is in shell_engine_instance
+    if not ui_manager_instance: logger.error("execute_shell_command: UIManager not initialized."); return
+    if not shell_engine_instance: logger.error("execute_shell_command: ShellEngine not initialized."); return
+
+    append_output_func = ui_manager_instance.append_output
+    try:
+        if not command_to_execute.strip(): append_output_func("⚠️ Empty command cannot be executed.", style_class='warning'); logger.warning(f"Attempted to execute empty command: '{command_to_execute}'"); return
+
+        process = subprocess.Popen(['bash', '-c', command_to_execute], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=shell_engine_instance.current_directory, text=True, errors='replace')
+        stdout, stderr = process.communicate()
+        output_prefix = f"Output from '{original_user_input_display}':\n"
+
+        if stdout: append_output_func(f"{output_prefix}{stdout.strip()}")
+        if stderr: append_output_func(f"Stderr from '{original_user_input_display}':\n{stderr.strip()}", style_class='warning')
+        if not stdout and not stderr and process.returncode == 0: append_output_func(f"{output_prefix}(No output)", style_class='info')
+
+        if process.returncode != 0:
+            logger.warning(f"Command '{command_to_execute}' exited with code {process.returncode}")
+            if not stderr: append_output_func(f"⚠️ Command '{original_user_input_display}' exited with code {process.returncode}.", style_class='warning')
+
+    except FileNotFoundError: append_output_func(f"❌ Shell (bash) not found.", style_class='error'); logger.error(f"Shell (bash) not found for: {command_to_execute}")
+    except Exception as e: append_output_func(f"❌ Error executing '{command_to_execute}': {e}", style_class='error'); logger.exception(f"Error executing shell command: {e}")
+
 async def main_async_runner():
-    global app_instance, ollama_service_ready, ui_manager_instance, shell_engine_instance
+    global app_instance, ollama_service_ready, ui_manager_instance, shell_engine_instance # current_directory removed
 
     ui_manager_instance = UIManager(config)
     ui_manager_instance.main_exit_app_ref = _exit_app_main
@@ -778,3 +897,4 @@ def run_shell():
 
 if __name__ == "__main__":
     run_shell()
+

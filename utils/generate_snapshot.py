@@ -12,9 +12,11 @@ FILES_TO_INCLUDE = [
     "config/default_command_categories.json",
     "config/.tmux.conf",          # Added .tmux.conf
     "requirements.txt",
+    "requirements-dev.txt",
     ".gitignore",
     "utils/generate_tree.py",
     "utils/generate_snapshot.py",
+    "utils/install_requirements.py",
     "project_tree.txt",
     "README.md",
     "micro_X.sh",                 # Added micro_X.sh

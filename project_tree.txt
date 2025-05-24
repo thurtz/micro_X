@@ -46,7 +46,8 @@ micro_X
 |   └── tests.md
 ├── utils/
 |   ├── generate_snapshot.py
-|   └── generate_tree.py
+|   ├── generate_tree.py
+|   └── install_requirements.py
 ├── .gitignore
 ├── .micro_x_history
 ├── LICENSE
@@ -56,5 +57,6 @@ micro_X
 ├── micro_X.desktop
 ├── micro_X.sh
 ├── pytest.ini
+├── requirements-dev.txt
 ├── requirements.txt
 └── setup.sh
