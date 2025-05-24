@@ -31,7 +31,8 @@ micro_X
 |   ├── ui_manager.old.py
 |   └── ui_manager.py
 ├── pytest_results/
-|   └── pytest_results.txt
+|   ├── pytest_results.txt
+|   └── pytest_results_20250524_141544.txt
 ├── setup_scripts/
 |   ├── setup_micro_X_mac.sh
 |   ├── setup_micro_X_mint.sh
@@ -47,7 +48,8 @@ micro_X
 ├── utils/
 |   ├── generate_snapshot.py
 |   ├── generate_tree.py
-|   └── install_requirements.py
+|   ├── install_requirements.py
+|   └── run_tests.py
 ├── .gitignore
 ├── .micro_x_history
 ├── LICENSE
