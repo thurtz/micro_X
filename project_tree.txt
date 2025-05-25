@@ -38,7 +38,9 @@ micro_X
 |   ├── pytest_results_20250524_165210.txt
 |   ├── pytest_results_20250524_170017.txt
 |   ├── pytest_results_20250525_114541.txt
-|   └── pytest_results_20250525_122158.txt
+|   ├── pytest_results_20250525_122158.txt
+|   ├── pytest_results_20250525_122317.txt
+|   └── pytest_results_20250525_125009.txt
 ├── setup_scripts/
 |   ├── setup_micro_X_mac.sh
 |   ├── setup_micro_X_mint.sh
@@ -48,6 +50,7 @@ micro_X
 |   ├── conftest.py
 |   ├── test_ai_handler.py
 |   ├── test_category_manager.py
+|   ├── test_git_context_manager.py
 |   ├── test_shell_engine.py
 |   ├── test_ui_manager.py
 |   └── tests.md
