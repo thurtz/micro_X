@@ -23,6 +23,7 @@ micro_X
 |   ├── ai_handler.py
 |   ├── category_manager.old.py
 |   ├── category_manager.py
+|   ├── git_context_manager.py
 |   ├── ollama_manager.old.py
 |   ├── ollama_manager.py
 |   ├── output_analyzer.py
@@ -35,7 +36,9 @@ micro_X
 |   ├── pytest_results_20250524_141544.txt
 |   ├── pytest_results_20250524_142652.txt
 |   ├── pytest_results_20250524_165210.txt
-|   └── pytest_results_20250524_170017.txt
+|   ├── pytest_results_20250524_170017.txt
+|   ├── pytest_results_20250525_114541.txt
+|   └── pytest_results_20250525_122158.txt
 ├── setup_scripts/
 |   ├── setup_micro_X_mac.sh
 |   ├── setup_micro_X_mint.sh

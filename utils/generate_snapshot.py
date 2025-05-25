@@ -31,6 +31,7 @@ FILES_TO_INCLUDE = [
     "modules/ollama_manager.py",
     "modules/shell_engine.py",
     "modules/ui_manager.py",
+    "modules/git_context_manager.py",
     "setup_scripts/setup_micro_X_mac.sh",
     "setup_scripts/setup_micro_X_mint.sh",
     "setup_scripts/setup_micro_X_termux.sh",
