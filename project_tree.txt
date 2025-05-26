@@ -40,7 +40,15 @@ micro_X
 |   ├── pytest_results_20250525_114541.txt
 |   ├── pytest_results_20250525_122158.txt
 |   ├── pytest_results_20250525_122317.txt
-|   └── pytest_results_20250525_125009.txt
+|   ├── pytest_results_20250525_125009.txt
+|   ├── pytest_results_20250525_125704.txt
+|   ├── pytest_results_20250525_125832.txt
+|   ├── pytest_results_20250525_130159.txt
+|   ├── pytest_results_20250525_170045.txt
+|   ├── pytest_results_20250525_170103.txt
+|   ├── pytest_results_20250525_170632.txt
+|   ├── pytest_results_20250525_222252.txt
+|   └── pytest_results_20250525_230525.txt
 ├── setup_scripts/
 |   ├── setup_micro_X_mac.sh
 |   ├── setup_micro_X_mint.sh
@@ -51,6 +59,7 @@ micro_X
 |   ├── test_ai_handler.py
 |   ├── test_category_manager.py
 |   ├── test_git_context_manager.py
+|   ├── test_main_startup.py
 |   ├── test_shell_engine.py
 |   ├── test_ui_manager.py
 |   └── tests.md

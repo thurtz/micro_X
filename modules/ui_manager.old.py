@@ -3,15 +3,14 @@ import logging
 import os
 import asyncio
 
-from prompt_toolkit import Application # Keep for get_app, though Application itself is created in main
-from prompt_toolkit.key_binding import KeyBindings # Import KeyBindings
+from prompt_toolkit import Application 
+from prompt_toolkit.key_binding import KeyBindings 
 from prompt_toolkit.layout import HSplit, Window, Layout
 from prompt_toolkit.widgets import TextArea
 from prompt_toolkit.styles import Style
 from prompt_toolkit.document import Document
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.history import FileHistory
-from prompt_toolkit.application import get_app
 
 from modules.category_manager import CATEGORY_MAP as CM_CATEGORY_MAP, CATEGORY_DESCRIPTIONS as CM_CATEGORY_DESCRIPTIONS
 from modules.ai_handler import explain_linux_command_with_ai
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 class UIManager:
     def __init__(self, config):
         self.config = config
-        self.app = None # Reference to the Application instance
+        self.app = None 
         self.output_field = None
         self.input_field = None
         self.key_help_field = None
@@ -38,30 +37,23 @@ class UIManager:
         self.confirmation_flow_active = False
         self.confirmation_flow_state = {} 
         
+        self.is_in_edit_mode = False # New flag for edit mode
+
         self.current_prompt_text = ""
         
-        self.kb = KeyBindings() # KeyBindings object now part of UIManager
-        self._register_keybindings() # Register keybindings upon initialization
+        self.kb = KeyBindings() 
+        self._register_keybindings() 
 
-        # References for main.py to call UIManager methods (if any are still needed)
-        # For now, these are primarily for actions triggered by UIManager that need main.py's context
         self.main_exit_app_ref = None 
         self.main_restore_normal_input_ref = None
-        self.main_normal_input_accept_handler_ref = None
-
+        # self.main_normal_input_accept_handler_ref = None # This is passed directly to methods needing it
 
         logger.debug("UIManager initialized with config and keybindings.")
 
     def _register_keybindings(self):
-        """Registers all keybindings for the application."""
-        # Note: Event handlers now become methods of UIManager.
-        # They will need access to `self` (for UIManager state) and `event` (from prompt_toolkit).
-
         @self.kb.add('c-c')
         @self.kb.add('c-d')
         def _handle_exit_or_cancel(event):
-            # Handles Ctrl+C/Ctrl+D for exiting or cancelling flows.
-            # `self` refers to UIManager instance.
             if self.categorization_flow_active:
                 self.append_output("\n⚠️ Categorization cancelled by user.", style_class='warning')
                 logger.info("Categorization flow cancelled by Ctrl+C/D.")
@@ -80,30 +72,40 @@ class UIManager:
                     self.confirmation_flow_state['future'].set_result({'action': 'cancel'})
                 if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
                 event.app.invalidate()
-            else:
+            elif self.is_in_edit_mode: # Handle cancelling edit mode
+                self.append_output("\n⌨️ Command editing cancelled.", style_class='info')
+                logger.info("Command edit mode cancelled by Ctrl+C/D.")
+                self.is_in_edit_mode = False # Reset edit mode flag
+                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                event.app.invalidate()
+            else: 
                 logger.info("Exit keybinding triggered.")
                 if self.main_exit_app_ref:
-                    self.main_exit_app_ref() # Call main's exit logic
-                else: # Fallback if ref not set (should not happen in normal flow)
+                    self.main_exit_app_ref() 
+                else: 
                     event.app.exit()
 
 
         @self.kb.add('c-n')
         def _handle_newline(event):
-            # Inserts a newline in the input buffer if not in an active flow.
-            if not self.categorization_flow_active and not self.confirmation_flow_active:
-                event.current_buffer.insert_text('\n')
+            if not self.categorization_flow_active and \
+               not self.confirmation_flow_active and \
+               not self.is_in_edit_mode: # Allow newline in edit mode if multiline
+                if self.input_field and self.input_field.multiline:
+                    event.current_buffer.insert_text('\n')
+                # If not multiline, or if we want to prevent newline submission in flows,
+                # this logic could be adjusted. For now, allowing newline if input_field is multiline.
+            elif self.input_field and self.input_field.multiline and self.is_in_edit_mode: # Explicitly allow newline in multiline edit mode
+                 event.current_buffer.insert_text('\n')
+
 
         @self.kb.add('enter')
         def _handle_enter(event):
-            # Handles the Enter key press to submit input.
             buff = event.current_buffer
-            # The buffer's accept_handler is set by UIManager's mode-setting methods
             buff.validate_and_handle() 
 
         @self.kb.add('tab')
         def _handle_tab(event):
-            # Handles Tab for completion or indentation.
             buff = event.current_buffer
             if buff.complete_state: 
                 event.app.current_buffer.complete_next()
@@ -112,35 +114,36 @@ class UIManager:
 
         @self.kb.add('pageup')
         def _handle_pageup(event):
-            # Scrolls the output field up.
             if self.output_field and self.output_field.window.render_info:
                 self.output_field.window._scroll_up()
                 event.app.invalidate()
 
         @self.kb.add('pagedown')
         def _handle_pagedown(event):
-            # Scrolls the output field down.
             if self.output_field and self.output_field.window.render_info:
                 self.output_field.window._scroll_down()
                 event.app.invalidate()
 
         @self.kb.add('c-up')
         def _handle_ctrl_up(event):
-            # Moves cursor up in the input buffer if not in an active flow.
+            # Allow cursor movement in edit mode even if it's multiline
             if not self.categorization_flow_active and not self.confirmation_flow_active:
                 event.current_buffer.cursor_up(count=1)
 
         @self.kb.add('c-down')
         def _handle_ctrl_down(event):
-            # Moves cursor down in the input buffer if not in an active flow.
+            # Allow cursor movement in edit mode even if it's multiline
             if not self.categorization_flow_active and not self.confirmation_flow_active:
                 event.current_buffer.cursor_down(count=1)
 
         @self.kb.add('up')
         def _handle_up_arrow(event):
-            # Handles Up arrow for history navigation or cursor movement.
+            # Allow history navigation/line movement unless in a specific flow choice prompt
             if self.categorization_flow_active or self.confirmation_flow_active:
-                return # Ignore if in flow
+                 # If it's a flow where up/down might select choices, handle differently or disallow.
+                 # For now, assuming up/down is for history/input lines.
+                 # If input is single line for flow, it will try history.
+                 pass # Let default behavior or specific flow input handler manage.
 
             buff = event.current_buffer
             doc = buff.document
@@ -153,9 +156,8 @@ class UIManager:
 
         @self.kb.add('down')
         def _handle_down_arrow(event):
-            # Handles Down arrow for history navigation or cursor movement.
             if self.categorization_flow_active or self.confirmation_flow_active:
-                return # Ignore if in flow
+                pass
 
             buff = event.current_buffer
             doc = buff.document
@@ -169,7 +171,6 @@ class UIManager:
         logger.debug("UIManager: Keybindings registered.")
 
     def get_key_bindings(self) -> KeyBindings:
-        """Returns the KeyBindings object managed by UIManager."""
         return self.kb
 
     # --- Categorization Flow Methods ---
@@ -179,6 +180,7 @@ class UIManager:
                                         ):
         self.categorization_flow_active = True
         self.confirmation_flow_active = False 
+        self.is_in_edit_mode = False # Ensure edit mode is off
         self.categorization_flow_state = {
             'command_initially_proposed': command_initially_proposed,
             'ai_raw_candidate': ai_raw_candidate,
@@ -381,6 +383,7 @@ class UIManager:
         logger.info(f"UIManager: Starting command confirmation flow for '{command_to_confirm}' from '{display_source}'.")
         self.confirmation_flow_active = True
         self.categorization_flow_active = False 
+        self.is_in_edit_mode = False # Ensure edit mode is off
         self.confirmation_flow_state = {
             'command_to_confirm': command_to_confirm, 
             'original_command': command_to_confirm, 
@@ -413,10 +416,12 @@ class UIManager:
             if action_taken == 'edit_mode_engaged':
                 command_for_edit = self.confirmation_flow_state.get('command_to_confirm', '')
                 accept_handler = self.confirmation_flow_state.get('normal_input_accept_handler_ref')
-                if accept_handler: # Ensure it's set
-                    self.set_edit_mode(accept_handler, command_for_edit)
+                if accept_handler: 
+                    self.set_edit_mode(accept_handler, command_for_edit) # UIManager sets its own edit mode
                 else:
                     logger.error("UIManager: normal_input_accept_handler_ref not available for edit mode.")
+            # The calling function (process_command in main.py) will handle restoring normal input
+            # if the action is not 'edit_mode_engaged' and the flow is truly over.
             logger.info("UIManager: Confirmation flow ended and self.confirmation_flow_active set to False.")
 
 
@@ -544,8 +549,10 @@ class UIManager:
     # --- Core UI Methods ---
     def get_app_instance(self):
         if not self.app:
-            try: self.app = get_app()
-            except Exception: logger.warning("UIManager: get_app() called when no application is running."); return None
+            try: self.app = Application.get_app() # Use Application.get_app()
+            except RuntimeError: # More specific exception for no running app
+                logger.warning("UIManager: get_app() called when no application is running.")
+                return None
         return self.app
 
     def _get_current_prompt(self) -> str:
@@ -603,7 +610,7 @@ class UIManager:
         return self.layout
 
     def _on_output_cursor_pos_changed(self, _=None):
-        if self.categorization_flow_active or self.confirmation_flow_active:
+        if self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:
             if self.output_field and self.output_field.buffer:
                 self.output_field.buffer.cursor_position = len(self.output_field.buffer.text)
             return
@@ -634,7 +641,7 @@ class UIManager:
         buffer = self.output_field.buffer
         current_cursor_pos = buffer.cursor_position
         buffer.set_document(Document(plain_text_output, cursor_position=len(plain_text_output)), bypass_readonly=True)
-        if self.auto_scroll or self.categorization_flow_active or self.confirmation_flow_active:
+        if self.auto_scroll or self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:
             buffer.cursor_position = len(plain_text_output)
         else:
             buffer.cursor_position = min(current_cursor_pos, len(plain_text_output))
@@ -671,6 +678,7 @@ class UIManager:
         logger.debug("UIManager: Setting normal input mode.")
         self.categorization_flow_active = False
         self.confirmation_flow_active = False
+        self.is_in_edit_mode = False # Ensure edit mode is off
         self.update_input_prompt(current_directory_path)
         if self.input_field:
             self.input_field.multiline = self.config.get('behavior', {}).get('input_field_height', 3) > 1
@@ -683,8 +691,15 @@ class UIManager:
 
     def set_flow_input_mode(self, prompt_text: str, accept_handler_func, is_categorization: bool = False, is_confirmation: bool = False):
         logger.debug(f"UIManager: Setting flow input mode. Prompt: '{prompt_text}'")
-        if is_categorization: self.categorization_flow_active = True; self.confirmation_flow_active = False
-        elif is_confirmation: self.confirmation_flow_active = True; self.categorization_flow_active = False
+        if is_categorization: 
+            self.categorization_flow_active = True
+            self.confirmation_flow_active = False
+            self.is_in_edit_mode = False
+        elif is_confirmation: 
+            self.confirmation_flow_active = True
+            self.categorization_flow_active = False
+            self.is_in_edit_mode = False
+        
         self.current_prompt_text = prompt_text
         if self.input_field:
             self.input_field.multiline = False
@@ -699,6 +714,7 @@ class UIManager:
         logger.debug(f"UIManager: Setting edit mode. Command: '{command_to_edit}'")
         self.categorization_flow_active = False
         self.confirmation_flow_active = False
+        self.is_in_edit_mode = True # Set edit mode flag
         self.current_prompt_text = "[Edit Command]> "
         if self.input_field:
             self.input_field.multiline = self.config.get('behavior', {}).get('input_field_height', 3) > 1

@@ -85,7 +85,7 @@ def load_configuration():
             "protected_branches": ["main", "testing"],
             "developer_branch": "dev",
             "halt_on_integrity_failure": True,
-            "allow_run_if_behind_remote": True 
+            "allow_run_if_behind_remote": True # New configuration option
         }
     }
     config = fallback_config.copy()
@@ -120,38 +120,13 @@ def normal_input_accept_handler(buff):
     This is the default handler for the input field.
     It's also used when submitting an edited command after choosing 'Modify' in AI confirmation.
     """
-    global shell_engine_instance, ui_manager_instance # These are globals
+    global shell_engine_instance # shell_engine_instance is a global
     user_input_stripped = buff.text.strip()
     logger.info(f"normal_input_accept_handler received: '{user_input_stripped}'")
-
-    # Capture the edit mode state *before* the async task.
-    # This is important because the UI state might change by the time _handle_input runs.
-    was_in_edit_mode = False
-    if ui_manager_instance: # Ensure ui_manager_instance is available
-        was_in_edit_mode = ui_manager_instance.is_in_edit_mode
-        if was_in_edit_mode:
-            logger.info("Input submission is from edit mode context.")
-
     async def _handle_input():
-        try:
-            if not await shell_engine_instance.handle_built_in_command(user_input_stripped):
-                # Pass the captured edit mode state to submit_user_input
-                await shell_engine_instance.submit_user_input(user_input_stripped, from_edit_mode=was_in_edit_mode)
-        finally:
-            # If the input came from edit mode, ensure the UI is restored to normal input mode.
-            # This is crucial because process_command's finally block might not trigger
-            # restore_normal_input_handler if ui_manager.is_in_edit_mode is still true at that point.
-            if was_in_edit_mode:
-                logger.debug("Input was from edit mode; explicitly calling restore_normal_input_handler.")
-                if shell_engine_instance and shell_engine_instance.main_restore_normal_input_ref:
-                    shell_engine_instance.main_restore_normal_input_ref()
-                else:
-                    logger.warning("Could not call restore_normal_input_handler after edit mode submission: ref missing.")
-            # If not from_edit_mode, the existing finally block in ShellEngine.process_command
-            # should handle restoring the normal input handler if no new flow was started.
-
+        if not await shell_engine_instance.handle_built_in_command(user_input_stripped):
+            await shell_engine_instance.submit_user_input(user_input_stripped)
     asyncio.create_task(_handle_input())
-
 
 def restore_normal_input_handler():
     """
