@@ -50,16 +50,15 @@ class GitContextManager:
             return False, "", "Git executable not found."
 
         try:
-            # Use asyncio.to_thread to run the blocking subprocess call
             process = await asyncio.to_thread(
                 subprocess.run,
                 [self._git_executable_path] + command_args,
                 capture_output=True,
                 text=True,
                 cwd=self.project_root,
-                check=False, # We check returncode manually
+                check=False, 
                 timeout=timeout,
-                errors='replace' # Handle potential encoding errors in git output
+                errors='replace' 
             )
             if process.returncode == 0:
                 logger.debug(f"Git command '{' '.join(command_args)}' succeeded. Output: {process.stdout.strip()}")
@@ -72,7 +71,7 @@ class GitContextManager:
             return False, "", f"Command timed out after {timeout} seconds."
         except FileNotFoundError:
             logger.error(f"Git executable not found at '{self._git_executable_path}' during command execution.")
-            self._is_git_available_cached = False # Update cache
+            self._is_git_available_cached = False 
             return False, "", "Git executable not found."
         except Exception as e:
             logger.error(f"Error running git command '{' '.join(command_args)}': {e}", exc_info=True)
@@ -93,13 +92,12 @@ class GitContextManager:
     async def is_repository(self) -> bool:
         """Checks if the project_root is a git repository. Caches the result."""
         if not await self.is_git_available():
-            self._is_git_repo = False # Cannot be a repo if git is not available
+            self._is_git_repo = False 
             return False
 
         if self._is_git_repo is None:
             git_dir = os.path.join(self.project_root, ".git")
             if os.path.isdir(git_dir):
-                # More robust check using a lightweight git command
                 success, _, _ = await self._run_git_command(["rev-parse", "--is-inside-work-tree"])
                 self._is_git_repo = success
             else:
@@ -113,8 +111,6 @@ class GitContextManager:
         """Gets the current active branch name. Returns 'HEAD' for detached HEAD state."""
         if not await self.is_repository():
             return None
-        # `git symbolic-ref --short HEAD` is good for branches, fails on detached HEAD.
-        # `git rev-parse --abbrev-ref HEAD` handles detached HEAD by returning "HEAD".
         success, branch_name, stderr = await self._run_git_command(["rev-parse", "--abbrev-ref", "HEAD"])
         if success:
             return branch_name
@@ -135,21 +131,19 @@ class GitContextManager:
         and no untracked files that aren't ignored).
         """
         if not await self.is_repository():
-            # If not a repo, arguably it's "clean" in the sense of no git changes.
-            # Or, this check should only be called if is_repository() is true.
-            return False # Or raise an error, or return True based on desired semantics
+            return False 
 
-        # `git status --porcelain` output is empty if clean.
         success, porcelain_output, stderr = await self._run_git_command(["status", "--porcelain"])
         if not success:
             logger.warning(f"Failed to get working directory status: {stderr}")
-            return False # Treat failure to get status as potentially unclean or problematic
+            return False 
 
         is_clean = not bool(porcelain_output)
         logger.debug(f"Working directory clean status: {is_clean}. Porcelain output: '{porcelain_output}'")
         return is_clean
 
-    async def fetch_remote_branch(self, branch_name: str, remote_name: str = "origin") -> bool:
+
+    async def fetch_remote_branch(self, branch_name: str, remote_name: str = "origin") -> str:
         """
         Fetches updates for a specific branch from the specified remote.
         Uses the configured fetch_timeout.
@@ -159,23 +153,38 @@ class GitContextManager:
             remote_name (str): The name of the remote (default: "origin").
 
         Returns:
-            bool: True if fetch was successful, False on error or timeout.
+            str: Fetch status: "success", "timeout", "offline_or_unreachable", "other_error".
         """
         if not await self.is_repository():
-            return False
+            return "not_a_repo" # Should be caught earlier, but good to have a distinct status
+        
         logger.info(f"Attempting to fetch '{branch_name}' from remote '{remote_name}' with timeout {self.fetch_timeout}s...")
         success, stdout, stderr = await self._run_git_command(
             ["fetch", remote_name, branch_name],
             timeout=self.fetch_timeout
         )
+
         if success:
             logger.info(f"Fetch for '{remote_name}/{branch_name}' completed. Stdout: {stdout}, Stderr: {stderr}")
-            return True
+            return "success"
         else:
-            # Timeout is already logged by _run_git_command's TimeoutExpired exception
-            if "Command timed out" not in stderr: # Avoid double logging timeout message
-                 logger.warning(f"Fetch for '{remote_name}/{branch_name}' failed. Stderr: {stderr}")
-            return False
+            # Analyze stderr to differentiate timeout/offline from other errors
+            # This is a simplification; real-world git stderr parsing can be complex
+            stderr_lower = stderr.lower()
+            if "timed out" in stderr_lower or "timeout" in stderr_lower:
+                # Already logged by _run_git_command if it's a subprocess.TimeoutExpired
+                if "Command timed out" not in stderr: # Avoid double logging
+                    logger.warning(f"Fetch for '{remote_name}/{branch_name}' timed out. Stderr: {stderr}")
+                return "timeout"
+            elif "could not resolve hostname" in stderr_lower or \
+                 "name or service not known" in stderr_lower or \
+                 "network is unreachable" in stderr_lower or \
+                 "connection refused" in stderr_lower: # Common for offline/unreachable
+                logger.warning(f"Fetch for '{remote_name}/{branch_name}' failed: Host unreachable or offline. Stderr: {stderr}")
+                return "offline_or_unreachable"
+            else:
+                logger.warning(f"Fetch for '{remote_name}/{branch_name}' failed with other error. Stderr: {stderr}")
+                return "other_error"
 
     async def get_remote_tracking_branch_hash(self, branch_name: str, remote_name: str = "origin") -> Optional[str]:
         """
@@ -191,104 +200,84 @@ class GitContextManager:
             return None
         return commit_hash
 
-    async def compare_head_with_remote_tracking(self, branch_name: str, remote_name: str = "origin") -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    async def compare_head_with_remote_tracking(self, branch_name: str, remote_name: str = "origin") -> Tuple[Optional[str], Optional[str], Optional[str], str]:
         """
-        Compares HEAD with its remote-tracking branch after ensuring local remote refs are updated.
+        Compares HEAD with its remote-tracking branch. Attempts to fetch first.
 
         Args:
             branch_name (str): The name of the local branch.
             remote_name (str): The name of the remote.
 
         Returns:
-            Tuple[Optional[str], Optional[str], Optional[str]]:
-                (status_string, local_hash, remote_hash)
-            Status can be: "synced", "ahead", "behind", "diverged", "no_upstream", "fetch_failed", "error"
+            Tuple[Optional[str], Optional[str], Optional[str], str]:
+                (comparison_status, local_hash, remote_hash, fetch_attempt_status)
+            Comparison Status can be: "synced", "ahead", "behind", "diverged",
+                                      "synced_local_cache", "ahead_local_cache", "behind_local_cache", "diverged_local_cache",
+                                      "no_upstream", "no_upstream_info_locally", "error"
+            Fetch Status can be: "success", "timeout", "offline_or_unreachable", "other_error", "not_a_repo"
         """
         if not await self.is_repository():
-            return "error", None, None
+            return "error", None, None, "not_a_repo"
 
-        # Attempt to fetch first to get the latest state of the remote branch
-        # This is important for an accurate comparison.
-        if not await self.fetch_remote_branch(branch_name, remote_name):
-            logger.warning(f"Fetch failed for {remote_name}/{branch_name}. Comparison might be against stale data or fail.")
-            # Depending on policy, we might still try to compare against the local cache of remote.
-            # For now, let's indicate fetch failure.
-            # If we want to proceed with stale data, we'd skip this return.
-            # return "fetch_failed", await self.get_head_commit_hash(), None # Or get stale remote hash
-
+        fetch_status = await self.fetch_remote_branch(branch_name, remote_name)
+        
         local_hash = await self.get_head_commit_hash()
+        if not local_hash:
+            return "error", None, None, fetch_status # Error getting local hash
+
+        # Try to get remote hash regardless of fetch status, to compare against local cache if fetch failed
         remote_hash = await self.get_remote_tracking_branch_hash(branch_name, remote_name)
 
-        if not local_hash:
-            return "error", None, remote_hash # Error getting local hash
+        comparison_prefix = ""
+        if fetch_status != "success":
+            comparison_prefix = "_local_cache" # Indicate comparison is against potentially stale data
+            if not remote_hash: # If fetch failed AND no local cache for remote
+                 logger.info(f"Branch '{branch_name}' has no remote tracking info locally after fetch issue (status: {fetch_status}).")
+                 return "no_upstream_info_locally", local_hash, None, fetch_status
 
-        if not remote_hash:
-            # Check if an upstream is configured at all for the local branch
-            # `git rev-parse --abbrev-ref @{u}` or `git for-each-ref --format='%(upstream:short)' refs/heads/<branch_name>`
-            success_upstream_ref, upstream_full_ref, _ = await self._run_git_command(
+
+        if not remote_hash: # Should only happen if fetch succeeded but remote branch disappeared, or no upstream and fetch failed to create it
+            success_upstream_ref, _, _ = await self._run_git_command(
                 ["rev-parse", "--symbolic-full-name", f"{branch_name}@{{upstream}}"]
             )
-            if not success_upstream_ref or not upstream_full_ref:
-                 logger.info(f"Branch '{branch_name}' does not seem to have a configured upstream or remote '{remote_name}/{branch_name}' not found after fetch.")
-                 return "no_upstream", local_hash, None
-            return "error", local_hash, None # Upstream exists but couldn't get its hash
+            if not success_upstream_ref:
+                 logger.info(f"Branch '{branch_name}' does not have a configured upstream.")
+                 return "no_upstream", local_hash, None, fetch_status
+            return "error", local_hash, None, fetch_status # Upstream exists but couldn't get hash
 
         if local_hash == remote_hash:
-            return "synced", local_hash, remote_hash
+            return f"synced{comparison_prefix}", local_hash, remote_hash, fetch_status
 
-        # Use git merge-base --is-ancestor <commit1> <commit2>
-        # Returns 0 if commit1 is an ancestor of commit2, 1 otherwise.
         is_local_ancestor_of_remote, _, _ = await self._run_git_command(["merge-base", "--is-ancestor", local_hash, remote_hash])
-        if is_local_ancestor_of_remote: # Local is older
-            return "behind", local_hash, remote_hash
+        if is_local_ancestor_of_remote:
+            return f"behind{comparison_prefix}", local_hash, remote_hash, fetch_status
 
         is_remote_ancestor_of_local, _, _ = await self._run_git_command(["merge-base", "--is-ancestor", remote_hash, local_hash])
-        if is_remote_ancestor_of_local: # Local is newer
-            return "ahead", local_hash, remote_hash
+        if is_remote_ancestor_of_local:
+            return f"ahead{comparison_prefix}", local_hash, remote_hash, fetch_status
 
-        return "diverged", local_hash, remote_hash
+        return f"diverged{comparison_prefix}", local_hash, remote_hash, fetch_status
 
-    # --- Placeholder for Future GPG Signature Verification ---
     async def verify_commit_signature(self, commit_hash: str) -> Tuple[bool, str]:
-        """
-        (Future) Verifies the GPG signature of a commit.
-        Requires GPG setup and trusted keys.
-        Returns (is_trusted_signature_bool, status_message_str)
-        """
         logger.warning("GPG commit signature verification is not yet implemented.")
-        # Example: success, output, stderr = await self._run_git_command(["verify-commit", "--raw", commit_hash])
-        # Parse output for GPG status (GOODSIG, BADSIG, etc.) and trust level.
         return False, "Not implemented"
 
     async def verify_tag_signature(self, tag_name: str) -> Tuple[bool, str]:
-        """
-        (Future) Verifies the GPG signature of a tag.
-        Requires GPG setup and trusted keys.
-        Returns (is_trusted_signature_bool, status_message_str)
-        """
         logger.warning("GPG tag signature verification is not yet implemented.")
-        # Example: success, output, stderr = await self._run_git_command(["tag", "-v", tag_name])
-        # Stderr often contains the gpg output.
         return False, "Not implemented"
 
-# --- Example Usage (for testing this module directly) ---
 async def _main_test():
     """Internal test function for direct execution of this module."""
     print("Testing GitContextManager...")
-    # Assuming this script is run from project root or a test script that sets cwd
-    # For micro_X, SCRIPT_DIR in main.py would be the project root.
-    # For this test, let's assume we are in the project root.
     project_root_for_test = "."
     try:
-        # Attempt to get actual project root if possible (e.g., if .git is in parent)
         if not os.path.isdir(os.path.join(project_root_for_test, ".git")):
             if os.path.isdir(os.path.join(os.path.dirname(os.getcwd()), ".git")):
                  project_root_for_test = os.path.dirname(os.getcwd())
-            else: # Fallback if .git isn't immediately obvious
+            else:
                 print(f"Warning: Testing with current directory '{os.getcwd()}' as project root. Ensure it's a git repo.")
     except Exception:
         pass
-
 
     gcm = GitContextManager(project_root=project_root_for_test)
 
@@ -300,21 +289,16 @@ async def _main_test():
             print(f"Current branch: {branch}")
             commit = await gcm.get_head_commit_hash()
             print(f"HEAD commit: {commit}")
-
             is_clean = await gcm.is_working_directory_clean()
-            print(f"Is working directory clean (no changes to tracked files/untracked)? {is_clean}")
+            print(f"Is working directory clean? {is_clean}")
             if not is_clean:
-                status_porcelain = await gcm._run_git_command(["status", "--porcelain"])
-                print(f"  Porcelain status: \n{status_porcelain[1]}")
+                status_porcelain_tuple = await gcm._run_git_command(["status", "--porcelain"])
+                print(f"  Porcelain status: \n{status_porcelain_tuple[1]}")
 
-
-            if branch and branch != "HEAD": # Only try remote compare if on a branch
+            if branch and branch != "HEAD":
                 print(f"\nComparing branch '{branch}' with remote 'origin'...")
-                # fetch_success = await gcm.fetch_remote_branch(branch) # fetch is now part of compare
-                # print(f"Fetch successful for comparison: {fetch_success}")
-
-                comparison_status, local_h, remote_h = await gcm.compare_head_with_remote_tracking(branch)
-                print(f"Comparison with remote for '{branch}': {comparison_status}")
+                comp_status, local_h, remote_h, fetch_s = await gcm.compare_head_with_remote_tracking(branch)
+                print(f"Comparison with remote for '{branch}': {comp_status} (Fetch: {fetch_s})")
                 print(f"  Local HEAD: {local_h}")
                 print(f"  Remote '{branch}': {remote_h}")
             else:
