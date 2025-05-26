@@ -84,7 +84,8 @@ def load_configuration():
         "integrity_check": {
             "protected_branches": ["main", "testing"],
             "developer_branch": "dev",
-            "halt_on_integrity_failure": True
+            "halt_on_integrity_failure": True,
+            "allow_run_if_behind_remote": True # New configuration option
         }
     }
     config = fallback_config.copy()
@@ -147,6 +148,8 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
     protected_branches = integrity_config.get("protected_branches", ["main", "testing"])
     developer_branch = integrity_config.get("developer_branch", "dev")
     halt_on_failure = integrity_config.get("halt_on_integrity_failure", True)
+    allow_run_if_behind = integrity_config.get("allow_run_if_behind_remote", True) # Use new config
+
     git_fetch_timeout_from_config = config.get('timeouts', {}).get('git_fetch_timeout')
 
     if git_fetch_timeout_from_config is not None:
@@ -177,10 +180,9 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
         is_developer_mode = False
         ui_manager_instance.append_output(f"ℹ️ Running on protected branch '{current_branch}'. Performing integrity checks...", style_class='info')
         
-        # 1. Check for clean working directory
         is_clean = await git_context_manager_instance.is_working_directory_clean()
         if not is_clean:
-            status_output_tuple = await git_context_manager_instance._run_git_command(["status", "--porcelain"]) # Get raw porcelain for details
+            status_output_tuple = await git_context_manager_instance._run_git_command(["status", "--porcelain"])
             status_output_details = status_output_tuple[1] if status_output_tuple[0] else "Could not get detailed status."
             error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Uncommitted local changes or untracked files detected."
             detail_msg = f"   Git status details:\n{status_output_details}"
@@ -191,62 +193,72 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
         else:
             ui_manager_instance.append_output(f"✅ Working directory is clean for branch '{current_branch}'.", style_class='info')
 
-        # 2. Check sync status with remote (only if working dir is clean)
-        if integrity_ok:
-            # compare_head_with_remote_tracking attempts a fetch internally
-            comparison_status, local_h, remote_h = await git_context_manager_instance.compare_head_with_remote_tracking(current_branch)
+        if integrity_ok: # Only proceed if working directory is clean
+            comparison_status, local_h, remote_h, fetch_status = await git_context_manager_instance.compare_head_with_remote_tracking(current_branch)
             
-            if comparison_status == "synced":
-                ui_manager_instance.append_output(f"✅ Branch '{current_branch}' is synced with 'origin/{current_branch}'.", style_class='success')
-                logger.info(f"Branch '{current_branch}' (Local: {local_h[:7] if local_h else 'N/A'}) is synced with remote (Remote: {remote_h[:7] if remote_h else 'N/A'}).")
-            elif comparison_status in ["no_upstream", "fetch_failed", "error"]:
-                # Treat these as critical failures for protected branches
-                error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Cannot reliably compare with remote. Status: {comparison_status}."
-                if comparison_status == "no_upstream":
-                    detail_msg = "   Reason: Local branch may not be tracking a remote branch or remote branch does not exist."
-                elif comparison_status == "fetch_failed":
-                    detail_msg = "   Reason: Failed to fetch latest updates from the remote repository."
-                else: # "error"
-                    detail_msg = "   Reason: An unexpected error occurred during remote comparison."
+            if fetch_status == "success":
+                if comparison_status == "synced":
+                    ui_manager_instance.append_output(f"✅ Branch '{current_branch}' is synced with 'origin/{current_branch}'.", style_class='success')
+                    logger.info(f"Branch '{current_branch}' (Local: {local_h[:7] if local_h else 'N/A'}) is synced with remote (Remote: {remote_h[:7] if remote_h else 'N/A'}).")
+                elif comparison_status == "behind" and allow_run_if_behind: # Check new config flag
+                    warn_msg = f"⚠️ Your local branch '{current_branch}' is behind 'origin/{current_branch}'. New updates are available."
+                    suggest_msg = "   Suggestion: Run the '/update' command to get the latest version."
+                    ui_manager_instance.append_output(warn_msg, style_class='warning')
+                    ui_manager_instance.append_output(suggest_msg, style_class='info')
+                    logger.warning(f"{warn_msg} Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}")
+                    # integrity_ok remains True, allowing run
+                elif comparison_status in ["ahead", "diverged"] or (comparison_status == "behind" and not allow_run_if_behind):
+                    status_description = comparison_status
+                    if comparison_status == "behind" and not allow_run_if_behind:
+                        status_description = "behind (and configuration disallows running)"
+                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Local branch has '{status_description}' from 'origin/{current_branch}'."
+                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
+                    ui_manager_instance.append_output(error_msg, style_class='error')
+                    ui_manager_instance.append_output(detail_msg, style_class='error')
+                    logger.critical(f"{error_msg} {detail_msg}")
+                    integrity_ok = False
+                else: # "no_upstream" (unlikely after successful fetch for a tracked branch), "error"
+                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Cannot reliably compare with remote after successful fetch. Status: {comparison_status}."
+                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
+                    ui_manager_instance.append_output(error_msg, style_class='error')
+                    ui_manager_instance.append_output(detail_msg, style_class='error')
+                    logger.critical(f"{error_msg} {detail_msg}")
+                    integrity_ok = False
+            elif fetch_status in ["timeout", "offline_or_unreachable"]:
+                ui_manager_instance.append_output(f"⚠️ Could not contact remote for branch '{current_branch}' (Reason: {fetch_status}). Comparing against local cache.", style_class='warning')
+                if comparison_status == "synced_local_cache" or comparison_status == "behind_local_cache": # Being behind local cache is okay for offline use
+                    ui_manager_instance.append_output(f"ℹ️ Branch '{current_branch}' is consistent with the last known state of 'origin/{current_branch}'. Running in offline-verified mode.", style_class='info')
+                elif comparison_status == "ahead_local_cache" or comparison_status == "diverged_local_cache":
+                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): Local branch has unpushed changes or diverged from the last known remote state. Status: {comparison_status}"
+                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Last Known Remote: {remote_h[:7] if remote_h else 'N/A'}"
+                    ui_manager_instance.append_output(error_msg, style_class='error')
+                    ui_manager_instance.append_output(detail_msg, style_class='error')
+                    logger.critical(f"{error_msg} {detail_msg}")
+                    integrity_ok = False
+                elif comparison_status == "no_upstream_info_locally":
+                     error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): No local information about the remote tracking branch. Cannot verify integrity."
+                     ui_manager_instance.append_output(error_msg, style_class='error')
+                     logger.critical(error_msg)
+                     integrity_ok = False
+                else: # "error" during local comparison
+                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): Error comparing with local cache. Status: {comparison_status}"
+                    ui_manager_instance.append_output(error_msg, style_class='error')
+                    logger.critical(error_msg)
+                    integrity_ok = False
+            elif fetch_status == "other_error":
+                error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): A non-network error occurred during 'git fetch'."
                 ui_manager_instance.append_output(error_msg, style_class='error')
-                ui_manager_instance.append_output(detail_msg, style_class='error')
-                logger.critical(f"{error_msg} {detail_msg}")
+                logger.critical(f"{error_msg} - Check git fetch logs or permissions.")
                 integrity_ok = False
-            elif comparison_status in ["ahead", "behind", "diverged"]:
-                error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Local branch has '{comparison_status}' from 'origin/{current_branch}'."
-                detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
-                ui_manager_instance.append_output(error_msg, style_class='error')
-                ui_manager_instance.append_output(detail_msg, style_class='error')
-                logger.critical(f"{error_msg} {detail_msg}")
-                integrity_ok = False
-            # else: (Should not happen if all statuses are covered)
-            #    logger.warning(f"Unexpected comparison status: {comparison_status}")
-
-
-        # 3. (Future) GPG Signed Tag/Commit Check for 'main' branch
-        # if current_branch == "main" and integrity_ok:
-        #     is_trusted_commit, sig_status_msg = await git_context_manager_instance.verify_commit_signature(head_commit) # or verify against a known tag's commit
-        #     if not is_trusted_commit:
-        #         ui_manager_instance.append_output(f"❌ Integrity Check Failed (Branch: main): Commit '{head_commit[:7]}' signature check failed: {sig_status_msg}", style_class='error')
-        #         logger.critical(f"Commit signature check failed for main branch HEAD {head_commit}: {sig_status_msg}")
-        #         integrity_ok = False
-        #     else:
-        #         ui_manager_instance.append_output(f"✅ Commit '{head_commit[:7]}' on main branch passed signature check (Placeholder).", style_class='success')
-
-        if integrity_ok: # This check is redundant if an earlier check set integrity_ok to False
-            # Only log this if all sub-checks passed
-            # The more specific success messages are already printed above.
-            # ui_manager_instance.append_output(f"✅ All integrity checks passed for branch '{current_branch}'.", style_class='success') # Can be removed
-            logger.info(f"All integrity checks completed for branch '{current_branch}'. Final status: {'OK' if integrity_ok else 'FAILED'}")
-        elif halt_on_failure: # This 'elif' means integrity_ok is False
+        
+        if integrity_ok:
+            logger.info(f"Integrity checks completed for branch '{current_branch}'. Final status: OK")
+        elif halt_on_failure: # This means integrity_ok is False
             logger.critical(f"Application integrity compromised on protected branch '{current_branch}'. Halting as per configuration.")
-            # Caller (_main_async_runner) will handle the actual halt if halt_on_failure is true.
+
     else: # Other branches (feature branches, detached HEAD)
         is_developer_mode = True
-        ui_manager_instance.append_output(
-            f"ℹ️ Running on unrecognized branch/commit '{current_branch}'. Developer mode assumed. Integrity checks informational.",
-            style_class='info'
-        )
+        ui_manager_instance.append_output(f"ℹ️ Running on unrecognized branch/commit '{current_branch}'. Developer mode assumed. Integrity checks informational.", style_class='info')
         logger.info(f"Developer mode assumed for unrecognized branch/commit: '{current_branch}'.")
     return is_developer_mode, integrity_ok
 
@@ -344,9 +356,9 @@ def run_shell():
     except (EOFError, KeyboardInterrupt):
         print("\nExiting micro_X Shell. 👋"); logger.info("Exiting due to EOF or KeyboardInterrupt at run_shell level.")
     except SystemExit as e:
-        if e.code == 0: # Normal exit requested by app logic (e.g. /exit command)
+        if e.code == 0:
              print("\nExiting micro_X Shell. 👋"); logger.info("Exiting micro_X Shell normally via SystemExit(0).")
-        else: # Exit due to an issue like integrity check failure
+        else:
              print(f"\nExiting micro_X Shell due to an issue (Code: {e.code}). Check logs at {LOG_FILE}"); logger.warning(f"Exiting micro_X Shell with code {e.code}.")
     except Exception as e:
         print(f"\nUnexpected critical error: {e}"); logger.critical("Critical error in run_shell or main_async_runner", exc_info=True)
@@ -360,7 +372,7 @@ def run_shell():
                 try:
                     final_branch_future = asyncio.run_coroutine_threadsafe(git_context_manager_instance.get_current_branch(), loop)
                     final_commit_future = asyncio.run_coroutine_threadsafe(git_context_manager_instance.get_head_commit_hash(), loop)
-                    final_branch = final_branch_future.result(timeout=0.5) # Short timeout for shutdown
+                    final_branch = final_branch_future.result(timeout=0.5)
                     final_commit = final_commit_future.result(timeout=0.5)
                     logger.info(f"micro_X Shell final state: Branch='{final_branch}', Commit='{final_commit[:7] if final_commit else 'N/A'}'")
                 except Exception as git_log_err:
