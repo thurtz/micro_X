@@ -94,7 +94,7 @@ def generate_file_tree(startpath, output_filepath, display_root_name="micro_X", 
                        '.pytest_cache', '.mypy_cache', '.ruff_cache', 'logs', 
                        'build', 'dist', 'site', '*.egg-info'] 
     if ignore_files is None:
-        ignore_files = ['.DS_Store', '*.pyc', '*.pyo', '.coverage']
+        ignore_files = ['.DS_Store', '*.pyc', '*.pyo', '.coverage', 'pytest_results*.txt']
 
     if not os.path.isdir(startpath):
         print(f"Error: Provided path '{startpath}' is not a directory or does not exist.")
@@ -153,7 +153,7 @@ if __name__ == "__main__":
         'snapshots' # Also ignore the snapshots directory itself from the tree
     ]
     custom_ignore_files = [
-        '.DS_Store', '*.pyc', '*.pyo', '.coverage', 'pytest_results*.txt',
+        '.DS_Store', '*.pyc', '*.pyo', '.coverage',
         output_filename # Ignore the tree file itself if it exists
     ]
 
