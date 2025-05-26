@@ -153,7 +153,7 @@ if __name__ == "__main__":
         'snapshots' # Also ignore the snapshots directory itself from the tree
     ]
     custom_ignore_files = [
-        '.DS_Store', '*.pyc', '*.pyo', '.coverage',
+        '.DS_Store', '*.pyc', '*.pyo', '.coverage', 'pytest_results*.txt',
         output_filename # Ignore the tree file itself if it exists
     ]
 
