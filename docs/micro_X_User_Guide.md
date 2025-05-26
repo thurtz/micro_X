@@ -1,6 +1,6 @@
 ## **micro\_X User Guide**
 
-Welcome to the micro\_X User Guide\! This document provides detailed information on using micro\_X, including its AI features, command categorization, command confirmation, Ollama service management, and interaction with tmux for certain command types.
+Welcome to the micro\_X User Guide\! This document provides detailed information on using micro\_X, including its AI features, command categorization, command confirmation, Ollama service management, interaction with tmux for certain command types, and the new branch-aware developer mode and code integrity checks.
 
 ### **1\. Introduction to micro\_X**
 
@@ -11,20 +11,22 @@ micro\_X is an AI-enhanced shell designed to make your command-line experience m
 * Benefit from AI-powered validation of commands.  
 * Review, get AI explanations for, modify, or cancel AI-generated commands before execution.  
 * Categorize commands for optimal execution, especially for interactive or long-running tasks which are handled via tmux.  
-* Manage the Ollama service directly from within micro\_X.
+* Manage the Ollama service directly from within micro\_X.  
+* **Run with confidence:** micro\_X performs startup integrity checks on main and testing branches and offers an automatic "Developer Mode" on the dev branch.
 
 ### **2\. Getting Started**
 
 * **Installation and Setup:** Before using micro\_X, ensure it has been properly installed and configured. Please refer to the main README.md file in the project root or run the ./setup.sh script (also in the project root) for detailed setup instructions tailored to your operating system.  
+  * **Important:** For full functionality, including the new developer mode and integrity checks, micro\_X should be run from a git clone of the repository, and the git command must be installed and accessible in your system's PATH.  
 * **Launching micro\_X:**  
   * Recommended Method (./micro\_X.sh):  
     From the terminal, navigate to the micro\_X directory and run ./micro\_X.sh. This script is the preferred way to launch micro\_X as it:  
     1. Activates the Python virtual environment.  
     2. Starts micro\_X (i.e., main.py) *inside a dedicated tmux session* (usually named micro\_X). This provides the most integrated experience.  
   * **Desktop Shortcut (Linux Mint):** If you used the setup script and installed the desktop entry, clicking "micro\_X" in your application menu will typically run the micro\_X.sh script.  
-  * Manual Method (python3 main.py):  
-    You can run micro\_X directly by navigating to its directory, activating the virtual environment (source .venv/bin/activate), and then running python3 main.py.  
-    Note on tmux features with manual launch: If you launch main.py directly, micro\_X itself will not be running inside a tmux session. However, commands categorized as semi\_interactive or interactive\_tui will still attempt to launch in new, independent tmux windows/sessions.  
+  * Manual Method (python3 main.py): You can run micro\_X directly by navigating to its directory, activating the virtual environment (source .venv/bin/activate), launch a tmux session specific for micro\_X (tmux \-f config/.tmux.conf new-session \-A \-s micro\_X) and then running python3 main.py. Note on tmux features with manual launch outside of the micro\_X tmux session: If you launch main.py directly, micro\_X itself will not be running inside a tmux session. However, commands categorized as semi\_interactive or interactive\_tui will still attempt to launch in new, independent tmux windows/sessions.  
+* Startup Behavior based on Git Branch:  
+  micro\_X checks the current Git branch on startup to determine its operational mode regarding integrity checks. See section "Developer Mode & Code Integrity" for details.  
 * **Ensuring Ollama is Ready:** Before using AI features, ensure Ollama is running. You can check this within micro\_X using the /ollama status command (see section 4.5).  
 * **The Interface:**  
   * **Output Area:** The top, larger pane displays command output, AI messages, and logs. It's scrollable.  
@@ -67,25 +69,23 @@ To translate a natural language query into a command:
    * Send your query to the configured AI translator(s).  
    * The translated command will be validated by another AI model.  
    * You'll see messages like "🤖 AI Query: ...", "🧠 Thinking...", "🤖 AI Suggests (validated): ...".  
-4. **Command Confirmation Flow:** If the AI successfully generates and validates a command, you will be prompted to confirm its execution:  
+4. Command Confirmation Flow: If the AI successfully generates and validates a command, you will be prompted to confirm its execution:  
    🤖 AI proposed command (from: /ai your query \-\> suggested\_command):  
-       👉 suggested\_command  
+   👉 suggested\_command  
    Action: \[Y\]es (Exec, prompt if new) | \[Ys\] Simple & Run | \[Ym\] Semi-Interactive & Run | \[Yi\] TUI & Run | \[E\]xplain | \[M\]odify | \[C\]ancel?  
-   \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/E/M/C):
-
+   \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/E/M/C):  
    Your options are:  
    * **Y or yes**: Execute the command. If the command is unknown to micro\_X's categorization system, you will be prompted to categorize it next (see section 4.3).  
    * **Ys**: Execute the command AND categorize it as simple.  
    * **Ym**: Execute the command AND categorize it as semi\_interactive.  
    * **Yi**: Execute the command AND categorize it as interactive\_tui.  
-   * **E or explain**: Ask the AI to explain what the suggested\_command does. After the explanation, you will be prompted again to execute, modify, or cancel.  
+   * E or explain: Ask the AI to explain what the suggested\_command does. After the explanation, you will be prompted again to execute, modify, or cancel.  
      🧠 Asking AI to explain: suggested\_command  
      💡 AI Explanation:  
      The command 'suggested\_command' does XYZ...  
      Command to consider: suggested\_command  
      Action: \[Y\]es (Exec, prompt if new) | \[Ys\] Simple & Run | \[Ym\] Semi-Interactive & Run | \[Yi\] TUI & Run | \[M\]odify | \[C\]ancel?  
-     \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/M/C):
-
+     \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/M/C):  
    * **M or modify**: The suggested\_command will be loaded into your input field, allowing you to edit it before pressing Enter to submit the modified version.  
    * **C or cancel (or N or no)**: Abort the execution. The command will not run.
 
@@ -98,16 +98,15 @@ When micro\_X encounters a command it hasn't seen before (either typed directly,
   * **semi\_interactive**: For commands that might run for a while, produce a lot of output, or have some minimal interactivity that doesn't require full TUI control (e.g., apt update, a long script, ping google.com). These are run in a new tmux window. Their output is captured and displayed in micro\_X after the command finishes or the tmux window closes/times out.  
     * **Smart Output Handling:** If a semi\_interactive command produces output resembling a full-screen TUI application, micro\_X avoids displaying garbled output and suggests re-categorizing to interactive\_tui.  
   * **interactive\_tui**: For fully interactive terminal applications (e.g., nano, vim, htop, ssh user@host). These are run in a new tmux window that micro\_X effectively hands control to. When you exit the application (and thus the tmux window), you'll return to micro\_X.  
-* **Categorization Prompt (Example for a directly typed unknown command):**  
+* Categorization Prompt (Example for a directly typed unknown command):  
   Command 'my\_new\_script.sh \--verbose' is not categorized. Choose an action:  
-    1: simple             (Direct output in micro\_X)  
-    2: semi\_interactive   (Output in micro\_X after tmux run (may be interactive))  
-    3: interactive\_tui    (Full interactive tmux session)  
-    M: Modify command before categorizing  
-    D: Execute as default 'semi\_interactive' (once, no save)  
-    C: Cancel categorization & execution  
-  \[Categorize\] Action (1-3/M/D/C):
-
+  1: simple (Direct output in micro\_X)  
+  2: semi\_interactive (Output in micro\_X after tmux run (may be interactive))  
+  3: interactive\_tui (Full interactive tmux session)  
+  M: Modify command before categorizing  
+  D: Execute as default 'semi\_interactive' (once, no save)  
+  C: Cancel categorization & execution  
+  \[Categorize\] Action (1-3/M/D/C):  
   Enter your choice. If you choose 1, 2, or 3, the command and its category will be saved in config/user\_command\_categories.json.
 
 #### **4.4. Managing Command Categories (/command subsystem)**
@@ -141,7 +140,46 @@ micro\_X supports AI translation and execution of chained commands (e.g., ls \-l
 * When categorized, the entire chained command is treated as a single entity.  
 * The "dominant" category usually applies. If any part of a chain requires interactive\_tui (like nano), the whole chain will likely run best under interactive\_tui.
 
-### **5\. Working with tmux (for semi\_interactive and interactive\_tui commands)**
+### **5\. Developer Mode & Code Integrity**
+
+To enhance reliability and security, micro\_X implements a branch-aware system for developer mode and code integrity checks.
+
+* **Purpose:** This system aims to ensure that users running micro\_X from its stable (main) or testing (testing) branches are using verified and synchronized code. For developers, it provides a seamless experience on the development branch (dev).  
+* **Developer Mode (dev branch):**  
+  * **Activation:** Automatically activated when micro\_X detects it is running from the dev Git branch.  
+  * **Behavior:** In this mode, startup integrity checks are informational or bypassed. micro\_X will run even if there are local uncommitted changes or if the dev branch has diverged from its remote counterpart.  
+  * **Intention:** This mode is designed for active development, allowing developers to make and test changes without interruption from integrity checks.  
+* **Protected Mode (main and testing branches):**  
+  * **Activation:** Automatically active when micro\_X detects it is running from the main or testing Git branches.  
+  * **Integrity Checks Performed at Startup:**  
+    1. **Clean Working Directory:** Verifies that there are no uncommitted modifications to tracked files and no untracked files (that are not listed in .gitignore).  
+    2. **Sync with Remote:** Verifies that the local branch (main or testing) is synchronized with its corresponding remote-tracking branch on origin (e.g., origin/main). micro\_X will attempt to git fetch the latest state from the remote to ensure an up-to-date comparison.  
+  * **Consequences of Failure:** If any of these integrity checks fail on a protected branch:  
+    * A detailed error message will be displayed in the micro\_X UI and logged.  
+    * micro\_X will **halt execution** to prevent running potentially tampered, unverified, or divergent code.  
+  * **User Action on Failure:** If micro\_X halts due to an integrity check failure:  
+    1. Review the error message in micro\_X or its logs (logs/micro\_x.log).  
+    2. Open a standard terminal in your micro\_X project directory.  
+    3. Use git status to see local changes.  
+    4. To resolve **uncommitted changes**:  
+       * Commit them: git add . && git commit \-m "Your changes" (and then git pull \--rebase and git push if these changes are intended for the remote).  
+       * Stash them: git stash (you can reapply later with git stash pop).  
+       * Discard them: git reset \--hard HEAD (Warning: This permanently deletes uncommitted changes).  
+    5. To resolve **divergence from remote** (e.g., "ahead", "behind", "diverged"):  
+       * Fetch latest changes: git fetch origin  
+       * Update local branch: git pull origin \<branchname\> (e.g., git pull origin main)  
+       * If you have local commits you wish to discard to match the remote exactly: git reset \--hard origin/\<branchname\> (e.g., git reset \--hard origin/main). **Use this command with extreme caution as it permanently discards local commits on this branch.**  
+    6. If you intend to make modifications or work with a version different from the official main or testing branches, it's highly recommended to switch to the dev branch (git checkout dev) or create your own feature branch.  
+* **Behavior on Other Branches/States:**  
+  * **Feature Branches (not dev, main, testing):** If micro\_X is run from any other branch, it will assume a developer-like mode where integrity checks are informational and do not halt execution.  
+  * **Detached HEAD State:** Similar to other branches, assumes developer mode.  
+* **Behavior if Not a Git Repository or git is Unavailable:**  
+  * If micro\_X cannot find the git command or detects it's not running from within a Git repository:  
+    * A warning message will be displayed.  
+    * Integrity checks will be disabled.  
+    * micro\_X will operate in a mode similar to "Developer Mode," allowing it to run but without the integrity guarantees.
+
+### **6\. Working with tmux (for semi\_interactive and interactive\_tui commands)**
 
 micro\_X uses tmux (a terminal multiplexer) to run commands categorized as semi\_interactive or interactive\_tui.
 
@@ -161,7 +199,7 @@ micro\_X uses tmux (a terminal multiplexer) to run commands categorized as semi\
   * These run in a tmux window, usually in the background relative to your main micro\_X interface.  
   * Output is captured and displayed in micro\_X after completion or timeout.
 
-#### **5.1. Basic tmux Interaction (If you need to manually intervene)**
+#### **6.1. Basic tmux Interaction (If you need to manually intervene)**
 
 Knowing tmux basics is helpful. The tmux prefix key is Ctrl+b by default.
 
@@ -183,7 +221,7 @@ Knowing tmux basics is helpful. The tmux prefix key is Ctrl+b by default.
   * Ctrl+b then n (next window)  
   * Ctrl+b then \[window\_number\] (e.g., 0, 1\)
 
-#### **5.2. Killing tmux Windows or Panes**
+#### **6.2. Killing tmux Windows or Panes**
 
 If a command in a tmux window (launched by micro\_X) becomes unresponsive:
 
@@ -197,7 +235,7 @@ If a command in a tmux window (launched by micro\_X) becomes unresponsive:
    tmux kill-window \-t \<window\_index\_or\_name\>  
    Example: tmux kill-window \-t micro\_x\_1a2b3c4d
 
-#### **5.3. Handling Processes that Lock Up tmux Windows**
+#### **6.3. Handling Processes that Lock Up tmux Windows**
 
 If a process is truly stuck:
 
@@ -208,14 +246,15 @@ If a process is truly stuck:
    kill \-9 \<PID\> \# Use with caution  
 3. **Clean tmux Window:** The tmux window might close or show "Pane is dead." Close it with Ctrl+b x if needed.
 
-### **6\. Security Considerations**
+### **7\. Security Considerations**
 
 * **AI-Generated Commands:** While micro\_X includes AI validation and a basic command sanitizer, **AI can still generate unexpected or potentially harmful commands.**  
 * **Review and Understand:** **Crucially, always use the \[E\]xplain option** in the command confirmation flow (section 4.2) for any AI-generated command if you are unsure about its function or impact.  
 * **Modify or Cancel:** Do not hesitate to \[M\]odify commands to your exact needs or \[C\]ancel them if they seem suspicious or incorrect.  
+* **Startup Integrity Checks:** The checks on main and testing branches provide an added layer of assurance against unintentional or unauthorized local code modifications. When these checks halt the application, it's a signal to review your local repository's state.  
 * **User Responsibility:** You are ultimately responsible for the commands executed in your environment. micro\_X is a tool to assist, not a replacement for careful judgment.
 
-### **7\. Troubleshooting Common Issues**
+### **8\. Troubleshooting Common Issues**
 
 * **"Ollama Connection Error" / AI Features Not Working:**  
   * Ensure the Ollama application/service is running. Use /ollama status within micro\_X.  
@@ -225,6 +264,36 @@ If a process is truly stuck:
   * Rephrase /ai queries. LLMs are not perfect.  
   * Ensure the correct Ollama models (translator, validator, explainer) are pulled and accessible by Ollama. Check config/default\_config.json for model names.  
 * **tmux Errors:** Ensure tmux is installed and accessible in your system's PATH.  
-* **Command Categorized Incorrectly:** Use /command move to change a command's category or /command remove to remove your custom categorization (it may then revert to a default or become unknown).
+* **Command Categorized Incorrectly:** Use /command move to change a command's category or /command remove to remove your custom categorization (it may then revert to a default or become unknown).  
+* **micro\_X Halts on Startup with "Integrity Check Failed" (on main or testing branch):**  
+  * **Message: "Uncommitted local changes or untracked files detected."**  
+    * *Reason:* You have modified files in your local micro\_X directory that have not been committed to Git, or there are new untracked files (not ignored by .gitignore).  
+    * *Solution:*  
+      1. Open a standard terminal in your micro\_X project directory.  
+      2. Run git status to see the changes.  
+      3. Either commit your changes (git add . && git commit \-m "your message"), stash them (git stash), or discard them if they are not needed (git checkout \-- . for modified files, or git clean \-fdx for untracked files \- **use with caution as these delete files**).  
+      4. Alternatively, if you are developing, switch to the dev branch: git checkout dev.  
+  * **Message: "Local branch has 'ahead'/'behind'/'diverged' from 'origin/\<branch\>'."**  
+    * *Reason:* Your local branch is not synchronized with the official remote version.  
+      * ahead: You have local commits that are not on the remote.  
+      * behind: The remote has new commits that you don't have locally.  
+      * diverged: Both local and remote have new, different commits.  
+    * *Solution:*  
+      1. Fetch the latest from remote: git fetch origin  
+      2. If **behind** or **synced but fetch brought new changes**: git pull origin \<branchname\> (e.g., git pull origin main) or git rebase origin/\<branchname\>.  
+      3. If **ahead**: Consider pushing your commits (git push origin \<branchname\>) if they are intended for the official branch. If not, you might need to reset your branch (see below) or move these commits to a feature branch.  
+      4. If **diverged**: This is more complex. You may need to git rebase origin/\<branchname\> (and resolve conflicts) or git merge origin/\<branchname\>.  
+      5. **To discard local commits and match the remote exactly (use with extreme caution):** git reset \--hard origin/\<branchname\> (e.g., git reset \--hard origin/main). This will delete any local commits on this branch not present on the remote.  
+      6. Alternatively, if you are developing, switch to the dev branch: git checkout dev.  
+  * **Message: "Cannot reliably compare with remote. Status: no\_upstream/fetch\_failed/error."**  
+    * *Reason:*  
+      * no\_upstream: Your local branch isn't set up to track a remote branch, or the remote branch doesn't exist.  
+      * fetch\_failed: micro\_X couldn't contact the remote server to get the latest updates (e.g., network issue).  
+      * error: An unexpected git error occurred.  
+    * *Solution:*  
+      1. Ensure you have an internet connection.  
+      2. Verify your local branch is tracking the correct remote branch (e.g., git branch \-vv). If not, you might need to set it up: git branch \--set-upstream-to=origin/\<branchname\> \<branchname\>.  
+      3. Try git fetch origin manually to see if there are errors.  
+      4. Check the micro\_X logs (logs/micro\_x.log) for more detailed git error messages.
 
 This guide should help you navigate and utilize the features of micro\_X more effectively. Happy shelling\!
