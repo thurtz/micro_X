@@ -3,7 +3,7 @@ import logging
 import os
 import asyncio
 
-from prompt_toolkit import Application
+from prompt_toolkit import Application # Keep this import for type hinting if needed elsewhere
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout import HSplit, Window, Layout
 from prompt_toolkit.widgets import TextArea
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class UIManager:
     def __init__(self, config):
         self.config = config
-        self.app = None
+        self.app = None # This will be set by main.py
         self.output_field = None
         self.input_field = None
         self.key_help_field = None
@@ -37,7 +37,7 @@ class UIManager:
         self.confirmation_flow_active = False
         self.confirmation_flow_state = {}
 
-        self.is_in_edit_mode = False # New flag for edit mode
+        self.is_in_edit_mode = False
 
         self.current_prompt_text = ""
 
@@ -46,11 +46,10 @@ class UIManager:
 
         self.main_exit_app_ref = None
         self.main_restore_normal_input_ref = None
-        # self.main_normal_input_accept_handler_ref = None # This is passed directly to methods needing it
 
-        # New flags for separator logic
         self.initial_prompt_settled = False
         self.last_output_was_separator = False
+        self.startup_separator_added = False
 
         logger.debug("UIManager initialized with config and keybindings.")
 
@@ -76,10 +75,10 @@ class UIManager:
                     self.confirmation_flow_state['future'].set_result({'action': 'cancel'})
                 if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
                 event.app.invalidate()
-            elif self.is_in_edit_mode: # Handle cancelling edit mode
+            elif self.is_in_edit_mode:
                 self.append_output("\n⌨️ Command editing cancelled.", style_class='info')
                 logger.info("Command edit mode cancelled by Ctrl+C/D.")
-                self.is_in_edit_mode = False # Reset edit mode flag
+                self.is_in_edit_mode = False
                 if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
                 event.app.invalidate()
             else:
@@ -94,12 +93,10 @@ class UIManager:
         def _handle_newline(event):
             if not self.categorization_flow_active and \
                not self.confirmation_flow_active and \
-               not self.is_in_edit_mode: # Allow newline in edit mode if multiline
+               not self.is_in_edit_mode:
                 if self.input_field and self.input_field.multiline:
                     event.current_buffer.insert_text('\n')
-                # If not multiline, or if we want to prevent newline submission in flows,
-                # this logic could be adjusted. For now, allowing newline if input_field is multiline.
-            elif self.input_field and self.input_field.multiline and self.is_in_edit_mode: # Explicitly allow newline in multiline edit mode
+            elif self.input_field and self.input_field.multiline and self.is_in_edit_mode:
                    event.current_buffer.insert_text('\n')
 
 
@@ -130,24 +127,18 @@ class UIManager:
 
         @self.kb.add('c-up')
         def _handle_ctrl_up(event):
-            # Allow cursor movement in edit mode even if it's multiline
             if not self.categorization_flow_active and not self.confirmation_flow_active:
                 event.current_buffer.cursor_up(count=1)
 
         @self.kb.add('c-down')
         def _handle_ctrl_down(event):
-            # Allow cursor movement in edit mode even if it's multiline
             if not self.categorization_flow_active and not self.confirmation_flow_active:
                 event.current_buffer.cursor_down(count=1)
 
         @self.kb.add('up')
         def _handle_up_arrow(event):
-            # Allow history navigation/line movement unless in a specific flow choice prompt
             if self.categorization_flow_active or self.confirmation_flow_active:
-                # If it's a flow where up/down might select choices, handle differently or disallow.
-                # For now, assuming up/down is for history/input lines.
-                # If input is single line for flow, it will try history.
-                pass # Let default behavior or specific flow input handler manage.
+                pass
 
             buff = event.current_buffer
             doc = buff.document
@@ -184,7 +175,7 @@ class UIManager:
                                         ):
         self.categorization_flow_active = True
         self.confirmation_flow_active = False
-        self.is_in_edit_mode = False # Ensure edit mode is off
+        self.is_in_edit_mode = False
         self.categorization_flow_state = {
             'command_initially_proposed': command_initially_proposed,
             'ai_raw_candidate': ai_raw_candidate,
@@ -387,7 +378,7 @@ class UIManager:
         logger.info(f"UIManager: Starting command confirmation flow for '{command_to_confirm}' from '{display_source}'.")
         self.confirmation_flow_active = True
         self.categorization_flow_active = False
-        self.is_in_edit_mode = False # Ensure edit mode is off
+        self.is_in_edit_mode = False
         self.confirmation_flow_state = {
             'command_to_confirm': command_to_confirm,
             'original_command': command_to_confirm,
@@ -421,11 +412,9 @@ class UIManager:
                 command_for_edit = self.confirmation_flow_state.get('command_to_confirm', '')
                 accept_handler = self.confirmation_flow_state.get('normal_input_accept_handler_ref')
                 if accept_handler:
-                    self.set_edit_mode(accept_handler, command_for_edit) # UIManager sets its own edit mode
+                    self.set_edit_mode(accept_handler, command_for_edit)
                 else:
                     logger.error("UIManager: normal_input_accept_handler_ref not available for edit mode.")
-            # The calling function (process_command in main.py) will handle restoring normal input
-            # if the action is not 'edit_mode_engaged' and the flow is truly over.
             logger.info("UIManager: Confirmation flow ended and self.confirmation_flow_active set to False.")
 
 
@@ -488,9 +477,9 @@ class UIManager:
         command_to_explain = self.confirmation_flow_state['command_to_confirm']
         self.append_output(f"\n🧠 Asking AI to explain: {command_to_explain}", style_class='ai-thinking')
 
-        current_app_inst = self.get_app_instance()
-        if current_app_inst and current_app_inst.is_running:
-            current_app_inst.invalidate()
+        # current_app_inst = self.get_app_instance() # Not needed here if only appending
+        if self.app and hasattr(self.app, 'is_running') and self.app.is_running:
+            self.app.invalidate()
 
         explanation = await explain_linux_command_with_ai(command_to_explain, self.config, self.append_output)
 
@@ -552,11 +541,10 @@ class UIManager:
 
     # --- Core UI Methods ---
     def get_app_instance(self):
+        """Returns the application instance if set by the main program."""
+        # self.app is set by main.py after Application is instantiated.
         if not self.app:
-            try: self.app = Application.get_app() # Use Application.get_app()
-            except RuntimeError: # More specific exception for no running app
-                logger.warning("UIManager: get_app() called when no application is running.")
-                return None
+            logger.debug("UIManager.get_app_instance: self.app is not yet set by the main application.")
         return self.app
 
     def _get_current_prompt(self) -> str:
@@ -583,7 +571,8 @@ class UIManager:
             'help-title': 'bold underline #e5c07b', 'help-text': '#abb2bf',
             'help-header': 'bold #61afef', 'help-command': '#c678dd',
             'help-description': '#abb2bf', 'help-example': 'italic #5c6370',
-            'output-separator': '#5c6370'  # New style for the separator
+            'output-separator': '#5c6370',
+            'startup-separator': 'bold #86c07c'
         })
         self.output_buffer = list(output_buffer_main)
         self.output_field = TextArea(
@@ -634,10 +623,6 @@ class UIManager:
             if not self.auto_scroll: self.auto_scroll = True
 
     def append_output(self, text: str, style_class: str = 'default', internal_call: bool = False):
-        """
-        Appends text to the output field.
-        `internal_call` is used by add_interaction_separator to prevent resetting its own flag.
-        """
         if not self.output_field:
             logger.warning("UIManager.append_output called, but output_field is not initialized. Buffering message.")
             if not text.endswith('\n'): text += '\n'
@@ -645,58 +630,90 @@ class UIManager:
             return
 
         if not text.endswith('\n'): text += '\n'
-        self.output_buffer.append((style_class, text)) # Still buffer for consistency, even if field exists
-
-        # Reconstruct text with styles for prompt_toolkit (if needed, or just plain text)
-        # For simplicity, we'll stick to plain text aggregation for the TextArea.
-        # If rich text with multiple styles per line was needed, FormattedTextControl would be better for output_field.
+        self.output_buffer.append((style_class, text))
         plain_text_output = "".join([content for _, content in self.output_buffer])
-
+        
         buffer = self.output_field.buffer
         current_cursor_pos = buffer.cursor_position
         buffer.set_document(Document(plain_text_output, cursor_position=len(plain_text_output)), bypass_readonly=True)
-
+        
         if self.auto_scroll or self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:
             buffer.cursor_position = len(plain_text_output)
         else:
             buffer.cursor_position = min(current_cursor_pos, len(plain_text_output))
 
-        if not internal_call: # Reset flag if it's a regular output
+        if not internal_call:
             self.last_output_was_separator = False
 
-        current_app_instance = self.get_app_instance()
-        if current_app_instance and current_app_instance.is_running:
-            current_app_instance.invalidate()
+        # Directly use self.app for invalidation, only if it's set and the app is running
+        if self.app: # Check if self.app has been set by main.py
+            # Check if app is running (prompt_toolkit apps might not have is_running until run_async)
+            # A simple check for invalidate method existing is safer before run_async
+            if hasattr(self.app, 'invalidate'):
+                try:
+                    if hasattr(self.app, 'is_running') and self.app.is_running:
+                        logger.debug("UIManager.append_output: Invalidating running app.")
+                        self.app.invalidate()
+                    elif not hasattr(self.app, 'is_running'): # App object exists but might not have is_running yet
+                        logger.debug("UIManager.append_output: self.app is set but no is_running, attempting invalidate.")
+                        self.app.invalidate()
+                    else: # App has is_running but it's false
+                        logger.debug("UIManager.append_output: self.app is set but not running. Invalidation skipped.")
+                except Exception as e:
+                    logger.error(f"Error during app invalidation: {e}", exc_info=True)
+            else:
+                logger.debug("UIManager.append_output: self.app object present but lacks invalidate method.")
+        else:
+            logger.debug("UIManager.append_output: self.app not set. Invalidation skipped.")
+
 
     def add_interaction_separator(self):
-        """Adds a visual separator to the output if enabled and appropriate."""
         if not self.config.get("ui", {}).get("enable_output_separator", True):
             return
-        if self.last_output_was_separator: # Prevent double separators
-            logger.debug("Skipping separator: last output was already a separator.")
+        if self.last_output_was_separator:
+            logger.debug("Skipping interaction separator: last output was already a separator.")
             return
-        if not self.output_buffer: # Don't add if buffer is empty (e.g., before any command)
-            logger.debug("Skipping separator: output buffer is empty.")
+        if not self.output_buffer:
+            logger.debug("Skipping interaction separator: output buffer is empty.")
             return
 
         separator_char = self.config.get("ui", {}).get("output_separator_character", "─")
         separator_length = self.config.get("ui", {}).get("output_separator_length", 30)
         separator_string = separator_char * separator_length
-
-        # Determine if an extra newline is needed before the separator for spacing
+        
         add_leading_newline = True
         if self.output_buffer:
             last_text_content = self.output_buffer[-1][1]
-            # If the last output was just newlines or ended with multiple newlines,
-            # avoid adding another one before the separator.
             if last_text_content.strip() == "" or last_text_content.endswith("\n\n"):
                 add_leading_newline = False
         
-        full_separator_text = f"\n{separator_string}\n" if add_leading_newline else f"{separator_string}\n"
+        full_separator_text = f"\n{separator_string}\n\n" if add_leading_newline else f"{separator_string}\n"
         
         logger.debug(f"Adding interaction separator: '{separator_string}'")
-        # Use internal_call=True to prevent append_output from resetting last_output_was_separator
         self.append_output(full_separator_text, style_class='output-separator', internal_call=True)
+        self.last_output_was_separator = True
+
+    def add_startup_separator(self):
+        """Adds a visual separator after startup messages if enabled."""
+        if not self.config.get("ui", {}).get("enable_startup_separator", True):
+            return
+        if self.startup_separator_added:
+            logger.debug("Skipping startup separator: already added.")
+            return
+        
+        separator_string = self.config.get("ui", {}).get("startup_separator_string", "🚀 micro_X Initialized & Ready 🚀")
+        
+        add_leading_newline = True
+        if self.output_buffer:
+            last_text_content = self.output_buffer[-1][1]
+            if last_text_content.strip() == "" or last_text_content.endswith("\n\n"):
+                add_leading_newline = False
+
+        full_separator_text = f"\n{separator_string}\n" if add_leading_newline else f"{separator_string}\n"
+
+        logger.debug(f"Adding startup separator: '{separator_string}'")
+        self.append_output(full_separator_text, style_class='startup-separator', internal_call=True)
+        self.startup_separator_added = True
         self.last_output_was_separator = True
 
 
@@ -711,34 +728,34 @@ class UIManager:
             full_rel_prompt = "~/" + relative_path
             if len(full_rel_prompt) <= max_prompt_len: dir_for_prompt = full_rel_prompt
             else:
-                chars_to_keep_at_end = max_prompt_len - (len("~/") + 3) # 3 for "..."
+                chars_to_keep_at_end = max_prompt_len - (len("~/") + 3)
                 dir_for_prompt = "~/" + "..." + relative_path[-chars_to_keep_at_end:] if chars_to_keep_at_end > 0 else "~/..."
         else:
             path_basename = os.path.basename(current_directory_path)
             if len(path_basename) <= max_prompt_len: dir_for_prompt = path_basename
             else:
-                chars_to_keep_at_end = max_prompt_len - 3 # 3 for "..."
+                chars_to_keep_at_end = max_prompt_len - 3
                 dir_for_prompt = "..." + path_basename[-chars_to_keep_at_end:] if chars_to_keep_at_end > 0 else "..."
         self.current_prompt_text = f"({dir_for_prompt}) > "
-        current_app_instance = self.get_app_instance()
-        if current_app_instance and current_app_instance.is_running:
-            if self.layout and self.input_field: current_app_instance.layout.focus(self.input_field)
-            current_app_instance.invalidate()
+        # current_app_instance = self.get_app_instance() # Not strictly needed here if only changing text
+        if self.app and hasattr(self.app, 'invalidate'): # Check if app exists and can be invalidated
+            if self.layout and self.input_field: self.app.layout.focus(self.input_field)
+            self.app.invalidate()
 
     def set_normal_input_mode(self, accept_handler_func, current_directory_path: str):
         logger.debug("UIManager: Setting normal input mode.")
         self.categorization_flow_active = False
         self.confirmation_flow_active = False
-        self.is_in_edit_mode = False # Ensure edit mode is off
+        self.is_in_edit_mode = False
         self.update_input_prompt(current_directory_path)
         if self.input_field:
             self.input_field.multiline = self.config.get('behavior', {}).get('input_field_height', 3) > 1
             self.input_field.buffer.accept_handler = accept_handler_func
             self.input_field.buffer.reset()
-            current_app_instance = self.get_app_instance()
-            if current_app_instance and current_app_instance.is_running:
-                if self.layout: current_app_instance.layout.focus(self.input_field)
-                current_app_instance.invalidate()
+            # current_app_instance = self.get_app_instance()
+            if self.app and hasattr(self.app, 'invalidate'):
+                if self.layout: self.app.layout.focus(self.input_field)
+                self.app.invalidate()
 
     def set_flow_input_mode(self, prompt_text: str, accept_handler_func, is_categorization: bool = False, is_confirmation: bool = False):
         logger.debug(f"UIManager: Setting flow input mode. Prompt: '{prompt_text}'")
@@ -756,16 +773,16 @@ class UIManager:
             self.input_field.multiline = False
             self.input_field.buffer.accept_handler = accept_handler_func
             self.input_field.buffer.reset()
-            current_app_instance = self.get_app_instance()
-            if current_app_instance and current_app_instance.is_running:
-                if self.layout: current_app_instance.layout.focus(self.input_field)
-                current_app_instance.invalidate()
+            # current_app_instance = self.get_app_instance()
+            if self.app and hasattr(self.app, 'invalidate'):
+                if self.layout: self.app.layout.focus(self.input_field)
+                self.app.invalidate()
 
     def set_edit_mode(self, accept_handler_func, command_to_edit: str):
         logger.debug(f"UIManager: Setting edit mode. Command: '{command_to_edit}'")
         self.categorization_flow_active = False
         self.confirmation_flow_active = False
-        self.is_in_edit_mode = True # Set edit mode flag
+        self.is_in_edit_mode = True
         self.current_prompt_text = "[Edit Command]> "
         if self.input_field:
             self.input_field.multiline = self.config.get('behavior', {}).get('input_field_height', 3) > 1
@@ -775,7 +792,7 @@ class UIManager:
                 cursor_position=len(command_to_edit)
             )
             logger.info(f"UIManager: Input buffer set to '{command_to_edit}' for editing.")
-            current_app_instance = self.get_app_instance()
-            if current_app_instance and current_app_instance.is_running:
-                if self.layout: current_app_instance.layout.focus(self.input_field)
-                current_app_instance.invalidate()
+            # current_app_instance = self.get_app_instance()
+            if self.app and hasattr(self.app, 'invalidate'):
+                if self.layout: self.app.layout.focus(self.input_field)
+                self.app.invalidate()
