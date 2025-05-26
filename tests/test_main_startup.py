@@ -25,7 +25,8 @@ def mock_main_globals(mocker):
         "integrity_check": {
             "protected_branches": ["main", "testing"],
             "developer_branch": "dev",
-            "halt_on_integrity_failure": True
+            "halt_on_integrity_failure": True,
+            "allow_run_if_behind_remote": True # Added for completeness
         },
         "timeouts": {"git_fetch_timeout": 5} # Example timeout
     }
@@ -134,7 +135,8 @@ async def test_on_protected_branch_all_clear(mock_main_globals, mock_git_context
     mock_gcm_instance.get_current_branch.return_value = protected_branch
     mock_gcm_instance.get_head_commit_hash.return_value = "maincommit123"
     mock_gcm_instance.is_working_directory_clean.return_value = True
-    mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("synced", "maincommit123", "maincommit123")
+    # Corrected: compare_head_with_remote_tracking returns 4 values
+    mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("synced", "maincommit123", "maincommit123", "success")
 
     is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
 
@@ -215,7 +217,8 @@ async def test_on_protected_branch_not_synced_ahead(mock_main_globals, mock_git_
     mock_gcm_instance.get_current_branch.return_value = protected_branch
     mock_gcm_instance.get_head_commit_hash.return_value = "local_ahead"
     mock_gcm_instance.is_working_directory_clean.return_value = True
-    mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("ahead", "local_ahead", "remote_base")
+    # Corrected: compare_head_with_remote_tracking returns 4 values
+    mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("ahead", "local_ahead", "remote_base", "success")
 
     is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
 
@@ -243,13 +246,14 @@ async def test_on_protected_branch_no_upstream(mock_main_globals, mock_git_conte
     mock_gcm_instance.get_current_branch.return_value = protected_branch
     mock_gcm_instance.get_head_commit_hash.return_value = "localcommit"
     mock_gcm_instance.is_working_directory_clean.return_value = True
-    mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("no_upstream", "localcommit", None)
+    # Corrected: compare_head_with_remote_tracking returns 4 values
+    mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("no_upstream", "localcommit", None, "success")
 
     is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
 
     assert is_dev_mode is False
     assert integrity_ok is False 
-    expected_message_part = "Cannot reliably compare with remote. Status: no_upstream"
+    expected_message_part = "Cannot reliably compare with remote after successful fetch. Status: no_upstream" # Adjusted expected message based on main.py logic
     found_message = False
     for call_args_tuple in mock_ui.append_output.call_args_list:
         args, kwargs = call_args_tuple
@@ -318,11 +322,38 @@ async def test_main_async_runner_proceeds_if_dev_mode_and_integrity_fails(mocker
     """
     Test that main_async_runner proceeds if in dev mode, even if integrity_ok is False.
     """
-    mocker.patch('main.perform_startup_integrity_checks', new_callable=AsyncMock, return_value=(True, False))
+    mocker.patch('main.perform_startup_integrity_checks', new_callable=AsyncMock, return_value=(True, False)) # is_dev_mode=True, integrity_ok=False
     mock_exit_app_main = MagicMock()
     mocker.patch('main._exit_app_main', new=mock_exit_app_main)
     mocker.patch('main.config', {
-        "integrity_check": {"halt_on_integrity_failure": True},
+        "integrity_check": {"halt_on_integrity_failure": True}, # Halt is true, but dev mode should override
+        "timeouts": {}, "behavior": {}, "ui": {}, "paths": {}, "prompts": {}, "ollama_service": {}
+    })
+    
+    mock_ui_manager_constructor = mocker.patch('main.UIManager')
+    mock_ui_instance = MagicMock()
+    mock_ui_instance.append_output = MagicMock()
+    mock_ui_manager_constructor.return_value = mock_ui_instance
+    
+    # Mock ShellEngine to see if it's called, indicating progression
+    mock_shell_engine_constructor = mocker.patch('main.ShellEngine', side_effect=RuntimeError("ShellEngine init called, proceeding past integrity check"))
+
+    from main import main_async_runner
+    with pytest.raises(RuntimeError, match="ShellEngine init called, proceeding past integrity check"):
+        await main_async_runner()
+    mock_exit_app_main.assert_not_called() # Should not exit if in dev mode
+
+@pytest.mark.asyncio
+async def test_main_async_runner_proceeds_if_integrity_ok_and_not_halting(mocker):
+    """
+    Test that main_async_runner proceeds if integrity is OK, even if halt_on_failure is true.
+    (This also covers the case where halt_on_integrity_failure is False)
+    """
+    mocker.patch('main.perform_startup_integrity_checks', new_callable=AsyncMock, return_value=(False, True)) # is_dev_mode=False, integrity_ok=True
+    mock_exit_app_main = MagicMock()
+    mocker.patch('main._exit_app_main', new=mock_exit_app_main)
+    mocker.patch('main.config', {
+        "integrity_check": {"halt_on_integrity_failure": True}, # Halt is true, but integrity is OK
         "timeouts": {}, "behavior": {}, "ui": {}, "paths": {}, "prompts": {}, "ollama_service": {}
     })
     
@@ -337,4 +368,5 @@ async def test_main_async_runner_proceeds_if_dev_mode_and_integrity_fails(mocker
     with pytest.raises(RuntimeError, match="ShellEngine init called, proceeding past integrity check"):
         await main_async_runner()
     mock_exit_app_main.assert_not_called()
+
 

@@ -194,14 +194,22 @@ async def test_fetch_remote_branch_success(gcm_instance, mock_gcm_subprocess_run
     mock_process_repo_check = MagicMock(returncode=0, stdout="true", stderr="")
     mock_process_fetch = MagicMock(returncode=0, stdout="Fetched.", stderr="")
     mock_gcm_subprocess_run.side_effect = [mock_process_repo_check, mock_process_fetch]
-    assert await gcm_instance.fetch_remote_branch("main") is True
+    assert await gcm_instance.fetch_remote_branch("main") == "success"
 
 @pytest.mark.asyncio
-async def test_fetch_remote_branch_failure(gcm_instance, mock_gcm_subprocess_run):
+async def test_fetch_remote_branch_failure_other_error(gcm_instance, mock_gcm_subprocess_run):
     mock_process_repo_check = MagicMock(returncode=0, stdout="true", stderr="")
     mock_process_fetch_fail = MagicMock(returncode=1, stdout="", stderr="Fetch error")
     mock_gcm_subprocess_run.side_effect = [mock_process_repo_check, mock_process_fetch_fail]
-    assert await gcm_instance.fetch_remote_branch("main") is False
+    assert await gcm_instance.fetch_remote_branch("main") == "other_error"
+
+@pytest.mark.asyncio
+async def test_fetch_remote_branch_failure_offline(gcm_instance, mock_gcm_subprocess_run):
+    mock_process_repo_check = MagicMock(returncode=0, stdout="true", stderr="")
+    mock_process_fetch_fail = MagicMock(returncode=1, stdout="", stderr="could not resolve hostname")
+    mock_gcm_subprocess_run.side_effect = [mock_process_repo_check, mock_process_fetch_fail]
+    assert await gcm_instance.fetch_remote_branch("main") == "offline_or_unreachable"
+
 
 @pytest.mark.asyncio
 async def test_fetch_remote_branch_timeout(gcm_instance_custom_timeout, mock_gcm_subprocess_run):
@@ -216,7 +224,7 @@ async def test_fetch_remote_branch_timeout(gcm_instance_custom_timeout, mock_gcm
         subprocess.TimeoutExpired(cmd="git fetch origin main", timeout=gcm_instance.fetch_timeout) 
     ]
     
-    assert await gcm_instance.fetch_remote_branch("main") is False # No explicit timeout here
+    assert await gcm_instance.fetch_remote_branch("main") == "timeout"
     
     # Verify that _run_git_command (which calls subprocess.run) was called for fetch
     # with the instance's configured timeout.
@@ -249,90 +257,134 @@ async def test_get_remote_tracking_branch_hash_failure(gcm_instance, mock_gcm_su
 async def test_compare_head_synced(gcm_instance, mock_gcm_subprocess_run):
     common_hash = "123abc456def"
     mock_gcm_subprocess_run.side_effect = [
-        MagicMock(returncode=0, stdout="true", stderr=""),                  # is_repository check
-        MagicMock(returncode=0, stdout="Fetched.", stderr=""),              # fetch_remote_branch (internal call to _run_git_command)
-        MagicMock(returncode=0, stdout=common_hash, stderr=""),             # get_head_commit_hash
-        MagicMock(returncode=0, stdout=common_hash, stderr=""),             # get_remote_tracking_branch_hash
+        MagicMock(returncode=0, stdout="true", stderr=""),                 # is_repository check
+        MagicMock(returncode=0, stdout="Fetched.", stderr=""),              # fetch_remote_branch (internal call to _run_git_command) -> success
+        MagicMock(returncode=0, stdout=common_hash, stderr=""),            # get_head_commit_hash
+        MagicMock(returncode=0, stdout=common_hash, stderr=""),            # get_remote_tracking_branch_hash
     ]
-    status, local_h, remote_h = await gcm_instance.compare_head_with_remote_tracking("main")
+    status, local_h, remote_h, fetch_s = await gcm_instance.compare_head_with_remote_tracking("main")
     assert status == "synced"
     assert local_h == common_hash
     assert remote_h == common_hash
+    assert fetch_s == "success"
 
 @pytest.mark.asyncio
 async def test_compare_head_ahead(gcm_instance, mock_gcm_subprocess_run):
     local_hash = "ahead123"
     remote_hash = "base456"
     mock_gcm_subprocess_run.side_effect = [
-        MagicMock(returncode=0, stdout="true", stderr=""),                  # is_repository
-        MagicMock(returncode=0, stdout="Fetched.", stderr=""),              # fetch
-        MagicMock(returncode=0, stdout=local_hash, stderr=""),              # get_head
-        MagicMock(returncode=0, stdout=remote_hash, stderr=""),             # get_remote_tracking
-        MagicMock(returncode=1, stdout="", stderr=""),                      # is_ancestor local remote (local is NOT ancestor of remote)
-        MagicMock(returncode=0, stdout="", stderr=""),                      # is_ancestor remote local (remote IS ancestor of local)
+        MagicMock(returncode=0, stdout="true", stderr=""),                 # is_repository
+        MagicMock(returncode=0, stdout="Fetched.", stderr=""),              # fetch -> success
+        MagicMock(returncode=0, stdout=local_hash, stderr=""),             # get_head
+        MagicMock(returncode=0, stdout=remote_hash, stderr=""),            # get_remote_tracking
+        MagicMock(returncode=1, stdout="", stderr=""),                     # is_ancestor local remote (local is NOT ancestor of remote)
+        MagicMock(returncode=0, stdout="", stderr=""),                     # is_ancestor remote local (remote IS ancestor of local)
     ]
-    status, lh, rh = await gcm_instance.compare_head_with_remote_tracking("main")
+    status, lh, rh, fetch_s = await gcm_instance.compare_head_with_remote_tracking("main")
     assert status == "ahead"
     assert lh == local_hash
     assert rh == remote_hash
+    assert fetch_s == "success"
 
 @pytest.mark.asyncio
 async def test_compare_head_behind(gcm_instance, mock_gcm_subprocess_run):
     local_hash = "base456"
     remote_hash = "behind789"
     mock_gcm_subprocess_run.side_effect = [
-        MagicMock(returncode=0, stdout="true", stderr=""),                  # is_repository
-        MagicMock(returncode=0, stdout="Fetched.", stderr=""),              # fetch
-        MagicMock(returncode=0, stdout=local_hash, stderr=""),              # get_head
-        MagicMock(returncode=0, stdout=remote_hash, stderr=""),             # get_remote_tracking
-        MagicMock(returncode=0, stdout="", stderr=""),                      # is_ancestor local remote (local IS ancestor of remote)
+        MagicMock(returncode=0, stdout="true", stderr=""),                 # is_repository
+        MagicMock(returncode=0, stdout="Fetched.", stderr=""),              # fetch -> success
+        MagicMock(returncode=0, stdout=local_hash, stderr=""),             # get_head
+        MagicMock(returncode=0, stdout=remote_hash, stderr=""),            # get_remote_tracking
+        MagicMock(returncode=0, stdout="", stderr=""),                     # is_ancestor local remote (local IS ancestor of remote)
     ]
-    status, lh, rh = await gcm_instance.compare_head_with_remote_tracking("main")
+    status, lh, rh, fetch_s = await gcm_instance.compare_head_with_remote_tracking("main")
     assert status == "behind"
+    assert lh == local_hash
+    assert rh == remote_hash
+    assert fetch_s == "success"
 
 @pytest.mark.asyncio
 async def test_compare_head_diverged(gcm_instance, mock_gcm_subprocess_run):
     local_hash = "diverged_local"
     remote_hash = "diverged_remote"
     mock_gcm_subprocess_run.side_effect = [
-        MagicMock(returncode=0, stdout="true", stderr=""),                  # is_repository
-        MagicMock(returncode=0, stdout="Fetched.", stderr=""),              # fetch
-        MagicMock(returncode=0, stdout=local_hash, stderr=""),              # get_head
-        MagicMock(returncode=0, stdout=remote_hash, stderr=""),             # get_remote_tracking
-        MagicMock(returncode=1, stdout="", stderr=""),                      # is_ancestor local remote -> False
-        MagicMock(returncode=1, stdout="", stderr=""),                      # is_ancestor remote local -> False
+        MagicMock(returncode=0, stdout="true", stderr=""),                 # is_repository
+        MagicMock(returncode=0, stdout="Fetched.", stderr=""),              # fetch -> success
+        MagicMock(returncode=0, stdout=local_hash, stderr=""),             # get_head
+        MagicMock(returncode=0, stdout=remote_hash, stderr=""),            # get_remote_tracking
+        MagicMock(returncode=1, stdout="", stderr=""),                     # is_ancestor local remote -> False
+        MagicMock(returncode=1, stdout="", stderr=""),                     # is_ancestor remote local -> False
     ]
-    status, lh, rh = await gcm_instance.compare_head_with_remote_tracking("main")
+    status, lh, rh, fetch_s = await gcm_instance.compare_head_with_remote_tracking("main")
     assert status == "diverged"
+    assert lh == local_hash
+    assert rh == remote_hash
+    assert fetch_s == "success"
 
 @pytest.mark.asyncio
 async def test_compare_head_no_upstream(gcm_instance, mock_gcm_subprocess_run):
     local_hash = "localonly123"
     mock_gcm_subprocess_run.side_effect = [
-        MagicMock(returncode=0, stdout="true", stderr=""),                  # is_repository
+        MagicMock(returncode=0, stdout="true", stderr=""),                 # is_repository
         MagicMock(returncode=0, stdout="Fetched.", stderr=""),              # fetch (succeeds)
-        MagicMock(returncode=0, stdout=local_hash, stderr=""),              # get_head
+        MagicMock(returncode=0, stdout=local_hash, stderr=""),             # get_head
         MagicMock(returncode=1, stdout="", stderr="No such ref"),           # get_remote_tracking_branch_hash fails
         MagicMock(returncode=1, stdout="", stderr="No upstream configured"),# rev-parse --symbolic-full-name <branch>@{upstream} fails
     ]
-    status, lh, rh = await gcm_instance.compare_head_with_remote_tracking("local-branch")
+    status, lh, rh, fetch_s = await gcm_instance.compare_head_with_remote_tracking("local-branch")
     assert status == "no_upstream"
     assert lh == local_hash
     assert rh is None
+    assert fetch_s == "success"
 
 @pytest.mark.asyncio
 async def test_compare_head_fetch_fails_then_no_remote_hash(gcm_instance, mock_gcm_subprocess_run):
     """Test when fetch fails, and subsequently remote hash cannot be found."""
     local_hash = "localhash_fetchfail"
     mock_gcm_subprocess_run.side_effect = [
-        MagicMock(returncode=0, stdout="true", stderr=""),                      # is_repository
-        MagicMock(returncode=1, stdout="", stderr="Fetch failed error"),        # fetch_remote_branch (internal _run_git_command) fails
-        MagicMock(returncode=0, stdout=local_hash, stderr=""),                  # get_head_commit_hash
-        MagicMock(returncode=1, stdout="", stderr="No such ref for remote"),    # get_remote_tracking_branch_hash fails
-        MagicMock(returncode=1, stdout="", stderr="No upstream configured"),    # rev-parse --symbolic-full-name <branch>@{upstream} fails
+        MagicMock(returncode=0, stdout="true", stderr=""),                       # is_repository
+        MagicMock(returncode=1, stdout="", stderr="Fetch failed error"),         # fetch_remote_branch (internal _run_git_command) fails -> other_error
+        MagicMock(returncode=0, stdout=local_hash, stderr=""),                   # get_head_commit_hash
+        MagicMock(returncode=1, stdout="", stderr="No such ref for remote"),     # get_remote_tracking_branch_hash fails
     ]
-    status, lh, rh = await gcm_instance.compare_head_with_remote_tracking("main")
-    assert status == "no_upstream" 
+    status, lh, rh, fetch_s = await gcm_instance.compare_head_with_remote_tracking("main")
+    assert status == "no_upstream_info_locally" 
     assert lh == local_hash
     assert rh is None
+    assert fetch_s == "other_error"
+
+@pytest.mark.asyncio
+async def test_compare_head_fetch_timeout_then_synced_local_cache(gcm_instance, mock_gcm_subprocess_run):
+    """Test when fetch times out, but local cache shows synced."""
+    common_hash = "hash123"
+    mock_gcm_subprocess_run.side_effect = [
+        MagicMock(returncode=0, stdout="true", stderr=""),                 # is_repository
+        subprocess.TimeoutExpired(cmd="git fetch", timeout=10),            # fetch_remote_branch -> timeout
+        MagicMock(returncode=0, stdout=common_hash, stderr=""),            # get_head_commit_hash
+        MagicMock(returncode=0, stdout=common_hash, stderr=""),            # get_remote_tracking_branch_hash (from local cache)
+    ]
+    status, lh, rh, fetch_s = await gcm_instance.compare_head_with_remote_tracking("main")
+    assert status == "synced_local_cache"
+    assert lh == common_hash
+    assert rh == common_hash
+    assert fetch_s == "timeout"
+
+@pytest.mark.asyncio
+async def test_compare_head_fetch_offline_then_ahead_local_cache(gcm_instance, mock_gcm_subprocess_run):
+    """Test when fetch indicates offline, and local cache shows ahead."""
+    local_hash = "local_ahead_cache"
+    remote_hash_cache = "remote_base_cache"
+    mock_gcm_subprocess_run.side_effect = [
+        MagicMock(returncode=0, stdout="true", stderr=""),                  # is_repository
+        MagicMock(returncode=1, stdout="", stderr="could not resolve hostname"), # fetch_remote_branch -> offline_or_unreachable
+        MagicMock(returncode=0, stdout=local_hash, stderr=""),              # get_head_commit_hash
+        MagicMock(returncode=0, stdout=remote_hash_cache, stderr=""),       # get_remote_tracking_branch_hash (from local cache)
+        MagicMock(returncode=1, stdout="", stderr=""),                      # is_ancestor local remote_cache -> False
+        MagicMock(returncode=0, stdout="", stderr=""),                      # is_ancestor remote_cache local -> True
+    ]
+    status, lh, rh, fetch_s = await gcm_instance.compare_head_with_remote_tracking("main")
+    assert status == "ahead_local_cache"
+    assert lh == local_hash
+    assert rh == remote_hash_cache
+    assert fetch_s == "offline_or_unreachable"
 
