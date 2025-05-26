@@ -72,7 +72,12 @@ def load_configuration():
         "ai_models": {"primary_translator": "llama3.2:3b", "direct_translator": "vitali87/shell-commands-qwen2-1.5b", "validator": "herawen/lisa:latest", "explainer": "llama3.2:3b"},
         "timeouts": {"tmux_poll_seconds": 300, "tmux_semi_interactive_sleep_seconds": 1, "git_fetch_timeout": 10},
         "behavior": {"input_field_height": 3, "default_category_for_unclassified": "simple", "validator_ai_attempts": 3, "translation_validation_cycles": 3, "ai_retry_delay_seconds": 1, "ollama_api_call_retries": 2},
-        "ui": {"max_prompt_length": 20},
+        "ui": {
+            "max_prompt_length": 20,
+            "enable_output_separator": True,       # New fallback
+            "output_separator_character": "─",     # New fallback
+            "output_separator_length": 30          # New fallback
+        },
         "paths": {"tmux_log_base_path": "/tmp"},
         "prompts": {
             "validator": {"system": "You are a Linux command validation assistant...", "user_template": "Is the following string likely a Linux command: '{command_text}'"},
@@ -85,7 +90,7 @@ def load_configuration():
             "protected_branches": ["main", "testing"],
             "developer_branch": "dev",
             "halt_on_integrity_failure": True,
-            "allow_run_if_behind_remote": True 
+            "allow_run_if_behind_remote": True
         }
     }
     config = fallback_config.copy()
@@ -138,17 +143,20 @@ def normal_input_accept_handler(buff):
                 # Pass the captured edit mode state to submit_user_input
                 await shell_engine_instance.submit_user_input(user_input_stripped, from_edit_mode=was_in_edit_mode)
         finally:
-            # If the input came from edit mode, ensure the UI is restored to normal input mode.
-            # This is crucial because process_command's finally block might not trigger
-            # restore_normal_input_handler if ui_manager.is_in_edit_mode is still true at that point.
+            # This finally block now primarily focuses on restoring UI state *after* edit mode.
+            # The decision to add a separator and restore normal input for other cases
+            # is handled by restore_normal_input_handler itself, which is called
+            # by various flows when they complete.
             if was_in_edit_mode:
                 logger.debug("Input was from edit mode; explicitly calling restore_normal_input_handler.")
                 if shell_engine_instance and shell_engine_instance.main_restore_normal_input_ref:
-                    shell_engine_instance.main_restore_normal_input_ref()
+                    shell_engine_instance.main_restore_normal_input_ref() # This will handle separator
                 else:
                     logger.warning("Could not call restore_normal_input_handler after edit mode submission: ref missing.")
-            # If not from_edit_mode, the existing finally block in ShellEngine.process_command
-            # should handle restoring the normal input handler if no new flow was started.
+            # If not from_edit_mode, and it was a built-in command handled above,
+            # restore_normal_input_handler might also be called by the built-in command's logic
+            # or by ShellEngine.process_command's finally block if it proceeded that far.
+            # The key is that restore_normal_input_handler is the central place for this UI reset.
 
     asyncio.create_task(_handle_input())
 
@@ -158,10 +166,21 @@ def restore_normal_input_handler():
     Restores the UI to normal input mode. This is typically called after
     a special flow (like categorization or confirmation) is completed or cancelled.
     It re-attaches the 'normal_input_accept_handler' to the input field.
+    This function will also add an interaction separator if configured and appropriate.
     """
     global ui_manager_instance, shell_engine_instance # These are globals
     logger.debug("restore_normal_input_handler called.")
     if ui_manager_instance and shell_engine_instance:
+        # Add interaction separator if configured and appropriate
+        # This check happens *before* setting normal input mode
+        if ui_manager_instance.initial_prompt_settled and \
+           ui_manager_instance.config.get("ui", {}).get("enable_output_separator", True) and \
+           not ui_manager_instance.categorization_flow_active and \
+           not ui_manager_instance.confirmation_flow_active and \
+           not ui_manager_instance.is_in_edit_mode:
+            logger.debug("Conditions met for adding interaction separator.")
+            ui_manager_instance.add_interaction_separator() # UIManager handles duplicate prevention
+
         # Pass the actual normal_input_accept_handler function
         ui_manager_instance.set_normal_input_mode(normal_input_accept_handler, shell_engine_instance.current_directory)
     elif not ui_manager_instance:
@@ -217,7 +236,7 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
     elif current_branch in protected_branches:
         is_developer_mode = False
         ui_manager_instance.append_output(f"ℹ️ Running on protected branch '{current_branch}'. Performing integrity checks...", style_class='info')
-        
+
         is_clean = await git_context_manager_instance.is_working_directory_clean()
         if not is_clean:
             status_output_tuple = await git_context_manager_instance._run_git_command(["status", "--porcelain"])
@@ -233,7 +252,7 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
 
         if integrity_ok: # Only proceed if working directory is clean
             comparison_status, local_h, remote_h, fetch_status = await git_context_manager_instance.compare_head_with_remote_tracking(current_branch)
-            
+
             if fetch_status == "success":
                 if comparison_status == "synced":
                     ui_manager_instance.append_output(f"✅ Branch '{current_branch}' is synced with 'origin/{current_branch}'.", style_class='success')
@@ -288,7 +307,7 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
                 ui_manager_instance.append_output(error_msg, style_class='error')
                 logger.critical(f"{error_msg} - Check git fetch logs or permissions.")
                 integrity_ok = False
-        
+
         if integrity_ok:
             logger.info(f"Integrity checks completed for branch '{current_branch}'. Final status: OK")
         elif halt_on_failure: # This means integrity_ok is False
@@ -357,7 +376,7 @@ async def main_async_runner():
         "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
         "Use '/ollama help' to manage the Ollama service.\n"
     )
-    initial_buffer_for_ui = list(ui_manager_instance.output_buffer)
+    initial_buffer_for_ui = list(ui_manager_instance.output_buffer) # Get existing messages (e.g. from integrity checks)
     is_buffer_empty_or_just_welcome = not initial_buffer_for_ui or \
                                       (len(initial_buffer_for_ui) == 1 and initial_buffer_for_ui[0][1] == initial_welcome_message)
     if is_buffer_empty_or_just_welcome and not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
@@ -376,6 +395,12 @@ async def main_async_runner():
     else:
         logger.critical("UIManager did not create input_field. Cannot set accept_handler.")
         return
+
+    # After initial UI setup and messages, mark the prompt as settled
+    # and ensure the separator flag is reset for the first real command.
+    if ui_manager_instance:
+        ui_manager_instance.initial_prompt_settled = True
+        ui_manager_instance.last_output_was_separator = False # Ensures first command can get a separator
 
     app_instance = Application(
         layout=layout_from_ui_manager,

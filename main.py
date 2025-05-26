@@ -14,6 +14,7 @@ import json
 import shutil
 import hashlib
 import sys
+import datetime # Added for log timestamps
 from typing import Tuple, Optional
 
 from modules.git_context_manager import GitContextManager
@@ -39,6 +40,7 @@ os.makedirs(os.path.join(SCRIPT_DIR, CONFIG_DIR), exist_ok=True)
 LOG_FILE = os.path.join(SCRIPT_DIR, LOG_DIR, "micro_x.log")
 HISTORY_FILE_PATH = os.path.join(SCRIPT_DIR, HISTORY_FILENAME)
 
+# Logging configuration remains the same
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
@@ -74,9 +76,12 @@ def load_configuration():
         "behavior": {"input_field_height": 3, "default_category_for_unclassified": "simple", "validator_ai_attempts": 3, "translation_validation_cycles": 3, "ai_retry_delay_seconds": 1, "ollama_api_call_retries": 2},
         "ui": {
             "max_prompt_length": 20,
-            "enable_output_separator": True,       # New fallback
-            "output_separator_character": "─",     # New fallback
-            "output_separator_length": 30          # New fallback
+            "enable_output_separator": True,
+            "output_separator_character": "─",
+            "output_separator_length": 30,
+            # New fallback options for UI startup separator
+            "enable_startup_separator": True,
+            "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n",
         },
         "paths": {"tmux_log_base_path": "/tmp"},
         "prompts": {
@@ -129,10 +134,8 @@ def normal_input_accept_handler(buff):
     user_input_stripped = buff.text.strip()
     logger.info(f"normal_input_accept_handler received: '{user_input_stripped}'")
 
-    # Capture the edit mode state *before* the async task.
-    # This is important because the UI state might change by the time _handle_input runs.
     was_in_edit_mode = False
-    if ui_manager_instance: # Ensure ui_manager_instance is available
+    if ui_manager_instance:
         was_in_edit_mode = ui_manager_instance.is_in_edit_mode
         if was_in_edit_mode:
             logger.info("Input submission is from edit mode context.")
@@ -140,23 +143,14 @@ def normal_input_accept_handler(buff):
     async def _handle_input():
         try:
             if not await shell_engine_instance.handle_built_in_command(user_input_stripped):
-                # Pass the captured edit mode state to submit_user_input
                 await shell_engine_instance.submit_user_input(user_input_stripped, from_edit_mode=was_in_edit_mode)
         finally:
-            # This finally block now primarily focuses on restoring UI state *after* edit mode.
-            # The decision to add a separator and restore normal input for other cases
-            # is handled by restore_normal_input_handler itself, which is called
-            # by various flows when they complete.
             if was_in_edit_mode:
                 logger.debug("Input was from edit mode; explicitly calling restore_normal_input_handler.")
                 if shell_engine_instance and shell_engine_instance.main_restore_normal_input_ref:
-                    shell_engine_instance.main_restore_normal_input_ref() # This will handle separator
+                    shell_engine_instance.main_restore_normal_input_ref()
                 else:
                     logger.warning("Could not call restore_normal_input_handler after edit mode submission: ref missing.")
-            # If not from_edit_mode, and it was a built-in command handled above,
-            # restore_normal_input_handler might also be called by the built-in command's logic
-            # or by ShellEngine.process_command's finally block if it proceeded that far.
-            # The key is that restore_normal_input_handler is the central place for this UI reset.
 
     asyncio.create_task(_handle_input())
 
@@ -168,20 +162,17 @@ def restore_normal_input_handler():
     It re-attaches the 'normal_input_accept_handler' to the input field.
     This function will also add an interaction separator if configured and appropriate.
     """
-    global ui_manager_instance, shell_engine_instance # These are globals
+    global ui_manager_instance, shell_engine_instance
     logger.debug("restore_normal_input_handler called.")
     if ui_manager_instance and shell_engine_instance:
-        # Add interaction separator if configured and appropriate
-        # This check happens *before* setting normal input mode
         if ui_manager_instance.initial_prompt_settled and \
            ui_manager_instance.config.get("ui", {}).get("enable_output_separator", True) and \
            not ui_manager_instance.categorization_flow_active and \
            not ui_manager_instance.confirmation_flow_active and \
            not ui_manager_instance.is_in_edit_mode:
             logger.debug("Conditions met for adding interaction separator.")
-            ui_manager_instance.add_interaction_separator() # UIManager handles duplicate prevention
+            ui_manager_instance.add_interaction_separator()
 
-        # Pass the actual normal_input_accept_handler function
         ui_manager_instance.set_normal_input_mode(normal_input_accept_handler, shell_engine_instance.current_directory)
     elif not ui_manager_instance:
         logger.warning("restore_normal_input_handler: ui_manager_instance is None.")
@@ -189,16 +180,16 @@ def restore_normal_input_handler():
         logger.warning("restore_normal_input_handler: shell_engine_instance is None.")
 
 def _exit_app_main():
-    global app_instance # app_instance is a global
+    global app_instance
     logger.info("Exit requested by _exit_app_main.")
     if app_instance and app_instance.is_running:
         app_instance.exit()
     else:
         logger.warning("_exit_app_main called but app_instance not running or None. Attempting sys.exit.")
-        sys.exit(1) # Fallback exit
+        sys.exit(1)
 
 async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
-    global git_context_manager_instance, ui_manager_instance, config # These are globals
+    global git_context_manager_instance, ui_manager_instance, config
     is_developer_mode = False
     integrity_ok = True
     integrity_config = config.get("integrity_check", {})
@@ -217,12 +208,12 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
     if not await git_context_manager_instance.is_git_available():
         ui_manager_instance.append_output("⚠️ Git command not found. Integrity checks cannot be performed. Assuming developer mode.", style_class='error')
         logger.error("Git command not found. Integrity checks skipped. Defaulting to developer mode.")
-        return True, True # is_developer_mode, integrity_ok
+        return True, True
 
     if not await git_context_manager_instance.is_repository():
         ui_manager_instance.append_output(f"⚠️ Project directory '{SCRIPT_DIR}' is not a Git repository. Integrity checks cannot be performed. Assuming developer mode.", style_class='error')
         logger.error(f"Not a Git repository at '{SCRIPT_DIR}'. Integrity checks skipped. Defaulting to developer mode.")
-        return True, True # is_developer_mode, integrity_ok
+        return True, True
 
     current_branch = await git_context_manager_instance.get_current_branch()
     head_commit = await git_context_manager_instance.get_head_commit_hash()
@@ -250,7 +241,7 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
         else:
             ui_manager_instance.append_output(f"✅ Working directory is clean for branch '{current_branch}'.", style_class='info')
 
-        if integrity_ok: # Only proceed if working directory is clean
+        if integrity_ok:
             comparison_status, local_h, remote_h, fetch_status = await git_context_manager_instance.compare_head_with_remote_tracking(current_branch)
 
             if fetch_status == "success":
@@ -263,7 +254,6 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
                     ui_manager_instance.append_output(warn_msg, style_class='warning')
                     ui_manager_instance.append_output(suggest_msg, style_class='info')
                     logger.warning(f"{warn_msg} Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}")
-                    # integrity_ok remains True
                 elif comparison_status in ["ahead", "diverged"] or (comparison_status == "behind" and not allow_run_if_behind):
                     status_description = comparison_status
                     if comparison_status == "behind" and not allow_run_if_behind:
@@ -274,7 +264,7 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
                     ui_manager_instance.append_output(detail_msg, style_class='error')
                     logger.critical(f"{error_msg} {detail_msg}")
                     integrity_ok = False
-                else: # "no_upstream", "error"
+                else:
                     error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Cannot reliably compare with remote after successful fetch. Status: {comparison_status}."
                     detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
                     ui_manager_instance.append_output(error_msg, style_class='error')
@@ -297,7 +287,7 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
                     ui_manager_instance.append_output(error_msg, style_class='error')
                     logger.critical(error_msg)
                     integrity_ok = False
-                else: # "error" during local comparison
+                else:
                     error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): Error comparing with local cache. Status: {comparison_status}"
                     ui_manager_instance.append_output(error_msg, style_class='error')
                     logger.critical(error_msg)
@@ -310,17 +300,17 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
 
         if integrity_ok:
             logger.info(f"Integrity checks completed for branch '{current_branch}'. Final status: OK")
-        elif halt_on_failure: # This means integrity_ok is False
+        elif halt_on_failure:
             logger.critical(f"Application integrity compromised on protected branch '{current_branch}'. Halting as per configuration.")
 
-    else: # Other branches (feature branches, detached HEAD)
+    else:
         is_developer_mode = True
         ui_manager_instance.append_output(f"ℹ️ Running on unrecognized branch/commit '{current_branch}'. Developer mode assumed. Integrity checks informational.", style_class='info')
         logger.info(f"Developer mode assumed for unrecognized branch/commit: '{current_branch}'.")
     return is_developer_mode, integrity_ok
 
 async def main_async_runner():
-    global app_instance, ui_manager_instance, shell_engine_instance, git_context_manager_instance # These are globals
+    global app_instance, ui_manager_instance, shell_engine_instance, git_context_manager_instance
 
     ui_manager_instance = UIManager(config)
     ui_manager_instance.main_exit_app_ref = _exit_app_main
@@ -341,7 +331,6 @@ async def main_async_runner():
                                         ollama_manager_module=sys.modules['modules.ollama_manager'],
                                         main_exit_app_ref=_exit_app_main,
                                         main_restore_normal_input_ref=restore_normal_input_handler,
-                                        # Pass the correct handler for normal input submission
                                         main_normal_input_accept_handler_ref=normal_input_accept_handler,
                                         is_developer_mode=is_developer_mode,
                                         git_context_manager_instance=git_context_manager_instance
@@ -376,7 +365,7 @@ async def main_async_runner():
         "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
         "Use '/ollama help' to manage the Ollama service.\n"
     )
-    initial_buffer_for_ui = list(ui_manager_instance.output_buffer) # Get existing messages (e.g. from integrity checks)
+    initial_buffer_for_ui = list(ui_manager_instance.output_buffer)
     is_buffer_empty_or_just_welcome = not initial_buffer_for_ui or \
                                       (len(initial_buffer_for_ui) == 1 and initial_buffer_for_ui[0][1] == initial_welcome_message)
     if is_buffer_empty_or_just_welcome and not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
@@ -390,17 +379,17 @@ async def main_async_runner():
         output_buffer_main=initial_buffer_for_ui
     )
     if ui_manager_instance and ui_manager_instance.input_field:
-        # Set the initial accept_handler for the input field
         ui_manager_instance.input_field.buffer.accept_handler = normal_input_accept_handler
     else:
         logger.critical("UIManager did not create input_field. Cannot set accept_handler.")
         return
 
-    # After initial UI setup and messages, mark the prompt as settled
-    # and ensure the separator flag is reset for the first real command.
     if ui_manager_instance:
         ui_manager_instance.initial_prompt_settled = True
-        ui_manager_instance.last_output_was_separator = False # Ensures first command can get a separator
+        ui_manager_instance.last_output_was_separator = False
+        # Add UI Startup Separator
+        ui_manager_instance.add_startup_separator()
+
 
     app_instance = Application(
         layout=layout_from_ui_manager,
@@ -417,6 +406,11 @@ async def main_async_runner():
     logger.info("micro_X Shell application run_async completed.")
 
 def run_shell():
+    # Log session start
+    logger.info("====================================================================")
+    logger.info(" micro_X Session Started")
+    logger.info(f" Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("====================================================================")
     try:
         asyncio.run(main_async_runner())
     except (EOFError, KeyboardInterrupt):
@@ -429,7 +423,7 @@ def run_shell():
     except Exception as e:
         print(f"\nUnexpected critical error: {e}"); logger.critical("Critical error in run_shell or main_async_runner", exc_info=True)
     finally:
-        global git_context_manager_instance # git_context_manager_instance is a global
+        global git_context_manager_instance
         if git_context_manager_instance :
             loop = None
             try: loop = asyncio.get_running_loop()
@@ -446,6 +440,11 @@ def run_shell():
             else:
                  logger.info(f"micro_X Shell final state (sync log attempt): Project Root='{git_context_manager_instance.project_root}' (Branch/commit info requires running loop for async calls)")
         logger.info("micro_X Shell application stopped.")
+        # Log session end
+        logger.info("====================================================================")
+        logger.info(" micro_X Session Ended")
+        logger.info(f" Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info("====================================================================")
         logging.shutdown()
 
 if __name__ == "__main__":
