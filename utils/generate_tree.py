@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import fnmatch # Added for robust pattern matching
 
 def _generate_recursive(current_path, prefix, ignore_dirs, ignore_files, 
                         pipe_segment, space_segment, entry_connector_dir, entry_connector_file,
@@ -12,7 +13,7 @@ def _generate_recursive(current_path, prefix, ignore_dirs, ignore_files,
         current_path (str): The directory path to list.
         prefix (str): The prefix string for indentation and tree lines.
         ignore_dirs (list): List of directory names to ignore.
-        ignore_files (list): List of file names/extensions to ignore.
+        ignore_files (list): List of file names/extensions/patterns to ignore (supports fnmatch).
         pipe_segment (str): String for a pipe segment in the prefix (e.g., "|   ").
         space_segment (str): String for a space segment in the prefix (e.g., "    ").
         entry_connector_dir (str): Prefix for directory entries (e.g., "├── ").
@@ -33,18 +34,14 @@ def _generate_recursive(current_path, prefix, ignore_dirs, ignore_files,
     for entry_name in entries:
         entry_full_path = os.path.join(current_path, entry_name)
         if os.path.isdir(entry_full_path):
-            if entry_name not in ignore_dirs:
+            if entry_name not in ignore_dirs: # Simple name check for directories
                 dirs_to_process.append(entry_name)
         else: # It's a file
             is_ignored = False
-            if entry_name in ignore_files: # Check for exact filename match
-                is_ignored = True
-            if not is_ignored:
-                for pattern in ignore_files:
-                    if pattern.startswith('*.'): # Wildcard extension like '*.log'
-                        if entry_name.endswith(pattern[1:]):
-                            is_ignored = True
-                            break
+            for pattern in ignore_files: # Use fnmatch for file patterns
+                if fnmatch.fnmatch(entry_name, pattern):
+                    is_ignored = True
+                    break
             if not is_ignored:
                 files_to_print.append(entry_name)
     
@@ -81,20 +78,22 @@ def generate_file_tree(startpath, output_filepath, display_root_name="micro_X", 
         output_filepath (str): The full path to the file where the tree will be saved.
         display_root_name (str, optional): The name to display for the root of the tree.
         ignore_dirs (list, optional): A list of directory names to ignore.
-        ignore_files (list, optional): A list of file names/extensions to ignore.
+        ignore_files (list, optional): A list of file names/extensions/patterns to ignore (supports fnmatch).
     """
     # Define tree drawing elements
-    pipe_segment = "|   "
-    space_segment = "    "
+    pipe_segment = "|   " # Consistent spacing
+    space_segment = "    " # Consistent spacing
     entry_connector_dir = "├── "
     entry_connector_file = "└── "
 
     if ignore_dirs is None:
         ignore_dirs = ['.git', '__pycache__', '.venv', 'venv', 'env', 'ENV', 
                        '.pytest_cache', '.mypy_cache', '.ruff_cache', 'logs', 
-                       'build', 'dist', 'site', '*.egg-info'] 
+                       'build', 'dist', 'site', '*.egg-info', 
+                       'snapshots'] # Added snapshots to default ignore_dirs
     if ignore_files is None:
-        ignore_files = ['.DS_Store', '*.pyc', '*.pyo', '.coverage']
+        # Default ignore_files, including the pattern for timestamped pytest results
+        ignore_files = ['.DS_Store', '*.pyc', '*.pyo', '.coverage', 'pytest_results_*.txt'] 
 
     if not os.path.isdir(startpath):
         print(f"Error: Provided path '{startpath}' is not a directory or does not exist.")
@@ -153,7 +152,8 @@ if __name__ == "__main__":
         'snapshots' # Also ignore the snapshots directory itself from the tree
     ]
     custom_ignore_files = [
-        '.DS_Store', '*.pyc', '*.pyo', '.coverage',
+        '.DS_Store', '*.pyc', '*.pyo', '.coverage', 
+        'pytest_results_*.txt', # Corrected pattern for timestamped pytest results
         output_filename # Ignore the tree file itself if it exists
     ]
 
