@@ -7,7 +7,8 @@
   },
   "timeouts": {
     "tmux_poll_seconds": 300,
-    "tmux_semi_interactive_sleep_seconds": 1
+    "tmux_semi_interactive_sleep_seconds": 1,
+    "git_fetch_timeout": 10
   },
   "behavior": {
     "input_field_height": 4,
@@ -20,7 +21,10 @@
     "tui_detection_char_threshold_pct": 3.0
   },
   "ui": {
-    "max_prompt_length": 20
+    "max_prompt_length": 20,
+    "enable_output_separator": true,
+    "output_separator_character": "─",
+    "output_separator_length": 30
   },
   "paths": {
     "tmux_log_base_path": "/tmp"
@@ -49,5 +53,11 @@
     "startup_wait_seconds": 10,
     "server_check_retries": 5,
     "server_check_interval_seconds": 2
+  },
+  "integrity_check": {
+    "protected_branches": ["main", "testing"],
+    "developer_branch": "dev",
+    "halt_on_integrity_failure": true,
+    "allow_run_if_behind_remote": true
   }
 }

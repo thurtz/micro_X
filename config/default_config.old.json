@@ -2,7 +2,8 @@
   "ai_models": {
     "primary_translator": "llama3.2:3b",
     "direct_translator": "vitali87/shell-commands-qwen2-1.5b",
-    "validator": "herawen/lisa:latest"
+    "validator": "herawen/lisa:latest",
+    "explainer": "llama3.2:3b"
   },
   "timeouts": {
     "tmux_poll_seconds": 300,
@@ -36,6 +37,17 @@
     "direct_translator": {
       "system": "Translate the following user request into a single Linux command. Output only the command. Do not include any other text, explanations, or markdown formatting.",
       "user_template": "Translate to a single Linux command: \"{human_input}\"."
+    },
+    "explainer": {
+      "system": "You are a helpful assistant that explains Linux commands in simple, clear terms. Describe what the command does, its main arguments/options shown, and any significant side effects or risks. Be concise. If the command is trivial, a very short explanation is fine. If it seems dangerous or complex, highlight that.",
+      "user_template": "Explain the following Linux command: '{command_text}'"
     }
+  },
+  "ollama_service": {
+    "executable_path": null,
+    "auto_start_serve": true,
+    "startup_wait_seconds": 10,
+    "server_check_retries": 5,
+    "server_check_interval_seconds": 2
   }
 }
