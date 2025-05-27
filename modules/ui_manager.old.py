@@ -3,15 +3,14 @@ import logging
 import os
 import asyncio
 
-from prompt_toolkit import Application # Keep for get_app, though Application itself is created in main
-from prompt_toolkit.key_binding import KeyBindings # Import KeyBindings
+from prompt_toolkit import Application # Keep this import for type hinting if needed elsewhere
+from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout import HSplit, Window, Layout
 from prompt_toolkit.widgets import TextArea
 from prompt_toolkit.styles import Style
 from prompt_toolkit.document import Document
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.history import FileHistory
-from prompt_toolkit.application import get_app
 
 from modules.category_manager import CATEGORY_MAP as CM_CATEGORY_MAP, CATEGORY_DESCRIPTIONS as CM_CATEGORY_DESCRIPTIONS
 from modules.ai_handler import explain_linux_command_with_ai
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 class UIManager:
     def __init__(self, config):
         self.config = config
-        self.app = None # Reference to the Application instance
+        self.app = None # This will be set by main.py
         self.output_field = None
         self.input_field = None
         self.key_help_field = None
@@ -31,37 +30,33 @@ class UIManager:
         self.style = None
         self.auto_scroll = True
         self.output_buffer = []
-        
+
         self.categorization_flow_active = False
         self.categorization_flow_state = {}
-        
+
         self.confirmation_flow_active = False
-        self.confirmation_flow_state = {} 
-        
+        self.confirmation_flow_state = {}
+
+        self.is_in_edit_mode = False
+
         self.current_prompt_text = ""
-        
-        self.kb = KeyBindings() # KeyBindings object now part of UIManager
-        self._register_keybindings() # Register keybindings upon initialization
 
-        # References for main.py to call UIManager methods (if any are still needed)
-        # For now, these are primarily for actions triggered by UIManager that need main.py's context
-        self.main_exit_app_ref = None 
+        self.kb = KeyBindings()
+        self._register_keybindings()
+
+        self.main_exit_app_ref = None
         self.main_restore_normal_input_ref = None
-        self.main_normal_input_accept_handler_ref = None
 
+        self.initial_prompt_settled = False
+        self.last_output_was_separator = False
+        self.startup_separator_added = False
 
         logger.debug("UIManager initialized with config and keybindings.")
 
     def _register_keybindings(self):
-        """Registers all keybindings for the application."""
-        # Note: Event handlers now become methods of UIManager.
-        # They will need access to `self` (for UIManager state) and `event` (from prompt_toolkit).
-
         @self.kb.add('c-c')
         @self.kb.add('c-d')
         def _handle_exit_or_cancel(event):
-            # Handles Ctrl+C/Ctrl+D for exiting or cancelling flows.
-            # `self` refers to UIManager instance.
             if self.categorization_flow_active:
                 self.append_output("\n⚠️ Categorization cancelled by user.", style_class='warning')
                 logger.info("Categorization flow cancelled by Ctrl+C/D.")
@@ -71,7 +66,7 @@ class UIManager:
                     self.categorization_flow_state['future'].set_result({'action': 'cancel_execution'})
                 if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
                 event.app.invalidate()
-            elif self.confirmation_flow_active: 
+            elif self.confirmation_flow_active:
                 self.append_output("\n⚠️ Command confirmation cancelled by user.", style_class='warning')
                 logger.info("Confirmation flow cancelled by Ctrl+C/D.")
                 if 'future' in self.confirmation_flow_state and \
@@ -80,96 +75,97 @@ class UIManager:
                     self.confirmation_flow_state['future'].set_result({'action': 'cancel'})
                 if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
                 event.app.invalidate()
+            elif self.is_in_edit_mode:
+                self.append_output("\n⌨️ Command editing cancelled.", style_class='info')
+                logger.info("Command edit mode cancelled by Ctrl+C/D.")
+                self.is_in_edit_mode = False
+                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                event.app.invalidate()
             else:
                 logger.info("Exit keybinding triggered.")
                 if self.main_exit_app_ref:
-                    self.main_exit_app_ref() # Call main's exit logic
-                else: # Fallback if ref not set (should not happen in normal flow)
+                    self.main_exit_app_ref()
+                else:
                     event.app.exit()
 
 
         @self.kb.add('c-n')
         def _handle_newline(event):
-            # Inserts a newline in the input buffer if not in an active flow.
-            if not self.categorization_flow_active and not self.confirmation_flow_active:
-                event.current_buffer.insert_text('\n')
+            if not self.categorization_flow_active and \
+               not self.confirmation_flow_active and \
+               not self.is_in_edit_mode:
+                if self.input_field and self.input_field.multiline:
+                    event.current_buffer.insert_text('\n')
+            elif self.input_field and self.input_field.multiline and self.is_in_edit_mode:
+                   event.current_buffer.insert_text('\n')
+
 
         @self.kb.add('enter')
         def _handle_enter(event):
-            # Handles the Enter key press to submit input.
             buff = event.current_buffer
-            # The buffer's accept_handler is set by UIManager's mode-setting methods
-            buff.validate_and_handle() 
+            buff.validate_and_handle()
 
         @self.kb.add('tab')
         def _handle_tab(event):
-            # Handles Tab for completion or indentation.
             buff = event.current_buffer
-            if buff.complete_state: 
+            if buff.complete_state:
                 event.app.current_buffer.complete_next()
-            else: 
-                event.current_buffer.insert_text('    ') 
+            else:
+                event.current_buffer.insert_text('    ')
 
         @self.kb.add('pageup')
         def _handle_pageup(event):
-            # Scrolls the output field up.
             if self.output_field and self.output_field.window.render_info:
                 self.output_field.window._scroll_up()
                 event.app.invalidate()
 
         @self.kb.add('pagedown')
         def _handle_pagedown(event):
-            # Scrolls the output field down.
             if self.output_field and self.output_field.window.render_info:
                 self.output_field.window._scroll_down()
                 event.app.invalidate()
 
         @self.kb.add('c-up')
         def _handle_ctrl_up(event):
-            # Moves cursor up in the input buffer if not in an active flow.
             if not self.categorization_flow_active and not self.confirmation_flow_active:
                 event.current_buffer.cursor_up(count=1)
 
         @self.kb.add('c-down')
         def _handle_ctrl_down(event):
-            # Moves cursor down in the input buffer if not in an active flow.
             if not self.categorization_flow_active and not self.confirmation_flow_active:
                 event.current_buffer.cursor_down(count=1)
 
         @self.kb.add('up')
         def _handle_up_arrow(event):
-            # Handles Up arrow for history navigation or cursor movement.
             if self.categorization_flow_active or self.confirmation_flow_active:
-                return # Ignore if in flow
+                pass
 
             buff = event.current_buffer
             doc = buff.document
-            if doc.cursor_position_row == 0: 
-                if buff.history_backward(): 
+            if doc.cursor_position_row == 0:
+                if buff.history_backward():
                     buff.document = Document(text=buff.text, cursor_position=len(buff.text))
                     event.app.invalidate()
-            else: 
+            else:
                 buff.cursor_up()
 
         @self.kb.add('down')
         def _handle_down_arrow(event):
-            # Handles Down arrow for history navigation or cursor movement.
             if self.categorization_flow_active or self.confirmation_flow_active:
-                return # Ignore if in flow
+                pass
 
             buff = event.current_buffer
             doc = buff.document
-            if doc.cursor_position_row == doc.line_count - 1: 
-                if buff.history_forward(): 
+            if doc.cursor_position_row == doc.line_count - 1:
+                if buff.history_forward():
                     buff.document = Document(text=buff.text, cursor_position=len(buff.text))
                     event.app.invalidate()
-            else: 
+            else:
                 buff.cursor_down()
-        
+
         logger.debug("UIManager: Keybindings registered.")
 
     def get_key_bindings(self) -> KeyBindings:
-        """Returns the KeyBindings object managed by UIManager."""
         return self.kb
 
     # --- Categorization Flow Methods ---
@@ -178,13 +174,14 @@ class UIManager:
                                         original_direct_input: str | None
                                         ):
         self.categorization_flow_active = True
-        self.confirmation_flow_active = False 
+        self.confirmation_flow_active = False
+        self.is_in_edit_mode = False
         self.categorization_flow_state = {
             'command_initially_proposed': command_initially_proposed,
             'ai_raw_candidate': ai_raw_candidate,
             'original_direct_input': original_direct_input,
             'command_to_add_final': command_initially_proposed,
-            'step': 0.5, 
+            'step': 0.5,
             'future': asyncio.Future()
         }
         logger.info(f"UIManager: Starting categorization flow for '{command_initially_proposed}'. State initialized.")
@@ -199,9 +196,9 @@ class UIManager:
             if 'future' in self.categorization_flow_state and \
                self.categorization_flow_state.get('future') and \
                not self.categorization_flow_state['future'].done():
-                   self.categorization_flow_state.get('future').set_result({'action': 'cancel_execution', 'reason': 'future_cancelled_externally'})
+                    self.categorization_flow_state.get('future').set_result({'action': 'cancel_execution', 'reason': 'future_cancelled_externally'})
             if 'future' in self.categorization_flow_state and self.categorization_flow_state.get('future'):
-                return await self.categorization_flow_state.get('future') 
+                return await self.categorization_flow_state.get('future')
             return {'action': 'cancel_execution', 'reason': 'future_cancelled_externally_no_future_obj'}
         finally:
             logger.debug(f"UIManager: Categorization flow finally block. Active: {self.categorization_flow_active}")
@@ -251,13 +248,13 @@ class UIManager:
             valid_choice = True
         elif response == '3':
             self.categorization_flow_state['step'] = 3.5
-            self._ask_step_3_5_enter_custom_command_for_categorization() 
+            self._ask_step_3_5_enter_custom_command_for_categorization()
             valid_choice = True
         elif response == '4':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'cancel_execution'})
             valid_choice = True
-        
+
         if not valid_choice:
             append_output_func("Invalid choice (1-4). Please try again.", style_class='error')
             self._ask_step_0_5_confirm_command_base()
@@ -301,7 +298,7 @@ class UIManager:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'cancel_execution'})
             valid_choice = True
-        
+
         if not valid_choice:
             append_output_func("Invalid choice. Please enter 1-3, M, D, or C.", style_class='error')
             self._ask_step_1_main_action()
@@ -380,17 +377,18 @@ class UIManager:
     async def prompt_for_command_confirmation(self, command_to_confirm: str, display_source: str, normal_input_accept_handler_ref) -> dict:
         logger.info(f"UIManager: Starting command confirmation flow for '{command_to_confirm}' from '{display_source}'.")
         self.confirmation_flow_active = True
-        self.categorization_flow_active = False 
+        self.categorization_flow_active = False
+        self.is_in_edit_mode = False
         self.confirmation_flow_state = {
-            'command_to_confirm': command_to_confirm, 
-            'original_command': command_to_confirm, 
-            'display_source': display_source, 
-            'step': 'ask_main_choice', 
+            'command_to_confirm': command_to_confirm,
+            'original_command': command_to_confirm,
+            'display_source': display_source,
+            'step': 'ask_main_choice',
             'future': asyncio.Future(),
-            'normal_input_accept_handler_ref': normal_input_accept_handler_ref 
+            'normal_input_accept_handler_ref': normal_input_accept_handler_ref
         }
 
-        self._ask_confirmation_main_choice() 
+        self._ask_confirmation_main_choice()
 
         action_taken = None
         try:
@@ -403,17 +401,17 @@ class UIManager:
             if 'future' in self.confirmation_flow_state and \
                self.confirmation_flow_state.get('future') and \
                not self.confirmation_flow_state.get('future').done():
-                   self.confirmation_flow_state.get('future').set_result({'action': 'cancel', 'reason': 'future_cancelled_externally'})
+                    self.confirmation_flow_state.get('future').set_result({'action': 'cancel', 'reason': 'future_cancelled_externally'})
             if 'future' in self.confirmation_flow_state and self.confirmation_flow_state.get('future'):
                 return await self.confirmation_flow_state.get('future')
             return {'action': 'cancel', 'reason': 'future_cancelled_externally_no_future_obj'}
         finally:
             logger.debug(f"UIManager: Confirmation flow finally block. Active: {self.confirmation_flow_active}")
-            self.confirmation_flow_active = False 
+            self.confirmation_flow_active = False
             if action_taken == 'edit_mode_engaged':
                 command_for_edit = self.confirmation_flow_state.get('command_to_confirm', '')
                 accept_handler = self.confirmation_flow_state.get('normal_input_accept_handler_ref')
-                if accept_handler: # Ensure it's set
+                if accept_handler:
                     self.set_edit_mode(accept_handler, command_for_edit)
                 else:
                     logger.error("UIManager: normal_input_accept_handler_ref not available for edit mode.")
@@ -438,7 +436,7 @@ class UIManager:
         future_to_set = self.confirmation_flow_state.get('future')
         cmd_to_confirm = self.confirmation_flow_state['command_to_confirm']
         valid_choice_made = False
-        
+
         logger.debug(f"UIManager: Confirmation main choice response: '{response}'")
 
         if response in ['y', 'yes']:
@@ -459,8 +457,8 @@ class UIManager:
             valid_choice_made = True
         elif response in ['e', 'explain']:
             self.confirmation_flow_state['step'] = 'explain'
-            asyncio.create_task(self._handle_explain_command_async()) 
-            valid_choice_made = True 
+            asyncio.create_task(self._handle_explain_command_async())
+            valid_choice_made = True
         elif response in ['m', 'modify']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'edit_mode_engaged', 'command': cmd_to_confirm})
@@ -469,29 +467,29 @@ class UIManager:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'cancel'})
             valid_choice_made = True
-        
+
         if not valid_choice_made:
             self.append_output("Invalid choice. Please enter Y, Ys, Ym, Yi, E, M, or C.", style_class='error')
-            self._ask_confirmation_main_choice() 
+            self._ask_confirmation_main_choice()
             return
 
     async def _handle_explain_command_async(self):
         command_to_explain = self.confirmation_flow_state['command_to_confirm']
         self.append_output(f"\n🧠 Asking AI to explain: {command_to_explain}", style_class='ai-thinking')
-        
-        current_app_inst = self.get_app_instance()
-        if current_app_inst and current_app_inst.is_running:
-            current_app_inst.invalidate()
-        
+
+        # current_app_inst = self.get_app_instance() # Not needed here if only appending
+        if self.app and hasattr(self.app, 'is_running') and self.app.is_running:
+            self.app.invalidate()
+
         explanation = await explain_linux_command_with_ai(command_to_explain, self.config, self.append_output)
-        
+
         if explanation:
             self.append_output("\n💡 AI Explanation:", style_class='info-header')
             self.append_output(explanation, style_class='info')
         else:
             self.append_output("⚠️ AI could not provide an explanation.", style_class='warning')
-        
-        self._ask_confirmation_after_explain() 
+
+        self._ask_confirmation_after_explain()
 
     def _ask_confirmation_after_explain(self):
         cmd = self.confirmation_flow_state['command_to_confirm']
@@ -516,9 +514,9 @@ class UIManager:
                 future_to_set.set_result({'action': 'execute', 'command': cmd_to_confirm})
             valid_choice_made = True
         elif response == 'ys':
-             if future_to_set and not future_to_set.done():
-                future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'simple'})
-             valid_choice_made = True
+                 if future_to_set and not future_to_set.done():
+                    future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'simple'})
+                 valid_choice_made = True
         elif response == 'ym':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'semi_interactive'})
@@ -535,17 +533,18 @@ class UIManager:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'cancel'})
             valid_choice_made = True
-        
+
         if not valid_choice_made:
             self.append_output("Invalid choice. Please enter Y, Ys, Ym, Yi, M, or C.", style_class='error')
-            self._ask_confirmation_after_explain() 
+            self._ask_confirmation_after_explain()
             return
 
     # --- Core UI Methods ---
     def get_app_instance(self):
+        """Returns the application instance if set by the main program."""
+        # self.app is set by main.py after Application is instantiated.
         if not self.app:
-            try: self.app = get_app()
-            except Exception: logger.warning("UIManager: get_app() called when no application is running."); return None
+            logger.debug("UIManager.get_app_instance: self.app is not yet set by the main application.")
         return self.app
 
     def _get_current_prompt(self) -> str:
@@ -572,6 +571,8 @@ class UIManager:
             'help-title': 'bold underline #e5c07b', 'help-text': '#abb2bf',
             'help-header': 'bold #61afef', 'help-command': '#c678dd',
             'help-description': '#abb2bf', 'help-example': 'italic #5c6370',
+            'output-separator': '#5c6370',
+            'startup-separator': 'bold #86c07c'
         })
         self.output_buffer = list(output_buffer_main)
         self.output_field = TextArea(
@@ -603,7 +604,7 @@ class UIManager:
         return self.layout
 
     def _on_output_cursor_pos_changed(self, _=None):
-        if self.categorization_flow_active or self.confirmation_flow_active:
+        if self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:
             if self.output_field and self.output_field.buffer:
                 self.output_field.buffer.cursor_position = len(self.output_field.buffer.text)
             return
@@ -621,7 +622,7 @@ class UIManager:
         else:
             if not self.auto_scroll: self.auto_scroll = True
 
-    def append_output(self, text: str, style_class: str = 'default'):
+    def append_output(self, text: str, style_class: str = 'default', internal_call: bool = False):
         if not self.output_field:
             logger.warning("UIManager.append_output called, but output_field is not initialized. Buffering message.")
             if not text.endswith('\n'): text += '\n'
@@ -631,16 +632,90 @@ class UIManager:
         if not text.endswith('\n'): text += '\n'
         self.output_buffer.append((style_class, text))
         plain_text_output = "".join([content for _, content in self.output_buffer])
+        
         buffer = self.output_field.buffer
         current_cursor_pos = buffer.cursor_position
         buffer.set_document(Document(plain_text_output, cursor_position=len(plain_text_output)), bypass_readonly=True)
-        if self.auto_scroll or self.categorization_flow_active or self.confirmation_flow_active:
+        
+        if self.auto_scroll or self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:
             buffer.cursor_position = len(plain_text_output)
         else:
             buffer.cursor_position = min(current_cursor_pos, len(plain_text_output))
-        current_app_instance = self.get_app_instance()
-        if current_app_instance and current_app_instance.is_running:
-            current_app_instance.invalidate()
+
+        if not internal_call:
+            self.last_output_was_separator = False
+
+        # Directly use self.app for invalidation, only if it's set and the app is running
+        if self.app: # Check if self.app has been set by main.py
+            # Check if app is running (prompt_toolkit apps might not have is_running until run_async)
+            # A simple check for invalidate method existing is safer before run_async
+            if hasattr(self.app, 'invalidate'):
+                try:
+                    if hasattr(self.app, 'is_running') and self.app.is_running:
+                        logger.debug("UIManager.append_output: Invalidating running app.")
+                        self.app.invalidate()
+                    elif not hasattr(self.app, 'is_running'): # App object exists but might not have is_running yet
+                        logger.debug("UIManager.append_output: self.app is set but no is_running, attempting invalidate.")
+                        self.app.invalidate()
+                    else: # App has is_running but it's false
+                        logger.debug("UIManager.append_output: self.app is set but not running. Invalidation skipped.")
+                except Exception as e:
+                    logger.error(f"Error during app invalidation: {e}", exc_info=True)
+            else:
+                logger.debug("UIManager.append_output: self.app object present but lacks invalidate method.")
+        else:
+            logger.debug("UIManager.append_output: self.app not set. Invalidation skipped.")
+
+
+    def add_interaction_separator(self):
+        if not self.config.get("ui", {}).get("enable_output_separator", True):
+            return
+        if self.last_output_was_separator:
+            logger.debug("Skipping interaction separator: last output was already a separator.")
+            return
+        if not self.output_buffer:
+            logger.debug("Skipping interaction separator: output buffer is empty.")
+            return
+
+        separator_char = self.config.get("ui", {}).get("output_separator_character", "─")
+        separator_length = self.config.get("ui", {}).get("output_separator_length", 30)
+        separator_string = separator_char * separator_length
+        
+        add_leading_newline = True
+        if self.output_buffer:
+            last_text_content = self.output_buffer[-1][1]
+            if last_text_content.strip() == "" or last_text_content.endswith("\n\n"):
+                add_leading_newline = False
+        
+        full_separator_text = f"\n{separator_string}\n\n" if add_leading_newline else f"{separator_string}\n"
+        
+        logger.debug(f"Adding interaction separator: '{separator_string}'")
+        self.append_output(full_separator_text, style_class='output-separator', internal_call=True)
+        self.last_output_was_separator = True
+
+    def add_startup_separator(self):
+        """Adds a visual separator after startup messages if enabled."""
+        if not self.config.get("ui", {}).get("enable_startup_separator", True):
+            return
+        if self.startup_separator_added:
+            logger.debug("Skipping startup separator: already added.")
+            return
+        
+        separator_string = self.config.get("ui", {}).get("startup_separator_string", "🚀 micro_X Initialized & Ready 🚀")
+        
+        add_leading_newline = True
+        if self.output_buffer:
+            last_text_content = self.output_buffer[-1][1]
+            if last_text_content.strip() == "" or last_text_content.endswith("\n\n"):
+                add_leading_newline = False
+
+        full_separator_text = f"\n{separator_string}\n" if add_leading_newline else f"{separator_string}\n"
+
+        logger.debug(f"Adding startup separator: '{separator_string}'")
+        self.append_output(full_separator_text, style_class='startup-separator', internal_call=True)
+        self.startup_separator_added = True
+        self.last_output_was_separator = True
+
 
     def update_input_prompt(self, current_directory_path: str):
         if not self.input_field: return
@@ -662,43 +737,52 @@ class UIManager:
                 chars_to_keep_at_end = max_prompt_len - 3
                 dir_for_prompt = "..." + path_basename[-chars_to_keep_at_end:] if chars_to_keep_at_end > 0 else "..."
         self.current_prompt_text = f"({dir_for_prompt}) > "
-        current_app_instance = self.get_app_instance()
-        if current_app_instance and current_app_instance.is_running:
-            if self.layout and self.input_field: current_app_instance.layout.focus(self.input_field)
-            current_app_instance.invalidate()
+        # current_app_instance = self.get_app_instance() # Not strictly needed here if only changing text
+        if self.app and hasattr(self.app, 'invalidate'): # Check if app exists and can be invalidated
+            if self.layout and self.input_field: self.app.layout.focus(self.input_field)
+            self.app.invalidate()
 
     def set_normal_input_mode(self, accept_handler_func, current_directory_path: str):
         logger.debug("UIManager: Setting normal input mode.")
         self.categorization_flow_active = False
         self.confirmation_flow_active = False
+        self.is_in_edit_mode = False
         self.update_input_prompt(current_directory_path)
         if self.input_field:
             self.input_field.multiline = self.config.get('behavior', {}).get('input_field_height', 3) > 1
             self.input_field.buffer.accept_handler = accept_handler_func
             self.input_field.buffer.reset()
-            current_app_instance = self.get_app_instance()
-            if current_app_instance and current_app_instance.is_running:
-                if self.layout: current_app_instance.layout.focus(self.input_field)
-                current_app_instance.invalidate()
+            # current_app_instance = self.get_app_instance()
+            if self.app and hasattr(self.app, 'invalidate'):
+                if self.layout: self.app.layout.focus(self.input_field)
+                self.app.invalidate()
 
     def set_flow_input_mode(self, prompt_text: str, accept_handler_func, is_categorization: bool = False, is_confirmation: bool = False):
         logger.debug(f"UIManager: Setting flow input mode. Prompt: '{prompt_text}'")
-        if is_categorization: self.categorization_flow_active = True; self.confirmation_flow_active = False
-        elif is_confirmation: self.confirmation_flow_active = True; self.categorization_flow_active = False
+        if is_categorization:
+            self.categorization_flow_active = True
+            self.confirmation_flow_active = False
+            self.is_in_edit_mode = False
+        elif is_confirmation:
+            self.confirmation_flow_active = True
+            self.categorization_flow_active = False
+            self.is_in_edit_mode = False
+
         self.current_prompt_text = prompt_text
         if self.input_field:
             self.input_field.multiline = False
             self.input_field.buffer.accept_handler = accept_handler_func
             self.input_field.buffer.reset()
-            current_app_instance = self.get_app_instance()
-            if current_app_instance and current_app_instance.is_running:
-                if self.layout: current_app_instance.layout.focus(self.input_field)
-                current_app_instance.invalidate()
+            # current_app_instance = self.get_app_instance()
+            if self.app and hasattr(self.app, 'invalidate'):
+                if self.layout: self.app.layout.focus(self.input_field)
+                self.app.invalidate()
 
     def set_edit_mode(self, accept_handler_func, command_to_edit: str):
         logger.debug(f"UIManager: Setting edit mode. Command: '{command_to_edit}'")
         self.categorization_flow_active = False
         self.confirmation_flow_active = False
+        self.is_in_edit_mode = True
         self.current_prompt_text = "[Edit Command]> "
         if self.input_field:
             self.input_field.multiline = self.config.get('behavior', {}).get('input_field_height', 3) > 1
@@ -708,7 +792,7 @@ class UIManager:
                 cursor_position=len(command_to_edit)
             )
             logger.info(f"UIManager: Input buffer set to '{command_to_edit}' for editing.")
-            current_app_instance = self.get_app_instance()
-            if current_app_instance and current_app_instance.is_running:
-                if self.layout: current_app_instance.layout.focus(self.input_field)
-                current_app_instance.invalidate()
+            # current_app_instance = self.get_app_instance()
+            if self.app and hasattr(self.app, 'invalidate'):
+                if self.layout: self.app.layout.focus(self.input_field)
+                self.app.invalidate()
