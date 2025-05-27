@@ -180,8 +180,7 @@ micro_x_context_snapshot_*.txt
 
 # Generated files that should not break integrity checks
 project_tree.txt
-pytest_results/pytest_results.txt # Add this specific path
+pytest_results/pytest_results.txt
 
 # pytest results
 pytest_results/pytest_results_*.txt
-
