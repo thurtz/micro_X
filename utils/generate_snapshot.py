@@ -65,7 +65,7 @@ LOG_DIR_NAME = "logs"
 LOG_FILE_BASENAME = "micro_x.log"
 
 # Log message content markers (these are the exact strings logged by logger.info(), AFTER stripping)
-LOG_SEPARATOR_LINE_TEXT = "=" * 68  # Corrected to 68 to match actual log output from main.py
+LOG_SEPARATOR_LINE_TEXT = "=" * 80 # Adjusted to match main.py's actual log output (was 68)
 LOG_SESSION_START_TEXT = "micro_X Session Started" 
 LOG_SESSION_END_TEXT = "micro_X Session Ended"   
 LOG_TIMESTAMP_PREFIX_TEXT = "Timestamp:" 
@@ -126,7 +126,7 @@ def run_utility_script(script_name: str, project_root: str, utils_dir: str) -> t
         if process.returncode == 0:
             print(f"Success: Utility '{script_name}' executed successfully.")
             return True, ""
-        elif script_name == "run_tests.py" and process.returncode == 1:
+        elif script_name == "run_tests.py" and process.returncode == 1: # Pytest returns 1 for test failures
             print(f"Notice: Utility '{script_name}' completed. Some tests failed. Results have been updated.")
             return True, f"[NOTICE: {script_name} reported test failures. Results file updated.]\n"
         else:
@@ -176,16 +176,16 @@ def _get_last_log_session(log_filepath: str) -> tuple[str, str]:
     parsing_debug_log.append(f"LogParser: Scanning {len(lines)} lines for session end markers...\n")
     print(f"LogParser: Scanning {len(lines)} lines for session end markers...") 
     found_end_marker_this_run = False
-    for i in range(len(lines) - 3):
+    for i in range(len(lines) - 3): # Need at least 4 lines for a full block
         msg0 = _get_message_from_log_line(lines[i])
         msg1 = _get_message_from_log_line(lines[i+1])
         msg2 = _get_message_from_log_line(lines[i+2])
         msg3 = _get_message_from_log_line(lines[i+3])
         
         is_potential_end_block = (msg0 == LOG_SEPARATOR_LINE_TEXT or \
-                                 msg1 == LOG_SESSION_END_TEXT or \
-                                 (msg2 is not None and msg2.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
-                                 msg3 == LOG_SEPARATOR_LINE_TEXT)
+                                  msg1 == LOG_SESSION_END_TEXT or \
+                                  (msg2 is not None and msg2.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
+                                  msg3 == LOG_SEPARATOR_LINE_TEXT)
 
         # Conditional detailed logging for snapshot
         if i < 5 or i > len(lines) - 8 or is_potential_end_block : 
@@ -218,8 +218,8 @@ def _get_last_log_session(log_filepath: str) -> tuple[str, str]:
         last_session_start_block_start_index = -1
         parsing_debug_log.append(f"LogParser: Searching backwards for corresponding start marker before index {last_session_end_block_start_index}...\n")
         print(f"LogParser: Searching backwards for corresponding start marker before index {last_session_end_block_start_index}...") 
-        for i in range(last_session_end_block_start_index - 4, -1, -1):
-            if i + 3 >= len(lines): continue
+        for i in range(last_session_end_block_start_index - 4, -1, -1): # Search backwards from before the found end block
+            if i + 3 >= len(lines): continue # Ensure we don't go out of bounds
             
             msg0_s = _get_message_from_log_line(lines[i])
             msg1_s = _get_message_from_log_line(lines[i+1])
@@ -227,11 +227,11 @@ def _get_last_log_session(log_filepath: str) -> tuple[str, str]:
             msg3_s = _get_message_from_log_line(lines[i+3])
             
             is_potential_start_block = (msg0_s == LOG_SEPARATOR_LINE_TEXT or \
-                                     msg1_s == LOG_SESSION_START_TEXT or \
-                                     (msg2_s is not None and msg2_s.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
-                                     msg3_s == LOG_SEPARATOR_LINE_TEXT)
+                                        msg1_s == LOG_SESSION_START_TEXT or \
+                                        (msg2_s is not None and msg2_s.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
+                                        msg3_s == LOG_SEPARATOR_LINE_TEXT)
 
-            if i > last_session_end_block_start_index - 4 - 10 or is_potential_start_block: 
+            if i > last_session_end_block_start_index - 4 - 10 or is_potential_start_block: # Log details for nearby or potential matches
                 parsing_debug_log.append(f"\nLogParser START SCAN (idx {i}):\n")
                 parsing_debug_log.append(f"  Msg0_s: {repr(msg0_s)} (Expected: {repr(LOG_SEPARATOR_LINE_TEXT)}) Match: {msg0_s == LOG_SEPARATOR_LINE_TEXT}\n")
                 parsing_debug_log.append(f"  Msg1_s: {repr(msg1_s)} (Expected: {repr(LOG_SESSION_START_TEXT)}) Match: {msg1_s == LOG_SESSION_START_TEXT}\n")
@@ -242,14 +242,14 @@ def _get_last_log_session(log_filepath: str) -> tuple[str, str]:
                msg1_s == LOG_SESSION_START_TEXT and \
                (msg2_s is not None and msg2_s.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) and \
                msg3_s == LOG_SEPARATOR_LINE_TEXT:
-                if i < last_session_end_block_start_index:
+                if i < last_session_end_block_start_index: # Ensure start is before end
                     last_session_start_block_start_index = i
                     parsing_debug_log.append(f"LogParser: Found corresponding session start block for completed session at index {i}.\n")
                     print(f"LogParser: Found corresponding session start block for completed session at index {i}.") 
                     break
         if last_session_start_block_start_index != -1:
             start_idx = last_session_start_block_start_index
-            end_idx = last_session_end_block_start_index + 4
+            end_idx = last_session_end_block_start_index + 4 # Include the 4 lines of the end block
             parsing_debug_log.append(f"LogParser: Extracting COMPLETED session from line {start_idx} to {end_idx-1}.\n")
             print(f"LogParser: Extracting COMPLETED session from line {start_idx} to {end_idx-1}.") 
             return "COMPLETED", "".join(lines[start_idx:end_idx])
@@ -257,8 +257,8 @@ def _get_last_log_session(log_filepath: str) -> tuple[str, str]:
             parsing_debug_log.append("[LogParser: Found session end(s), but no corresponding start marker for the last completed one.]\n")
             print("[LogParser: Found session end(s), but no corresponding start marker for the last completed one.]") 
     elif not found_end_marker_this_run: 
-         parsing_debug_log.append("[LogParser: No complete session end marker blocks found in log during scan.]\n")
-         print("[LogParser: No complete session end marker blocks found in log during scan.]") 
+        parsing_debug_log.append("[LogParser: No complete session end marker blocks found in log during scan.]\n")
+        print("[LogParser: No complete session end marker blocks found in log during scan.]") 
 
 
     # Attempt 2: Find the last ACTIVE session (if no completed session was found)
@@ -266,16 +266,16 @@ def _get_last_log_session(log_filepath: str) -> tuple[str, str]:
     print("LogParser: No completed session found. Looking for last active session...") 
     session_start_block_indices = []
     found_start_marker_this_run = False
-    for i in range(len(lines) - 3):
+    for i in range(len(lines) - 3): # Need at least 4 lines for a full block
         msg0 = _get_message_from_log_line(lines[i])
         msg1 = _get_message_from_log_line(lines[i+1])
         msg2 = _get_message_from_log_line(lines[i+2])
         msg3 = _get_message_from_log_line(lines[i+3])
         
         is_potential_active_start_block = (msg0 == LOG_SEPARATOR_LINE_TEXT or \
-                                          msg1 == LOG_SESSION_START_TEXT or \
-                                          (msg2 is not None and msg2.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
-                                          msg3 == LOG_SEPARATOR_LINE_TEXT)
+                                           msg1 == LOG_SESSION_START_TEXT or \
+                                           (msg2 is not None and msg2.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
+                                           msg3 == LOG_SEPARATOR_LINE_TEXT)
         
         if i < 5 or i > len(lines) - 8 or is_potential_active_start_block:
             parsing_debug_log.append(f"\nLogParser ACTIVE SCAN (idx {i}):\n")
@@ -341,8 +341,11 @@ def generate_snapshot(summary_message=None, include_logs=False):
 
     prerequisite_notices = []
     tree_success, tree_notice = run_utility_script("generate_tree.py", project_root, utils_dir)
-    if not tree_success: prerequisite_notices.append(tree_notice)
+    if not tree_success: prerequisite_notices.append(tree_notice) # Only append notice if script itself failed, not for tree generation logic failure
+    
     tests_ran_successfully, tests_notice = run_utility_script("run_tests.py", project_root, utils_dir)
+    # tests_notice will contain info about failures if run_tests.py returns 1 (test failures)
+    # or if the script itself had an issue.
     if tests_notice: prerequisite_notices.append(tests_notice)
 
     if prerequisite_notices:
@@ -398,8 +401,14 @@ def generate_snapshot(summary_message=None, include_logs=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate a snapshot of the micro_X project, optionally running prerequisite utilities and including logs.",
-        formatter_class=argparse.RawTextHelpFormatter
+        description="Generate a snapshot of the micro_X project context. "
+                    "This includes specified source files, configuration, "
+                    "and optionally the latest log session. "
+                    "Prerequisite utilities (generate_tree.py, run_tests.py) are run by default "
+                    "to ensure included artifacts like project_tree.txt and pytest_results.txt are up-to-date.",
+        epilog="Typically run via '/utils generate_snapshot [options]' from within micro_X, "
+               "or directly for development/debugging.",
+        formatter_class=argparse.RawTextHelpFormatter # Allows for newlines in help
     )
     parser.add_argument(
         "-s", "--summary", type=str,
@@ -411,6 +420,8 @@ if __name__ == "__main__":
         help="Include the last session (completed or active) from the log file\n(logs/micro_x.log) in the snapshot.",
         default=False
     )
+    # Add other arguments if needed in the future
+    
     args = parser.parse_args()
     generated_file = generate_snapshot(summary_message=args.summary, include_logs=args.include_logs)
     if generated_file: print(f"\nSnapshot generation complete. File: {generated_file}")

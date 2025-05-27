@@ -6,6 +6,7 @@ import sys
 import datetime
 import re # Not strictly needed in this version if only doing string replace for sanitization
 import logging
+import argparse # Added for help argument handling
 
 # --- Configuration ---
 RESULTS_DIR_NAME = "pytest_results"
@@ -15,45 +16,64 @@ HOME_DIR_PLACEHOLDER = "<HOME>"
 
 # --- Logging Setup ---
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
-)
+# BasicConfig will be set in if __name__ == "__main__" or by the calling application (micro_X)
 
 def get_project_root():
     """
     Determines the project root directory.
     Assumes this script is in a 'utils' subdirectory of the project root,
-    and the project root contains a 'main.py' or a '.git' directory as fallback.
+    or the project root itself.
     """
     script_path = os.path.abspath(__file__)
-    utils_dir = os.path.dirname(script_path)
-    project_root_candidate1 = os.path.dirname(utils_dir)
+    current_dir_name = os.path.basename(os.path.dirname(script_path))
+    
+    # Candidate 1: Parent of the script's directory (if script is in utils/)
+    project_root_candidate1 = os.path.dirname(os.path.dirname(script_path))
+    # Candidate 2: The script's own directory (if script is in root, e.g. for direct run)
+    project_root_candidate2 = os.path.dirname(script_path)
 
-    # Check criteria
-    if os.path.exists(os.path.join(project_root_candidate1, "main.py")) or \
-       os.path.exists(os.path.join(project_root_candidate1, ".venv")) or \
-       os.path.exists(os.path.join(project_root_candidate1, ".git")):
-        # Don't log the absolute path here, it will be logged by the caller if needed
+    def is_valid_root(path):
+        return os.path.exists(os.path.join(path, "main.py")) or \
+               os.path.exists(os.path.join(path, ".venv")) or \
+               os.path.exists(os.path.join(path, ".git")) or \
+               os.path.isdir(os.path.join(path, "modules")) # Added modules check
+
+    if current_dir_name == "utils" and is_valid_root(project_root_candidate1):
         return project_root_candidate1
+    elif is_valid_root(project_root_candidate2): # If not in utils, check if script_dir is root
+        return project_root_candidate2
+    elif is_valid_root(project_root_candidate1): # Fallback to parent even if not in "utils"
+         return project_root_candidate1
+    else: # Final fallback if no clear indicators
+        logger.warning(f"Could not reliably determine project root from '{script_path}'. Using script's parent directory: {project_root_candidate2}")
+        return project_root_candidate2
 
-    if os.path.exists(os.path.join(utils_dir, "main.py")) or \
-       os.path.exists(os.path.join(utils_dir, ".venv")) or \
-       os.path.exists(os.path.join(utils_dir, ".git")):
-        return utils_dir
-
-    # Fallback, log this warning in the main run_tests function where context is clearer
-    return project_root_candidate1
 
 def sanitize_pytest_output(output_text: str, proj_root: str, user_home: str) -> str:
     """Sanitizes project and home directory paths in pytest output."""
     sanitized_text = output_text
+    # Replace project_root first, as it might be inside home_dir
     sanitized_text = sanitized_text.replace(proj_root, PROJECT_ROOT_PLACEHOLDER)
+    
+    # Only replace home_dir if it's different from project_root and not just "/"
+    # and ensure project_root (now placeholder) isn't part of home_dir string being replaced
     if user_home != "/" and user_home != proj_root:
-        if not proj_root.startswith(user_home + os.sep):
-            sanitized_text = sanitized_text.replace(user_home, HOME_DIR_PLACEHOLDER)
-    if HOME_DIR_PLACEHOLDER not in PROJECT_ROOT_PLACEHOLDER and user_home != "/":
+        # Check if proj_root was a subdirectory of home_dir
+        if proj_root.startswith(user_home + os.sep):
+            # If so, home_dir part would have been replaced if we naively replace user_home
+            # Example: home_dir = /home/user, proj_root = /home/user/project
+            # proj_root becomes <PROJECT_ROOT>
+            # We should not replace "/home/user" with "<HOME>" if it's part of "<PROJECT_ROOT>" original path
+            # This is tricky. The current replacement order (proj_root then home_dir) is generally safer.
+            # We just need to be careful not to re-replace parts of the already replaced proj_root.
+            # A simple string replace of user_home should be okay if PROJECT_ROOT_PLACEHOLDER is unique.
+            pass # Handled by the next replacement if user_home is still in the string
+
+        # Replace user_home if it's still present and distinct
+        # This check ensures we don't replace / if home is /
+        # and also avoids replacing if home_dir was the same as proj_root (already handled)
         sanitized_text = sanitized_text.replace(user_home, HOME_DIR_PLACEHOLDER)
+        
     return sanitized_text
 
 def display_path(abs_path: str, proj_root: str, user_home: str) -> str:
@@ -61,33 +81,35 @@ def display_path(abs_path: str, proj_root: str, user_home: str) -> str:
     if abs_path.startswith(proj_root):
         relative_part = os.path.relpath(abs_path, proj_root)
         return f"{PROJECT_ROOT_PLACEHOLDER}{os.sep}{relative_part}" if relative_part != '.' else PROJECT_ROOT_PLACEHOLDER
-    elif abs_path.startswith(user_home) and user_home != "/": # Added user_home != "/" to avoid replacing root if home is root
+    elif user_home != "/" and abs_path.startswith(user_home) : # Added user_home != "/"
         relative_part = os.path.relpath(abs_path, user_home)
         return f"{HOME_DIR_PLACEHOLDER}{os.sep}{relative_part}" if relative_part != '.' else HOME_DIR_PLACEHOLDER
     return abs_path # Return original if not under project or home, or if logic is complex
 
-def run_tests():
+def run_tests_main_logic():
     """
-    Runs pytest, captures its output, sanitizes paths, and saves the results.
-    Console output from this utility itself will also use anonymized paths.
+    Core logic for running tests and saving results.
+    Returns the pytest exit code.
     """
     project_root = get_project_root()
     home_dir = os.path.expanduser("~")
 
-    # Log the identified project root (once, and clearly marked)
-    logger.info(f"Project root identified. Will be referred to as {PROJECT_ROOT_PLACEHOLDER} in subsequent messages and results.")
-    logger.info(f"Actual project root: {project_root}") # Log it once for debug if needed, console will use placeholder
-    if not (os.path.exists(os.path.join(project_root, "main.py")) or \
-            os.path.exists(os.path.join(project_root, ".venv")) or \
-            os.path.exists(os.path.join(project_root, ".git"))):
-        logger.warning(f"Could not reliably determine project root. Using: {project_root}")
-        # Use display_path for the warning printed to console
-        print(f"Warning: Project root determination might be inaccurate (using {display_path(project_root, project_root, home_dir)}).")
-
-
+    logger.info(f"Project root identified as: {project_root}. Will be referred to as {PROJECT_ROOT_PLACEHOLDER} in subsequent messages and results.")
+    # Log the actual path once for debugging if needed, console will use placeholder
+    logger.debug(f"Actual project root: {project_root}") 
+    
+    # Check for .venv more robustly
     venv_dir_abs = os.path.join(project_root, ".venv")
     pytest_executable_name = "pytest.exe" if sys.platform == "win32" else "pytest"
-    pytest_path_abs = os.path.join(venv_dir_abs, "Scripts" if sys.platform == "win32" else "bin", pytest_executable_name)
+    
+    # Determine pip executable path within venv
+    if sys.platform == "win32":
+        pytest_path_abs = os.path.join(venv_dir_abs, "Scripts", pytest_executable_name)
+        if not os.path.exists(pytest_path_abs): # Fallback for some Windows venv structures
+             pytest_path_abs = os.path.join(venv_dir_abs, "bin", pytest_executable_name)
+    else: # Linux, macOS
+        pytest_path_abs = os.path.join(venv_dir_abs, "bin", pytest_executable_name)
+
 
     results_abs_dir = os.path.join(project_root, RESULTS_DIR_NAME)
     os.makedirs(results_abs_dir, exist_ok=True)
@@ -96,8 +118,7 @@ def run_tests():
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     timestamped_results_file_path_abs = os.path.join(results_abs_dir, f"pytest_results_{timestamp}.txt")
 
-    # Use display_path for console output
-    dp_project_root = PROJECT_ROOT_PLACEHOLDER # Since all project paths will be relative to this
+    dp_project_root = PROJECT_ROOT_PLACEHOLDER 
     dp_pytest_path = display_path(pytest_path_abs, project_root, home_dir)
     dp_fixed_results_file = display_path(fixed_results_file_path_abs, project_root, home_dir)
     dp_timestamped_results_file = display_path(timestamped_results_file_path_abs, project_root, home_dir)
@@ -105,8 +126,8 @@ def run_tests():
     if not os.path.exists(pytest_path_abs):
         logger.error(f"Pytest executable not found at actual path: '{pytest_path_abs}'.")
         print(f"Error: Pytest executable not found at '{dp_pytest_path}'.")
-        print("Please ensure pytest is installed in the virtual environment '.venv'.")
-        sys.exit(2)
+        print("Please ensure pytest is installed in the virtual environment '.venv' (e.g., via setup.sh or by running 'pip install pytest pytest-mock pytest-asyncio' in the activated venv).")
+        return 2 # Pytest's exit code for internal error / setup issue
 
     logger.info(f"Running tests from project root (shown as {dp_project_root})")
     logger.info(f"Pytest executable (shown as {dp_pytest_path})")
@@ -116,6 +137,7 @@ def run_tests():
     print(f"\nRunning tests from: {dp_project_root}")
     print(f"Using Pytest: {dp_pytest_path}")
 
+    # Pytest command: run pytest on the project_root, use short traceback
     pytest_command = [pytest_path_abs, project_root, "--tb=short"]
     
     try:
@@ -123,17 +145,18 @@ def run_tests():
             pytest_command,
             capture_output=True,
             text=True,
-            cwd=project_root,
-            check=False
+            cwd=project_root, # Run pytest from the project root
+            check=False, # We'll check the returncode manually
+            errors='replace' # Replace non-UTF8 chars if any
         )
     except FileNotFoundError:
         logger.error(f"Error: Could not execute pytest. Actual path '{pytest_path_abs}' not found or not executable.")
         print(f"Error: Could not execute pytest. '{dp_pytest_path}' not found or not executable.")
-        sys.exit(3)
+        return 3 # Pytest's exit code for interruption
     except Exception as e:
-        logger.error(f"An unexpected error occurred while trying to run pytest: {e}")
+        logger.error(f"An unexpected error occurred while trying to run pytest: {e}", exc_info=True)
         print(f"An unexpected error occurred while trying to run pytest: {e}")
-        sys.exit(4)
+        return 4 # Pytest's exit code for internal error
 
     raw_stdout = process.stdout
     raw_stderr = process.stderr
@@ -143,13 +166,12 @@ def run_tests():
 
     output_for_file_lines = []
     output_for_file_lines.append(f"pytest execution from micro_X utility ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})\n")
-    # Construct the command string using placeholders for the file output
-    anonymized_pytest_executable = f"{PROJECT_ROOT_PLACEHOLDER}{os.sep}.venv{os.sep}{'Scripts' if sys.platform == 'win32' else 'bin'}{os.sep}{pytest_executable_name}"
-    output_for_file_lines.append(f"Command: {anonymized_pytest_executable} {PROJECT_ROOT_PLACEHOLDER} --tb=short\n")
+    
+    anonymized_pytest_executable_for_display = display_path(pytest_path_abs, project_root, home_dir)
+    output_for_file_lines.append(f"Command: {anonymized_pytest_executable_for_display} {PROJECT_ROOT_PLACEHOLDER} --tb=short\n")
     output_for_file_lines.append(f"Return Code: {process.returncode}\n")
-    # Modified lines to not include the actual paths in the file:
     output_for_file_lines.append(f"Note: Actual project root path has been replaced with: {PROJECT_ROOT_PLACEHOLDER}\n")
-    if home_dir != "/" and home_dir != project_root : # Check if home_dir is distinct and not root
+    if home_dir != "/" and home_dir != project_root : 
         output_for_file_lines.append(f"Note: Actual home directory path has been replaced with: {HOME_DIR_PLACEHOLDER}\n")
     
     output_for_file_lines.append("\n--- STDOUT ---\n")
@@ -188,7 +210,27 @@ def run_tests():
     print(f"  - Archive: {dp_timestamped_results_file}")
     print("---------------------------------")
 
-    sys.exit(process.returncode)
+    return process.returncode
+
 
 if __name__ == "__main__":
-    run_tests()
+    # Setup basic logging for direct script execution
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
+    )
+
+    parser = argparse.ArgumentParser(
+        description="Run pytest for the micro_X project and save sanitized results.",
+        epilog="This script is typically run via '/utils run_tests' from within the micro_X shell, "
+               "or directly for development purposes. It expects pytest to be installed in the '.venv' "
+               "of the project root."
+    )
+    # This script doesn't take functional arguments other than -h/--help for now.
+    # If arguments were to be added (e.g., to pass to pytest), they'd be defined here.
+    # parser.add_argument("--pytest-args", help="Additional arguments to pass to pytest", nargs=argparse.REMAINDER)
+    
+    args = parser.parse_args() # Handles -h/--help
+
+    exit_code = run_tests_main_logic()
+    sys.exit(exit_code)

@@ -2,6 +2,8 @@
 
 import os
 import fnmatch # Added for robust pattern matching
+import argparse # Added for help argument handling
+import sys # Added to exit if path is not a directory
 
 def _generate_recursive(current_path, prefix, ignore_dirs, ignore_files, 
                         pipe_segment, space_segment, entry_connector_dir, entry_connector_file,
@@ -123,6 +125,17 @@ def generate_file_tree(startpath, output_filepath, display_root_name="micro_X", 
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Generate a directory tree structure for the micro_X project.",
+        epilog="This script is typically run from the '/utils list' or '/utils generate_tree' command within the micro_X shell."
+    )
+    # Add a dummy argument if you want to allow -h/--help but not other args
+    # Or, if you plan to add arguments later, define them here.
+    # For now, just having argparse will enable -h/--help.
+    # parser.add_argument("--output", default="project_tree.txt", help="Output filename (default: project_tree.txt)")
+    
+    args = parser.parse_args() # This will handle -h/--help
+
     script_location_dir = os.path.dirname(os.path.abspath(__file__))
     
     # Determine project root (assuming script is in 'utils' or project root)
@@ -139,7 +152,7 @@ if __name__ == "__main__":
         project_root = project_root_candidate
 
     # Define the output file path
-    output_filename = "project_tree.txt"
+    output_filename = "project_tree.txt" # Keep this fixed for now, or use args.output if defined
     output_file_full_path = os.path.join(project_root, output_filename)
 
     desired_root_display_name = "micro_X" # This is the name displayed at the top of the tree
@@ -169,3 +182,4 @@ if __name__ == "__main__":
         print(f"\nGeneration complete. Tree saved in: {output_file_full_path}")
     else:
         print("\nTree generation failed or could not be saved.")
+        sys.exit(1)

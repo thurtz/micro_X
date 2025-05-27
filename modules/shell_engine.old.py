@@ -296,7 +296,7 @@ class ShellEngine:
                         try: os.remove(log_path)
                         except OSError as e_del: logger.error(f"Error deleting tmux log {log_path}: {e_del}")
                 elif window_closed_or_cmd_done: # Window closed, no log file found
-                     append_output_func(f"Output from '{original_user_input_display}': (Tmux window closed, no log found)", style_class='info')
+                        append_output_func(f"Output from '{original_user_input_display}': (Tmux window closed, no log found)", style_class='info')
 
                 if not output_captured_from_log and not window_closed_or_cmd_done: # Timeout and no log
                     append_output_func(f"Output from '{original_user_input_display}': (Tmux window may still be running or timed out without output)", style_class='warning')
@@ -412,13 +412,13 @@ class ShellEngine:
             ('class:help-text', "Welcome to micro_X! An intelligent shell that blends traditional command execution with AI capabilities.\n"),
             ('class:help-header', "\nAvailable Commands:\n"),
             ('class:help-command', "  /ai <query>             "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
-            ('class:help-example', "                              Example: /ai list all text files in current folder\n"),
+            ('class:help-example', "                           Example: /ai list all text files in current folder\n"),
             ('class:help-command', "  /command <subcommand>   "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
-            ('class:help-example', "                              Type '/command help' for detailed options.\n"),
+            ('class:help-example', "                           Type '/command help' for detailed options.\n"),
             ('class:help-command', "  /ollama <subcommand>    "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"),
-            ('class:help-example', "                              Type '/ollama help' for detailed options.\n"),
+            ('class:help-example', "                           Type '/ollama help' for detailed options.\n"),
             ('class:help-command', "  /utils <script> [args]  "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
-            ('class:help-example', "                              Type '/utils list' or '/utils help' for available scripts.\n"),
+            ('class:help-example', "                           Type '/utils list' or '/utils help' for available scripts.\n"),
             ('class:help-command', "  /update                 "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
             ('class:help-command', "  /help                   "), ('class:help-description', "- Display this help message.\n"),
             ('class:help-command', "  exit | quit             "), ('class:help-description', "- Exit the micro_X shell.\n"),
@@ -555,14 +555,15 @@ class ShellEngine:
 
     async def handle_built_in_command(self, user_input: str) -> bool:
         """
-        Handles built-in commands like /help, exit, /update, /utils, /ollama.
+        Handles built-in commands like /help, exit, /update, /utils, /ollama, and /command.
         Returns True if the command was handled, False otherwise.
         """
         user_input_stripped = user_input.strip()
         logger.info(f"ShellEngine.handle_built_in_command received: '{user_input_stripped}'")
 
         if user_input_stripped.lower() in {"/help", "help"}:
-            self._display_general_help(); return True
+            self._display_general_help()
+            return True
         elif user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
             self.ui_manager.append_output("Exiting micro_X Shell 🚪", style_class='info')
             logger.info("Exit command received from built-in handler.")
@@ -572,10 +573,12 @@ class ShellEngine:
                 if app_instance and app_instance.is_running: app_instance.exit()
             return True
         elif user_input_stripped.lower() == "/update":
-            await self._handle_update_command(); return True
-        elif user_input_stripped.startswith("/utils"):
-            await self._handle_utils_command_async(user_input_stripped); return True
-        elif user_input_stripped.startswith("/ollama"):
+            await self._handle_update_command()
+            return True
+        elif user_input_stripped.startswith("/utils"): # No space needed after /utils for this check
+            await self._handle_utils_command_async(user_input_stripped)
+            return True
+        elif user_input_stripped.startswith("/ollama"): # No space needed after /ollama
             try:
                 parts = user_input_stripped.split() # Simple split for /ollama commands
                 await self._handle_ollama_command_async(parts)
@@ -583,6 +586,30 @@ class ShellEngine:
                 self.ui_manager.append_output(f"❌ Error processing /ollama command: {e}", style_class='error')
                 logger.error(f"Error in /ollama command '{user_input_stripped}': {e}", exc_info=True)
             return True
+        elif user_input_stripped.startswith("/command"): # Check for /command prefix
+            logger.info(f"Handling /command subsystem input: {user_input_stripped}")
+            if not self.category_manager_module:
+                logger.error("Category Manager module not available to handle /command.")
+                self.ui_manager.append_output("❌ Internal Error: Command subsystem not available.", style_class='error')
+                return True # Still handled, albeit with an error
+
+            action_result = self.category_manager_module.handle_command_subsystem_input(user_input_stripped)
+            
+            if isinstance(action_result, dict) and action_result.get('action') == 'force_run':
+                command_to_run = action_result['command']
+                forced_category = action_result['category']
+                logger.info(f"/command run: Forcing execution of '{command_to_run}' as '{forced_category}'")
+                # process_command is async, and so is handle_built_in_command
+                await self.process_command(
+                    command_str_original=command_to_run,
+                    original_user_input_for_display=user_input_stripped, # Use the full /command run ... string
+                    forced_category=forced_category,
+                    is_ai_generated=False # It's a user-directed force run
+                )
+            # If action_result is None, category_manager handled it (e.g., printed help/list, or error)
+            # and no further ShellEngine action is needed beyond what category_manager did.
+            return True # Command was handled by the /command subsystem
+            
         return False # Not a built-in command handled here
 
     async def process_command(self, command_str_original: str, original_user_input_for_display: str,
@@ -649,9 +676,9 @@ class ShellEngine:
                 if category == self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
                     logger.info(f"Command '{command_for_classification}' uncategorized. Starting interactive flow via UIManager.")
                     if not self.main_normal_input_accept_handler_ref: 
-                         logger.error("CRITICAL: main_normal_input_accept_handler_ref is None in ShellEngine. Cannot proceed with categorization's modify option correctly.")
-                         append_output_func("❌ Internal Error: Cannot handle command modification during categorization. Please restart.", style_class='error')
-                         return
+                        logger.error("CRITICAL: main_normal_input_accept_handler_ref is None in ShellEngine. Cannot proceed with categorization's modify option correctly.")
+                        append_output_func("❌ Internal Error: Cannot handle command modification during categorization. Please restart.", style_class='error')
+                        return
 
                     categorization_result = await self.ui_manager.start_categorization_flow(
                         command_for_classification, ai_raw_candidate, original_direct_input_if_different
@@ -679,7 +706,7 @@ class ShellEngine:
             if command_str_original != command_to_execute_expanded:
                 logger.info(f"Expanded command: '{command_to_execute_expanded}' (original: '{command_str_original}')")
                 if command_to_execute_expanded != command_for_classification and command_to_execute_expanded != command_to_be_added_if_new:
-                     append_output_func(f"Expanded for execution: {command_to_execute_expanded}", style_class='info')
+                    append_output_func(f"Expanded for execution: {command_to_execute_expanded}", style_class='info')
 
             command_to_execute_sanitized = self.sanitize_and_validate(command_to_execute_expanded, original_user_input_for_display)
             if not command_to_execute_sanitized:
@@ -767,29 +794,33 @@ class ShellEngine:
                 if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref() 
             return # End processing for /ai command
 
-        # Handle built-in commands (excluding /ai which is handled above)
-        # These are checked before from_edit_mode logic for non-/ai commands.
-        if await self.handle_built_in_command(user_input_stripped):
-            # Built-in command was handled. If it came from edit mode, UI restoration is managed by
-            # the finally block in main.normal_input_accept_handler or by specific built-ins like 'cd'.
-            return
+        # Built-in commands (like cd, /command, /help, etc.) are handled by main.normal_input_accept_handler
+        # calling ShellEngine.handle_built_in_command *before* calling this submit_user_input method.
+        # So, if we reach here, it means it was NOT a built-in command handled by that initial check
+        # (unless it's /ai, which is explicitly handled above in this method).
 
-        # If input is from edit mode (and not /ai or other built-in), process it directly as a command
+        # If input is from edit mode (and not /ai, which was handled above), process it directly as a command.
+        # Other built-ins would have been caught by handle_built_in_command before submit_user_input was called.
         if from_edit_mode:
-            logger.info(f"Input '{user_input_stripped}' is from edit mode and not a built-in. Processing directly.")
+            logger.info(f"Input '{user_input_stripped}' is from edit mode and not an /ai command. Processing directly.")
             await self.process_command(user_input_stripped, user_input_stripped, 
                                        ai_raw_candidate=None, 
                                        original_direct_input_if_different=None, 
                                        is_ai_generated=False) # is_ai_generated is False because user edited it.
-            # UI restoration is handled by main.normal_input_accept_handler's finally block.
+            # UI restoration for edit mode is handled by main.normal_input_accept_handler's finally block.
             return
 
-        # --- Logic for fresh input (not from_edit_mode, not /ai, not other built-in) ---
+        # --- Logic for fresh input (not from_edit_mode, not /ai, not other built-in like /command, /help etc.) ---
         logger.debug(f"submit_user_input: Processing fresh direct command: '{user_input_stripped}'")
+        
+        # This input is not /ai, not from edit mode, and was not caught by handle_built_in_command.
+        # This is where a direct OS command (e.g., "ls -l") or an unknown command/phrase would land.
+        
         category = self.category_manager_module.classify_command(user_input_stripped)
         logger.debug(f"submit_user_input: classify_command returned: '{category}' for command '{user_input_stripped}'")
 
         if category != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
+            # Command is known and categorized (e.g., "ls -l" is in default_command_categories.json)
             logger.debug(f"Fresh direct input '{user_input_stripped}' is known: '{category}'.")
             await self.process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
         else: # Command is unknown, try AI validation / NL translation
@@ -799,6 +830,7 @@ class ShellEngine:
                 self.ui_manager.append_output(f"⚠️ Ollama service not available for validation.", style_class='warning')
                 self.ui_manager.append_output(f"   Attempting direct categorization or try '/ollama status' or '/ollama start'.", style_class='info')
                 logger.warning(f"Ollama service not ready. Skipping AI validation for '{user_input_stripped}'.")
+                # Proceed to process_command, which will trigger categorization flow for unknown command
                 await self.process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
                 return
 
