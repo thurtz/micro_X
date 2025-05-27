@@ -178,7 +178,10 @@ config/user_command_categories.json
 micro_x_context_snapshot_*.txt
 # micro_x_context_snapshot.txt # If using the non-timestamped version
 
+# Generated files that should not break integrity checks
+project_tree.txt
+pytest_results/pytest_results.txt # Add this specific path
+
 # pytest results
-pytest_results.txt
 pytest_results/pytest_results_*.txt
 
