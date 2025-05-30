@@ -2,7 +2,6 @@
 
 # Script to set up the micro_X environment on Linux Mint
 # MODIFIED to be called from a root setup.sh and accept PROJECT_ROOT
-# MODIFIED to create branch-specific .desktop files
 
 echo "--- micro_X Setup Script for Linux Mint (OS-Specific) ---"
 echo ""
@@ -72,22 +71,6 @@ else
     echo "tmux is already installed."
 fi
 
-# Git (needed for branch detection for .desktop file)
-echo "Checking for git..."
-if ! command_exists git; then
-    echo "git not found. Attempting to install..."
-    sudo apt update
-    sudo apt install -y git
-    if ! command_exists git; then
-        echo "ERROR: Failed to install git. Please install it manually. Branch-specific desktop entry might not be created."
-        # Not exiting, as core functionality might still work, but desktop entry will be generic.
-    else
-        echo "git installed."
-    fi
-else
-    echo "git is already installed."
-fi
-
 # Ollama
 echo "Checking for Ollama..."
 if ! command_exists ollama; then
@@ -139,14 +122,14 @@ echo ""
 echo "--- Setting up Python Environment for micro_X ---"
 
 # Check if main.py exists in the PROJECT_ROOT
-if [ ! -f "$PROJECT_ROOT/main.py" ]; then
+if [ ! -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
     echo "ERROR: main.py not found in the project root ($PROJECT_ROOT)."
     echo "Please ensure the main setup.sh script is run from the correct project root."
     exit 1
 fi
 
 # Create a Virtual Environment in PROJECT_ROOT
-VENV_DIR="$PROJECT_ROOT/.venv"
+VENV_DIR="$PROJECT_ROOT/.venv" # MODIFIED
 if [ -d "$VENV_DIR" ]; then
     echo "Virtual environment '$VENV_DIR' already exists. Skipping creation."
 else
@@ -160,7 +143,7 @@ else
 fi
 
 # Create requirements.txt if it doesn't exist in PROJECT_ROOT
-REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt"
+REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt" # MODIFIED
 if [ ! -f "$REQUIREMENTS_FILE" ]; then
     echo "Creating $REQUIREMENTS_FILE..."
     cat <<EOF > "$REQUIREMENTS_FILE"
@@ -185,14 +168,14 @@ echo ""
 
 # --- 4. Make Scripts Executable & Handle Desktop File ---
 echo "--- Finalizing Scripts & Desktop Entry ---"
-if [ -f "$PROJECT_ROOT/main.py" ]; then
-    chmod +x "$PROJECT_ROOT/main.py"
+if [ -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
+    chmod +x "$PROJECT_ROOT/main.py" # MODIFIED
     echo "main.py is now executable."
 else
     echo "WARNING: main.py not found, cannot make executable."
 fi
 
-MICRO_X_LAUNCHER_SH="$PROJECT_ROOT/micro_X.sh"
+MICRO_X_LAUNCHER_SH="$PROJECT_ROOT/micro_X.sh" # MODIFIED
 if [ -f "$MICRO_X_LAUNCHER_SH" ]; then
     chmod +x "$MICRO_X_LAUNCHER_SH"
     echo "micro_X.sh is now executable."
@@ -200,84 +183,50 @@ else
     echo "INFO: micro_X.sh (launch script) not found. If you have one, ensure it's executable."
 fi
 
-DESKTOP_FILE_TEMPLATE_SOURCE="$PROJECT_ROOT/micro_X.desktop"
-if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ]; then
-    echo "Found desktop entry template: $DESKTOP_FILE_TEMPLATE_SOURCE."
+DESKTOP_FILE_SOURCE="$PROJECT_ROOT/micro_X.desktop" # MODIFIED
+if [ -f "$DESKTOP_FILE_SOURCE" ]; then
+    echo "Found $DESKTOP_FILE_SOURCE."
 
-    read -p "Do you want to install a desktop entry to your local applications menu? (y/N) " install_desktop_choice
+    read -p "Do you want to install the $DESKTOP_FILE_SOURCE to your local applications menu? (y/N) " install_desktop_choice
     if [[ "$install_desktop_choice" =~ ^[Yy]$ ]]; then
         LOCAL_APPS_DIR="$HOME/.local/share/applications"
         mkdir -p "$LOCAL_APPS_DIR"
 
-        CURRENT_BRANCH_NAME="unknown"
-        SANITIZED_BRANCH_NAME="unknown"
-
-        if command_exists git && [ -d "$PROJECT_ROOT/.git" ]; then
-            BRANCH_OUTPUT=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)
-            if [ $? -eq 0 ] && [ -n "$BRANCH_OUTPUT" ] && [ "$BRANCH_OUTPUT" != "HEAD" ]; then
-                SANITIZED_BRANCH_NAME=$(echo "$BRANCH_OUTPUT" | sed 's/\//_/g' | sed 's/[^a-zA-Z0-9_-]//g')
-                if [ -n "$SANITIZED_BRANCH_NAME" ]; then
-                    CURRENT_BRANCH_NAME="$SANITIZED_BRANCH_NAME"
-                fi
-            elif [ "$BRANCH_OUTPUT" == "HEAD" ]; then # Handle detached HEAD state
-                CURRENT_BRANCH_NAME="detached" # Or perhaps a short commit hash
-            fi
-        fi
-
-        DESKTOP_FILENAME_BASE="micro_x" # Base for the .desktop filename
-        APP_NAME_BASE="micro_X"       # Base for the Name= field
-        FINAL_DESKTOP_FILENAME="${DESKTOP_FILENAME_BASE}.desktop" # Default filename
-        FINAL_DISPLAY_NAME="$APP_NAME_BASE"                     # Default display name
-        FINAL_COMMENT="Launch micro_X AI Shell"                 # Default comment
-
-        if [ "$CURRENT_BRANCH_NAME" != "unknown" ]; then
-            FINAL_DESKTOP_FILENAME="${DESKTOP_FILENAME_BASE}_${CURRENT_BRANCH_NAME}.desktop"
-            FINAL_DISPLAY_NAME="${APP_NAME_BASE} (${CURRENT_BRANCH_NAME})"
-            FINAL_COMMENT="Launch micro_X AI Shell (${CURRENT_BRANCH_NAME} branch)"
-        fi
-        
-        FINAL_DESKTOP_FILE_PATH="$LOCAL_APPS_DIR/$FINAL_DESKTOP_FILENAME"
-
         TEMP_DESKTOP_FILE=$(mktemp)
-        cp "$DESKTOP_FILE_TEMPLATE_SOURCE" "$TEMP_DESKTOP_FILE"
+        cp "$DESKTOP_FILE_SOURCE" "$TEMP_DESKTOP_FILE"
 
-        # Ensure Exec path in .desktop file points to micro_X.sh in THIS PROJECT_ROOT
-        # The MICRO_X_LAUNCHER_SH variable already holds the correct absolute path.
+        # Ensure Exec path in .desktop file points to micro_X.sh in PROJECT_ROOT
         ESCAPED_LAUNCHER_PATH=$(echo "$MICRO_X_LAUNCHER_SH" | sed 's/\//\\\//g') # Escape slashes for sed
-        sed -i "s|^Exec=.*|Exec=\"$ESCAPED_LAUNCHER_PATH\"|" "$TEMP_DESKTOP_FILE"
+        sed -i "s/^Exec=.*/Exec=\"$ESCAPED_LAUNCHER_PATH\"/" "$TEMP_DESKTOP_FILE"
         
-        # Update Name and Comment fields
-        sed -i "s|^Name=.*|Name=$FINAL_DISPLAY_NAME|" "$TEMP_DESKTOP_FILE"
-        sed -i "s|^Comment=.*|Comment=$FINAL_COMMENT|" "$TEMP_DESKTOP_FILE"
-        
-        # If an Icon field exists and needs to be made absolute (assuming icon is in PROJECT_ROOT)
-        # Example: Icon=micro_x_icon.png
-        # if grep -q "^Icon=" "$TEMP_DESKTOP_FILE" && ! grep -q "^Icon=/" "$TEMP_DESKTOP_FILE" && ! grep -q "^Icon=~" "$TEMP_DESKTOP_FILE"; then
+        # Example for updating Icon path if it's relative and icon is in PROJECT_ROOT
+        # Assuming Icon=some_icon.png and the icon is in $PROJECT_ROOT/assets/some_icon.png
+        # This part needs to be adapted if you have an icon and know its relative path
+        # For now, we assume Exec is the main thing to fix.
+        # If Icon line exists and is relative (does not start with / or ~)
+        # if grep -q "^Icon=[^/~]" "$TEMP_DESKTOP_FILE"; then
         #    ICON_NAME=$(grep "^Icon=" "$TEMP_DESKTOP_FILE" | cut -d'=' -f2)
-        #    ABSOLUTE_ICON_PATH="$PROJECT_ROOT/$ICON_NAME" # Adjust if icon is in a subdir like assets/
-        #    if [ -f "$ABSOLUTE_ICON_PATH" ]; then
-        #        ESCAPED_PROJECT_ROOT_ICON_PATH=$(echo "$ABSOLUTE_ICON_PATH" | sed 's/\//\\\//g')
-        #        sed -i "s|^Icon=.*|Icon=$ESCAPED_PROJECT_ROOT_ICON_PATH|" "$TEMP_DESKTOP_FILE"
-        #        echo "Updated Icon path in .desktop file to be absolute: $ABSOLUTE_ICON_PATH"
-        #    else
-        #        echo "Warning: Icon '$ICON_NAME' specified in template but not found at '$ABSOLUTE_ICON_PATH'. Using original Icon line."
-        #    fi
+        #    ESCAPED_PROJECT_ROOT_ICON_PATH=$(echo "$PROJECT_ROOT/$ICON_NAME" | sed 's/\//\\\//g')
+        #    sed -i "s/^Icon=.*/Icon=$ESCAPED_PROJECT_ROOT_ICON_PATH/" "$TEMP_DESKTOP_FILE"
+        #    echo "Updated Icon path in .desktop file to be absolute: $PROJECT_ROOT/$ICON_NAME"
         # fi
 
-        echo "Copying modified desktop entry to $FINAL_DESKTOP_FILE_PATH..."
-        cp "$TEMP_DESKTOP_FILE" "$FINAL_DESKTOP_FILE_PATH"
-        rm "$TEMP_DESKTOP_FILE"
+
+        echo "Copying modified $DESKTOP_FILE_SOURCE to $LOCAL_APPS_DIR/micro_X.desktop..."
+        cp "$TEMP_DESKTOP_FILE" "$LOCAL_APPS_DIR/micro_X.desktop"
+        rm "$TEMP_DESKTOP_FILE" 
 
         if command_exists update-desktop-database; then
             echo "Updating desktop database..."
             update-desktop-database "$LOCAL_APPS_DIR"
         fi
-        echo "Desktop entry '$FINAL_DISPLAY_NAME' installed. You should find it in your application menu."
+        echo "micro_X.desktop installed. You should find 'micro_X' in your application menu."
     else
-        echo "Skipping installation of desktop entry to applications menu."
+        echo "Skipping installation of $DESKTOP_FILE_SOURCE to applications menu."
+        echo "You can manually copy and modify it to $HOME/.local/share/applications/ or /usr/share/applications/ later if desired."
     fi
 else
-    echo "INFO: $DESKTOP_FILE_TEMPLATE_SOURCE template not found. No desktop entry will be installed."
+    echo "INFO: $DESKTOP_FILE_SOURCE not found. No desktop entry will be installed."
 fi
 echo ""
 
@@ -285,16 +234,16 @@ echo ""
 echo "--- Setup Complete! ---"
 echo ""
 echo "To run micro_X:"
-if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ] && [[ "$install_desktop_choice" =~ ^[Yy]$ ]]; then
-    echo "1. Look for '$FINAL_DISPLAY_NAME' in your desktop application menu."
+if [ -f "$DESKTOP_FILE_SOURCE" ] && [[ "$install_desktop_choice" =~ ^[Yy]$ ]]; then
+    echo "1. Look for 'micro_X' in your desktop application menu."
     echo "   (It might take a few moments or a logout/login for it to appear)."
 fi
 echo "2. Alternatively, from the terminal:"
-echo "   If you have micro_X.sh in the project root ($PROJECT_ROOT):"
-echo "     cd \"$PROJECT_ROOT\" && ./micro_X.sh"
+echo "   If you have micro_X.sh in the project root ($PROJECT_ROOT):" # MODIFIED
+echo "     cd \"$PROJECT_ROOT\" && ./micro_X.sh" # MODIFIED
 echo ""
 echo "   If running main.py directly (micro_X.sh usually handles this):"
-echo "   a. Navigate to the project directory: cd \"$PROJECT_ROOT\""
+echo "   a. Navigate to the project directory: cd \"$PROJECT_ROOT\"" # MODIFIED
 echo "   b. Activate the virtual environment: source $VENV_DIR/bin/activate"
 echo "   c. Run the main Python script: ./main.py (or python3 main.py)"
 echo ""
