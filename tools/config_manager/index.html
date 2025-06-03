@@ -33,13 +33,14 @@
             transition: max-height 0.3s ease-out;
         }
         .accordion-content.open {
-            max-height: 1000px; /* Adjust as needed */
+            max-height: 1000px; /* Adjust as needed for content */
         }
-        /* Ensure tooltips are visible - Styling primarily handled by Flowbite or direct classes */
+        /* Ensure tooltips are positioned correctly if not fully handled by Flowbite default */
         [data-tooltip-target] {
-            position: relative; /* Needed for tooltip positioning */
+            position: relative; 
         }
-        /* Basic tooltip visibility, Flowbite will handle the rest */
+        /* Basic tooltip visibility, Flowbite will handle the rest of the styling.
+           The classes for styling are applied directly to the tooltip div in the HTML. */
         .tooltip {
             transition: opacity 0.3s;
         }
@@ -50,9 +51,11 @@
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
     
+    <!-- Header -->
     <header class="bg-gray-800 shadow-md p-4">
         <div class="container mx-auto flex justify-between items-center">
             <h1 class="text-2xl font-bold text-blue-400">micro_X Configuration Manager</h1>
+            <!-- Global Actions -->
             <div class="flex space-x-2">
                 <button id="autoLoadBtn" class="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg text-sm transition duration-150" data-tooltip-target="tooltip-auto-load">Auto-Load from Project</button>
                 <div id="tooltip-auto-load" role="tooltip" class="absolute z-10 invisible inline-block px-3 py-2 text-sm font-medium text-white transition-opacity duration-300 bg-gray-900 rounded-lg shadow-sm opacity-0 tooltip dark:bg-gray-700">
@@ -65,9 +68,11 @@
         </div>
     </header>
 
+    <!-- Main Content -->
     <main class="container mx-auto p-4 flex-grow">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             
+            <!-- User Config JSON Section -->
             <section id="userConfigSection" class="bg-gray-800 p-6 rounded-lg shadow-xl">
                 <h2 class="text-xl font-semibold mb-4 text-blue-300 border-b border-gray-700 pb-2">User General Configuration (`user_config.json`)</h2>
                 <div class="space-y-4">
@@ -81,10 +86,18 @@
                     <div id="userConfigEditor" class="space-y-3 p-3 bg-gray-700 rounded-md min-h-[200px]">
                         <p class="text-gray-400 text-sm">Upload a `user_config.json` file to view and edit its settings, or generate a new one.</p>
                     </div>
-                    <button id="downloadUserConfigBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50" disabled>Download `user_config.json`</button>
+                    <div class="flex gap-2 mt-4">
+                        <button id="downloadUserConfigBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50" disabled>Download File</button>
+                        <button id="saveUserConfigToProjectBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50" disabled data-tooltip-target="tooltip-save-project">Save to Project</button>
+                        <div id="tooltip-save-project" role="tooltip" class="absolute z-10 invisible inline-block px-3 py-2 text-sm font-medium text-white transition-opacity duration-300 bg-gray-900 rounded-lg shadow-sm opacity-0 tooltip dark:bg-gray-700">
+                           Saves to micro_X/config/ via local server. Requires server to be running.
+                           <div class="tooltip-arrow" data-popper-arrow></div>
+                       </div>
+                    </div>
                 </div>
             </section>
 
+            <!-- User Command Categories JSON Section -->
             <section id="userCommandCategoriesSection" class="bg-gray-800 p-6 rounded-lg shadow-xl">
                 <h2 class="text-xl font-semibold mb-4 text-blue-300 border-b border-gray-700 pb-2">User Command Categories (`user_command_categories.json`)</h2>
                 <div class="space-y-4">
@@ -98,10 +111,14 @@
                     <div id="userCategoriesEditor" class="space-y-3 p-3 bg-gray-700 rounded-md min-h-[200px]">
                         <p class="text-gray-400 text-sm">Upload a `user_command_categories.json` file to manage your custom command categorizations, or generate a new one.</p>
                     </div>
-                    <button id="downloadUserCategoriesBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50" disabled>Download `user_command_categories.json`</button>
+                    <div class="flex gap-2 mt-4">
+                        <button id="downloadUserCategoriesBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50" disabled>Download File</button>
+                        <button id="saveUserCategoriesToProjectBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50" disabled data-tooltip-target="tooltip-save-project">Save to Project</button>
+                    </div>
                 </div>
             </section>
             
+            <!-- Default Configs Viewer Section (Optional) -->
             <section id="defaultConfigsViewerSection" class="md:col-span-2 bg-gray-800 p-6 rounded-lg shadow-xl">
                 <h2 class="text-xl font-semibold mb-4 text-yellow-300 border-b border-gray-700 pb-2">Default Configurations (Reference)</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -123,10 +140,12 @@
             </section>
         </div>
 
+        <!-- Message Area for feedback -->
         <div id="messageArea" class="mt-6 p-3 bg-gray-700 text-gray-300 rounded-lg text-sm hidden"></div>
 
     </main>
 
+    <!-- Footer -->
     <footer class="bg-gray-800 text-center p-4 mt-auto">
         <p class="text-sm text-gray-400">&copy; 2025 micro_X Configuration Manager. For use with the micro_X Shell project.</p>
     </footer>
@@ -138,28 +157,28 @@
             }
             console.log("micro_X Config Manager UI Initialized (CSS @apply removed)");
 
-            // HTML Elements References (ensure all are captured)
+            // HTML Elements References
             const userConfigFileInput = document.getElementById('userConfigFile');
             const downloadUserConfigBtn = document.getElementById('downloadUserConfigBtn');
+            const saveUserConfigToProjectBtn = document.getElementById('saveUserConfigToProjectBtn');
             const userConfigEditor = document.getElementById('userConfigEditor');
             const generateNewUserConfigBtn = document.getElementById('generateNewUserConfigBtn');
 
             const userCategoriesFileInput = document.getElementById('userCategoriesFile');
             const downloadUserCategoriesBtn = document.getElementById('downloadUserCategoriesBtn');
+            const saveUserCategoriesToProjectBtn = document.getElementById('saveUserCategoriesToProjectBtn');
             const userCategoriesEditor = document.getElementById('userCategoriesEditor');
             const generateNewUserCategoriesBtn = document.getElementById('generateNewUserCategoriesBtn');
-
-            const defaultConfigFileInput = document.getElementById('defaultConfigFile');
-            const defaultConfigViewer = document.getElementById('defaultConfigViewer');
-            const defaultCategoriesFileInput = document.getElementById('defaultCategoriesFile');
-            const defaultCategoriesViewer = document.getElementById('defaultCategoriesViewer');
             
             const autoLoadBtn = document.getElementById('autoLoadBtn');
             const loadDefaultsBtn = document.getElementById('loadDefaultsBtn');
             const resetAllBtn = document.getElementById('resetAllBtn');
             const messageArea = document.getElementById('messageArea');
+            const defaultConfigFileInput = document.getElementById('defaultConfigFile');
+            const defaultConfigViewer = document.getElementById('defaultConfigViewer');
+            const defaultCategoriesFileInput = document.getElementById('defaultCategoriesFile');
+            const defaultCategoriesViewer = document.getElementById('defaultCategoriesViewer');
 
-            // --- Global State ---
             let userConfigData = null;
             let userCategoriesData = null;
             let defaultGeneralConfigData = null; 
@@ -260,7 +279,7 @@
                 console.log(`Updated userConfigData.${pathArray.join('.')}${pathArray.length > 0 ? '.' : ''}${key} = `, value);
             }
 
-            function handleFileUpload(fileInput, dataStoreSetter, editorElement, downloadButton, configType, isDefaultViewer = false) {
+            function handleFileUpload(fileInput, dataStoreSetter, editorElement, downloadButton, saveToProjectButton, configType, isDefaultViewer = false) {
                 fileInput.addEventListener('change', (event) => {
                     const file = event.target.files[0];
                     if (file) {
@@ -278,6 +297,7 @@
                                         renderUserCommandCategoriesEditor(editorElement, jsonData);
                                     }
                                     if(downloadButton) downloadButton.disabled = false;
+                                    if(saveToProjectButton) saveToProjectButton.disabled = false; 
                                 }
                                 showMessage(`${file.name} loaded successfully.`, 'success');
                             } catch (error) {
@@ -285,7 +305,10 @@
                                 showMessage(`Error parsing ${file.name}: ${error.message}`, 'error');
                                 dataStoreSetter(null);
                                 editorElement.innerHTML = `<p class="text-red-400 text-sm">Failed to load or parse ${file.name}. Ensure it's valid JSON.</p>`;
-                                if (!isDefaultViewer && downloadButton) downloadButton.disabled = true;
+                                if (!isDefaultViewer) {
+                                    if(downloadButton) downloadButton.disabled = true;
+                                    if(saveToProjectButton) saveToProjectButton.disabled = true;
+                                }
                             }
                         };
                         reader.readAsText(file);
@@ -666,33 +689,27 @@
             }
             
             // --- Event Listeners ---
-            handleFileUpload(userConfigFileInput, (data) => userConfigData = data, userConfigEditor, downloadUserConfigBtn, 'userConfig');
-            handleFileUpload(userCategoriesFileInput, (data) => userCategoriesData = data, userCategoriesEditor, downloadUserCategoriesBtn, 'userCategories');
-            handleFileUpload(defaultConfigFileInput, (data) => defaultGeneralConfigData = data, defaultConfigViewer, null, 'defaultConfig', true); 
-            handleFileUpload(defaultCategoriesFileInput, (data) => defaultCommandCategoriesData = data, defaultCategoriesViewer, null, 'defaultCategories', true);
+            handleFileUpload(userConfigFileInput, (data) => userConfigData = data, userConfigEditor, downloadUserConfigBtn, saveUserConfigToProjectBtn, 'userConfig');
+            handleFileUpload(userCategoriesFileInput, (data) => userCategoriesData = data, userCategoriesEditor, downloadUserCategoriesBtn, saveUserCategoriesToProjectBtn, 'userCategories');
+            handleFileUpload(defaultConfigFileInput, (data) => defaultGeneralConfigData = data, defaultConfigViewer, null, null, 'defaultConfig', true); 
+            handleFileUpload(defaultCategoriesFileInput, (data) => defaultCommandCategoriesData = data, defaultCategoriesViewer, null, null, 'defaultCategories', true);
 
             generateNewUserConfigBtn.addEventListener('click', () => {
                 console.log("Generate New User Config button clicked.");
-                // confirm() removed for sandbox compatibility
-                // if (confirm("Are you sure you want to generate a new user_config.json template? This will replace any current user config view.")) {
-                    console.log("User confirmed (or confirm skipped) for new user config.");
-                    userConfigData = JSON.parse(JSON.stringify(PRELOADED_DEFAULT_CONFIG)); 
-                    renderUserConfigEditor(userConfigEditor, userConfigData);
-                    downloadUserConfigBtn.disabled = false;
-                    showMessage('New user_config.json template generated from defaults.', 'success');
-                // }
+                userConfigData = JSON.parse(JSON.stringify(PRELOADED_DEFAULT_CONFIG)); 
+                renderUserConfigEditor(userConfigEditor, userConfigData);
+                downloadUserConfigBtn.disabled = false;
+                saveUserConfigToProjectBtn.disabled = false; 
+                showMessage('New user_config.json template generated from defaults.', 'success');
             });
 
             generateNewUserCategoriesBtn.addEventListener('click', () => {
                 console.log("Generate New User Categories button clicked.");
-                // confirm() removed for sandbox compatibility
-                // if (confirm("Are you sure you want to generate a new user_command_categories.json template? This will replace any current user categories view.")) {
-                    console.log("User confirmed (or confirm skipped) for new user categories.");
-                    userCategoriesData = { "simple": [], "semi_interactive": [], "interactive_tui": [] };
-                    renderUserCommandCategoriesEditor(userCategoriesEditor, userCategoriesData);
-                    downloadUserCategoriesBtn.disabled = false;
-                    showMessage('New empty user_command_categories.json template generated.', 'success');
-                // }
+                userCategoriesData = { "simple": [], "semi_interactive": [], "interactive_tui": [] };
+                renderUserCommandCategoriesEditor(userCategoriesEditor, userCategoriesData);
+                downloadUserCategoriesBtn.disabled = false;
+                saveUserCategoriesToProjectBtn.disabled = false; 
+                showMessage('New empty user_command_categories.json template generated.', 'success');
             });
             
             autoLoadBtn.addEventListener('click', async () => {
@@ -700,8 +717,8 @@
                 showMessage('Attempting to auto-load configurations from ../../config/ ... (Ensure page is served via HTTP)', 'info');
 
                 const filesToLoad = [
-                    { path: '../../config/user_config.json', setter: (data) => userConfigData = data, renderer: renderUserConfigEditor, editorElement: userConfigEditor, downloadBtn: downloadUserConfigBtn, name: 'user_config.json' },
-                    { path: '../../config/user_command_categories.json', setter: (data) => userCategoriesData = data, renderer: renderUserCommandCategoriesEditor, editorElement: userCategoriesEditor, downloadBtn: downloadUserCategoriesBtn, name: 'user_command_categories.json' },
+                    { path: '../../config/user_config.json', setter: (data) => userConfigData = data, renderer: renderUserConfigEditor, editorElement: userConfigEditor, downloadBtn: downloadUserConfigBtn, saveBtn: saveUserConfigToProjectBtn, name: 'user_config.json' },
+                    { path: '../../config/user_command_categories.json', setter: (data) => userCategoriesData = data, renderer: renderUserCommandCategoriesEditor, editorElement: userCategoriesEditor, downloadBtn: downloadUserCategoriesBtn, saveBtn: saveUserCategoriesToProjectBtn, name: 'user_command_categories.json' },
                     { path: '../../config/default_config.json', setter: (data) => defaultGeneralConfigData = data, renderer: renderJsonViewer, editorElement: defaultConfigViewer, name: 'default_config.json' },
                     { path: '../../config/default_command_categories.json', setter: (data) => defaultCommandCategoriesData = data, renderer: renderJsonViewer, editorElement: defaultCategoriesViewer, name: 'default_command_categories.json' }
                 ];
@@ -720,18 +737,16 @@
                         .then(data => {
                             fileInfo.setter(data);
                             fileInfo.renderer(fileInfo.editorElement, data);
-                            if (fileInfo.downloadBtn) {
-                                fileInfo.downloadBtn.disabled = false;
-                            }
+                            if (fileInfo.downloadBtn) fileInfo.downloadBtn.disabled = false;
+                            if (fileInfo.saveBtn) fileInfo.saveBtn.disabled = false; 
                             successMessages.push(`${fileInfo.name} loaded successfully.`);
                         })
                         .catch(error => {
                             console.error(`Error loading ${fileInfo.name}:`, error);
                             errorMessages.push(`Failed to load ${fileInfo.name}: ${error.message}.`);
-                            fileInfo.editorElement.innerHTML = `<p class="text-red-400 text-sm">Failed to auto-load ${fileInfo.name}. Ensure it's served via HTTP and accessible at ${fileInfo.path}</p>`;
-                             if (fileInfo.downloadBtn) { 
-                                fileInfo.downloadBtn.disabled = true;
-                            }
+                            fileInfo.editorElement.innerHTML = `<p class="text-red-400 text-sm">Failed to auto-load ${fileInfo.name}. Please ensure it's served via HTTP and accessible at ${fileInfo.path}</p>`;
+                             if (fileInfo.downloadBtn) fileInfo.downloadBtn.disabled = true;
+                             if (fileInfo.saveBtn) fileInfo.saveBtn.disabled = true;
                         })
                 );
 
@@ -749,6 +764,53 @@
                 }
             });
 
+            saveUserConfigToProjectBtn.addEventListener('click', async () => {
+                if (!userConfigData) {
+                    showMessage('No user config data to save.', 'warning');
+                    return;
+                }
+                showMessage('Attempting to save user_config.json to project via local server...', 'info');
+                try {
+                    const response = await fetch('/api/save/user_config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(userConfigData)
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        showMessage(result.message || 'user_config.json saved successfully to project!', 'success');
+                    } else {
+                        throw new Error(result.message || `Server error ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Error saving user_config.json to project:', error);
+                    showMessage(`Error saving user_config.json: ${error.message}. Ensure local server is running and supports this endpoint.`, 'error');
+                }
+            });
+
+            saveUserCategoriesToProjectBtn.addEventListener('click', async () => {
+                if (!userCategoriesData) {
+                    showMessage('No user categories data to save.', 'warning');
+                    return;
+                }
+                showMessage('Attempting to save user_command_categories.json to project via local server...', 'info');
+                try {
+                    const response = await fetch('/api/save/user_categories', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(userCategoriesData)
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        showMessage(result.message || 'user_command_categories.json saved successfully to project!', 'success');
+                    } else {
+                        throw new Error(result.message || `Server error ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Error saving user_command_categories.json to project:', error);
+                    showMessage(`Error saving user_command_categories.json: ${error.message}. Ensure local server is running and supports this endpoint.`, 'error');
+                }
+            });
 
             downloadUserConfigBtn.addEventListener('click', () => {
                 if (userConfigData) {
@@ -787,8 +849,7 @@
             });
             
             resetAllBtn.addEventListener('click', () => {
-                // confirm() removed for sandbox compatibility
-                console.log("Reset All button clicked and confirmed (or confirm skipped).");
+                console.log("Reset All button clicked.");
                 userConfigData = null;
                 userCategoriesData = null;
                 defaultGeneralConfigData = null;
@@ -805,7 +866,9 @@
                 defaultCategoriesFileInput.value = '';
 
                 downloadUserConfigBtn.disabled = true;
+                saveUserConfigToProjectBtn.disabled = true;
                 downloadUserCategoriesBtn.disabled = true;
+                saveUserCategoriesToProjectBtn.disabled = true;
                 showMessage('All configurations cleared from the UI.', 'info');
             });
 
