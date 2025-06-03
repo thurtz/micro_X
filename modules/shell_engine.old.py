@@ -63,8 +63,11 @@ class ShellEngine:
         module_file_path = os.path.abspath(__file__)
         modules_dir_path = os.path.dirname(module_file_path)
         self.PROJECT_ROOT = os.path.dirname(modules_dir_path)
-        if not os.path.basename(self.PROJECT_ROOT) == os.path.basename(sys.path[0]):
-            logger.warning(f"ShellEngine inferred PROJECT_ROOT as {self.PROJECT_ROOT}. If incorrect, pass explicitly.")
+        # A simple check for project root, can be made more robust
+        if not (os.path.exists(os.path.join(self.PROJECT_ROOT, "main.py")) or \
+                os.path.exists(os.path.join(self.PROJECT_ROOT, ".git"))):
+            logger.warning(f"ShellEngine inferred PROJECT_ROOT as {self.PROJECT_ROOT}. If incorrect, pass explicitly or improve detection.")
+
 
         self.REQUIREMENTS_FILENAME = "requirements.txt"
         self.REQUIREMENTS_FILE_PATH = os.path.join(self.PROJECT_ROOT, self.REQUIREMENTS_FILENAME)
@@ -411,17 +414,17 @@ class ShellEngine:
             ('class:help-title', "micro_X AI-Enhanced Shell - Help\n\n"),
             ('class:help-text', "Welcome to micro_X! An intelligent shell that blends traditional command execution with AI capabilities.\n"),
             ('class:help-header', "\nAvailable Commands:\n"),
-            ('class:help-command', "  /ai <query>             "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
+            ('class:help-command', "  /ai <query>            "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
             ('class:help-example', "                           Example: /ai list all text files in current folder\n"),
-            ('class:help-command', "  /command <subcommand>   "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
+            ('class:help-command', "  /command <subcommand>  "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
             ('class:help-example', "                           Type '/command help' for detailed options.\n"),
-            ('class:help-command', "  /ollama <subcommand>    "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"),
+            ('class:help-command', "  /ollama <subcommand>   "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"),
             ('class:help-example', "                           Type '/ollama help' for detailed options.\n"),
-            ('class:help-command', "  /utils <script> [args]  "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
-            ('class:help-example', "                           Type '/utils list' or '/utils help' for available scripts.\n"),
-            ('class:help-command', "  /update                 "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
-            ('class:help-command', "  /help                   "), ('class:help-description', "- Display this help message.\n"),
-            ('class:help-command', "  exit | quit             "), ('class:help-description', "- Exit the micro_X shell.\n"),
+            ('class:help-command', "  /utils <script> [args] "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
+            ('class:help-example', "                           Type '/utils list' or '/utils <script_name> help' for details.\n"), # Updated
+            ('class:help-command', "  /update                "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
+            ('class:help-command', "  /help                  "), ('class:help-description', "- Display this help message.\n"),
+            ('class:help-command', "  exit | quit            "), ('class:help-description', "- Exit the micro_X shell.\n"),
             ('class:help-header', "\nDirect Commands:\n"),
             ('class:help-text', "  You can type standard Linux commands directly (e.g., 'ls -l', 'cd my_folder').\n"),
             ('class:help-text', "  Unknown commands will trigger an interactive categorization flow.\n"),
@@ -448,11 +451,11 @@ class ShellEngine:
             ("class:help-title", "Ollama Service Management - Help\n"),
             ("class:help-text", "Use these commands to manage the Ollama service used by micro_X.\n"),
             ("class:help-header", "\nAvailable /ollama Subcommands:\n"),
-            ("class:help-command", "  /ollama start         "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
-            ("class:help-command", "  /ollama stop          "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
-            ("class:help-command", "  /ollama restart       "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"), # Corrected quote here
-            ("class:help-command", "  /ollama status        "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
-            ("class:help-command", "  /ollama help          "), ("class:help-description", "- Displays this help message.\n"),
+            ("class:help-command", "  /ollama start        "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
+            ("class:help-command", "  /ollama stop         "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
+            ("class:help-command", "  /ollama restart      "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"), # Corrected quote here
+            ("class:help-command", "  /ollama status       "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
+            ("class:help-command", "  /ollama help         "), ("class:help-description", "- Displays this help message.\n"),
             ("class:help-text", "\nNote: These commands primarily interact with an Ollama instance managed by micro_X in a tmux session. ")
         ]
         help_output_string = "".join([text for _, text in help_text])
@@ -472,53 +475,87 @@ class ShellEngine:
             logger.warning(f"shlex error for /utils '{full_command_str}': {e}")
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate(); return
         
-        utils_help_message = "ℹ️ Usage: /utils <script_name_no_ext> [args...] | list | help"
+        utils_help_message = "ℹ️ Usage: /utils <script_name> [args... | help | -h | --help] | list"
         if len(parts) < 2:
             self.ui_manager.append_output(utils_help_message, style_class='info')
             logger.debug("Insufficient arguments for /utils command.")
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate(); return
         
-        subcommand_or_script_name = parts[1]; args = parts[2:]
-        if subcommand_or_script_name.lower() in ["list", "help"]:
+        subcommand_or_script_name = parts[1]
+        
+        if subcommand_or_script_name.lower() == "list":
             try:
                 if not os.path.exists(self.UTILS_DIR_PATH) or not os.path.isdir(self.UTILS_DIR_PATH):
                     self.ui_manager.append_output(f"❌ Utility directory '{self.UTILS_DIR_NAME}' not found at '{self.UTILS_DIR_PATH}'.", style_class='error'); logger.error(f"Utility directory not found: {self.UTILS_DIR_PATH}")
                     if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate(); return
                 available_scripts = [f[:-3] for f in os.listdir(self.UTILS_DIR_PATH) if os.path.isfile(os.path.join(self.UTILS_DIR_PATH, f)) and f.endswith(".py") and f != "__init__.py"]
                 if available_scripts:
-                    self.ui_manager.append_output("Available utility scripts (run with /utils <script_name>):", style_class='info')
-                    for script_name in sorted(available_scripts): self.ui_manager.append_output(f"  - {script_name}", style_class='info')
+                    self.ui_manager.append_output("Available utility scripts (run with /utils <script_name> [args... | help]):", style_class='info')
+                    for script_name_no_ext in sorted(available_scripts): self.ui_manager.append_output(f"  - {script_name_no_ext}", style_class='info')
                 else: self.ui_manager.append_output(f"No executable Python utility scripts found in '{self.UTILS_DIR_NAME}'.", style_class='info')
                 logger.info(f"Listed utils scripts: {available_scripts}")
             except Exception as e: self.ui_manager.append_output(f"❌ Error listing utility scripts: {e}", style_class='error'); logger.error(f"Error listing utility scripts: {e}", exc_info=True)
             finally:
                 if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate(); return
         
-        script_filename = f"{subcommand_or_script_name}.py"; script_path = os.path.join(self.UTILS_DIR_PATH, script_filename)
+        # If not 'list', then subcommand_or_script_name is treated as a script name
+        script_name_no_ext = subcommand_or_script_name
+        script_filename = f"{script_name_no_ext}.py"
+        script_path = os.path.join(self.UTILS_DIR_PATH, script_filename)
+
         if not os.path.isfile(script_path):
             self.ui_manager.append_output(f"❌ Utility script not found: {script_filename} in '{self.UTILS_DIR_NAME}' directory.", style_class='error'); logger.warning(f"Utility script not found: {script_path}")
             self.ui_manager.append_output(utils_help_message, style_class='info')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate(); return
         
-        command_to_execute_list = [sys.executable, script_path] + args; command_str_for_display = f"{sys.executable} {script_path} {' '.join(args)}"
-        self.ui_manager.append_output(f"🚀 Executing utility: {command_str_for_display}\n   (Working directory: {self.PROJECT_ROOT})", style_class='info'); logger.info(f"Executing utility script: {command_to_execute_list} with cwd={self.PROJECT_ROOT}")
+        args_for_script = parts[2:]
+        command_to_execute_list = [sys.executable, script_path]
+        
+        # Check if the first argument for the script is a help flag
+        is_help_request = False
+        if args_for_script and args_for_script[0].lower() in ["help", "-h", "--help"]:
+            is_help_request = True
+            # For argparse compatibility, use --help
+            command_to_execute_list.append("--help")
+            # Remove the help argument from args_for_script if it was 'help' so it's not passed twice
+            # or misinterpreted by scripts not using argparse for 'help' keyword.
+            # However, since we force --help, it's fine.
+        else:
+            command_to_execute_list.extend(args_for_script)
+
+        command_str_for_display = f"{sys.executable} {script_path} {' '.join(args_for_script if not is_help_request else ['--help'])}"
+        
+        if is_help_request:
+            self.ui_manager.append_output(f"📜 Requesting help for utility: {script_name_no_ext}", style_class='info')
+        else:
+            self.ui_manager.append_output(f"🚀 Executing utility: {command_str_for_display}\n   (Working directory: {self.PROJECT_ROOT})", style_class='info')
+        
+        logger.info(f"Executing utility script: {command_to_execute_list} with cwd={self.PROJECT_ROOT}")
         if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
+        
         try:
             process = await asyncio.to_thread(subprocess.run, command_to_execute_list, capture_output=True, text=True, cwd=self.PROJECT_ROOT, check=False, errors='replace')
             output_prefix = f"Output from '{script_filename}':\n"; has_output = False
             if process.stdout: self.ui_manager.append_output(f"{output_prefix}{process.stdout.strip()}"); has_output = True
             if process.stderr: self.ui_manager.append_output(f"Stderr from '{script_filename}':\n{process.stderr.strip()}", style_class='warning'); has_output = True
-            if not has_output and process.returncode == 0: self.ui_manager.append_output(f"{output_prefix}(No output)", style_class='info')
-            if process.returncode != 0:
+            
+            if not has_output and process.returncode == 0 and not is_help_request: 
+                self.ui_manager.append_output(f"{output_prefix}(No output)", style_class='info')
+            
+            if process.returncode != 0 and not is_help_request: # Don't show error for non-zero exit if it was a help request (argparse exits > 0 for --help)
                 self.ui_manager.append_output(f"⚠️ Utility '{script_filename}' exited with code {process.returncode}.", style_class='warning')
-                logger.warning(f"Utility script '{script_path}' exited with code {process.returncode}. Args: {args}")
-            else:
-                if not process.stderr: self.ui_manager.append_output(f"✅ Utility '{script_filename}' completed.", style_class='success')
-                logger.info(f"Utility script '{script_path}' completed with code {process.returncode}. Args: {args}")
+                logger.warning(f"Utility script '{script_path}' exited with code {process.returncode}. Args: {args_for_script}")
+            elif not is_help_request and not process.stderr : # Only show success if not help and no stderr
+                self.ui_manager.append_output(f"✅ Utility '{script_filename}' completed.", style_class='success')
+            
+            if not is_help_request: # Log completion only if not a help request
+                 logger.info(f"Utility script '{script_path}' completed with code {process.returncode}. Args: {args_for_script}")
+
         except FileNotFoundError: self.ui_manager.append_output(f"❌ Error: Python interpreter ('{sys.executable}') or script ('{script_filename}') not found.", style_class='error'); logger.error(f"FileNotFoundError executing utility: {command_to_execute_list}", exc_info=True)
         except Exception as e: self.ui_manager.append_output(f"❌ Unexpected error executing utility '{script_filename}': {e}", style_class='error'); logger.error(f"Error executing utility script '{script_path}': {e}", exc_info=True)
         finally:
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
+
 
     async def _handle_ollama_command_async(self, user_input_parts: list):
         """Handles /ollama subcommands by calling the OllamaManager module."""
