@@ -2,7 +2,7 @@
 
 **micro\_X** is an intelligent, interactive shell environment designed to bridge the gap between natural language and executable Linux commands. It leverages local large language models (LLMs) via Ollama to translate your queries, validate commands, explain their functionality, and streamline your command-line workflow. It also features branch-aware integrity checks to ensure code reliability when running on stable or testing branches.
 
-GitHub Repository: [https://github.com/thurtz/micro](https://github.com/thurtz/micro)\_X.git
+GitHub Repository: [https://github.com/thurtz/micro\_X.git](https://github.com/thurtz/micro_X.git)
 
 Detailed User Guide: docs/micro\_X\_User\_Guide.md
 
@@ -11,13 +11,14 @@ Detailed User Guide: docs/micro\_X\_User\_Guide.md
 micro\_X provides a text-based user interface (TUI) where you can:
 
 * Type standard Linux commands.  
-* Enter natural language queries (prefixed with /ai) to have them translated into shell commands.  
-* Benefit from AI-powered validation of translated or directly entered commands.  
+* Force natural language queries (prefixed with /ai) to have them translated into shell commands.  
+* Benefit from AI-powered validation and translation of natural language (without the need for /ai prefixed) or directly entered commands.  
 * **Confirm AI-Generated Commands:** Review, get explanations, modify, or cancel commands suggested by the AI before execution.  
 * Categorize commands (simple, semi\_interactive, interactive\_tui) for appropriate execution, including running interactive commands in tmux.  
 * Manage command history and categorizations.  
 * Control the underlying Ollama service directly from within the shell.  
-* **Branch-Aware Integrity & Developer Mode:** Automatically enables a permissive 'Developer Mode' when running off the dev branch. Performs startup integrity checks on main and testing branches.
+* **Branch-Aware Integrity & Developer Mode:** Automatically enables a permissive 'Developer Mode' when running off the dev branch. Performs startup integrity checks on main and testing branches.  
+* **Web-Based Configuration Manager:** An integrated tool to easily view and edit user configurations and command categorizations via a web interface (launched with /utils config\_manager).
 
 ## **Key Features**
 
@@ -57,7 +58,8 @@ micro\_X provides a text-based user interface (TUI) where you can:
   * modules/git\_context\_manager.py: Handles Git interactions for integrity checks.  
 * **Shell-like Functionality:** Supports cd, history, and shell variable expansion.  
 * **Security:** Basic sanitization for potentially dangerous commands. The command confirmation flow with the "Explain" option and startup integrity checks are key safety features. **Always review and understand commands, especially AI-generated ones, before execution.**  
-  * **Logging & Configuration:** Detailed logging and persistent configuration.
+  * **Logging & Configuration:** Detailed logging and persistent configuration.  
+* **Web-Based Configuration Manager:** Launch with /utils config\_manager \--start to easily manage user\_config.json and user\_command\_categories.json via a web UI.
 
 ## **Choosing a Branch & Setup**
 
@@ -102,19 +104,17 @@ Detailed manual instructions and prerequisites for each platform are also availa
 
 If you want to work with or test different branches simultaneously, you can clone the repository into separate directories:
 
-1. **Main Branch (Stable):**  
+1. Main Branch (Stable):  
    git clone https://github.com/thurtz/micro\_X.git micro\_X-main  
    cd micro\_X-main  
    \# git checkout main \# Usually already on main  
-   ./setup.sh \# Run setup within this directory
-
-2. **Testing Branch:**  
+   ./setup.sh \# Run setup within this directory  
+2. Testing Branch:  
    git clone https://github.com/thurtz/micro\_X.git micro\_X-testing  
    cd micro\_X-testing  
    git checkout testing  
-   ./setup.sh \# Run setup within this directory
-
-3. **Development Branch:**  
+   ./setup.sh \# Run setup within this directory  
+3. Development Branch:  
    git clone https://github.com/thurtz/micro\_X.git micro\_X-dev  
    cd micro\_X-dev  
    git checkout dev  
@@ -145,8 +145,7 @@ Each directory will have its own independent micro\_X installation and virtual e
      ./micro\_X.sh  
    * Manually: From the micro\_X directory:  
      source .venv/bin/activate  
-     tmux \-f config/.tmux.conf new-session \-A \-s micro\_X  
-     python3 main.py
+     tmux \-f config/.tmux.conf new-session \-A \-s micro\_X
 
 ### **Operational Modes (Based on Git Branch)**
 
@@ -169,9 +168,10 @@ micro\_X's behavior at startup is influenced by the current Git branch:
 ### **Interacting with micro\_X**
 
 * **Direct Commands:** Type any Linux command and press Enter (e.g., ls \-l).  
-* AI Translation (/ai): Prefix your query with /ai.  
+* Forced AI Translation (/ai): Prefix your query with /ai.  
   (\~) \> /ai list all python files in my documents folder  
   If the AI suggests a command, you'll be prompted to confirm, explain, modify, or cancel it.  
+* Natural language (without the use of /ai) will go through validation and translation rather than just translation. If the AI suggests a command, you'll be prompted to confirm, explain, modify, or cancel it.  
 * Command Management (/command): Use /command help for options to add, remove, list, or move categorized commands.  
   (\~) \> /command list  
   (\~) \> /command add "my\_custom\_script.sh \--interactive" interactive\_tui  
@@ -183,6 +183,7 @@ micro\_X's behavior at startup is influenced by the current Git branch:
   (\~) \> /utils list  
   (\~) \> /utils generate\_tree  
   (\~) \> /utils generate\_snapshot help (or \-h, \--help)  
+  (\~) \> /utils config\_manager \--start (Launches the web-based configuration tool)  
 * **Update (/update):** Check for and pull updates for micro\_X.  
 * **Help (/help):** Displays the main help message.  
 * **Navigation & Control:**  
@@ -202,7 +203,8 @@ micro\_X uses a hierarchical configuration system (fallback \-\> default \-\> us
 * **User Command Categories:** config/user\_command\_categories.json (Your categorizations).  
 * **Command History:** .micro\_x\_history (project root).  
 * **Logs:** logs/micro\_x.log.  
-* **Tmux Configuration:** config/.tmux.conf (used by micro\_X.sh).
+* **Tmux Configuration:** config/.tmux.conf (used by micro\_X.sh).  
+* **Web-Based Config Manager:** For a graphical way to edit user\_config.json and user\_command\_categories.json, use the /utils config\_manager \--start command.
 
 ## **Security Considerations**
 
@@ -222,25 +224,22 @@ micro\_X uses a hierarchical configuration system (fallback \-\> default \-\> us
        * Stash them (to potentially reapply later): git stash  
        * Discard them permanently: git reset \--hard HEAD (Warning: This permanently deletes uncommitted changes).  
     4. **To sync your local branch with the remote (e.g., testing or main):**  
-       * **Option A (Rebase \- for a linear history, often preferred):**  
-         git checkout \<branchname\>  \# e.g., testing or main  
+       * Option A (Rebase \- for a linear history, often preferred):  
+         git checkout \<branchname\> \# e.g., testing or main  
          git fetch origin  
-         git rebase origin/\<branchname\>
-
+         git rebase origin/\<branchname\>  
          This fetches the latest remote changes and reapplies any local commits on top. If you have no local commits (which should be the case on main or testing), it will fast-forward your branch to match the remote if it's behind.  
          A more concise way to do fetch and rebase is: git pull \--rebase origin \<branchname\>  
        * Option B (Reset Hard \- to exactly match remote, discarding ALL local differences):  
          If your local branch is ahead or has diverged with commits you want to discard to make it identical to the remote:  
          git checkout \<branchname\> \# e.g., testing or main  
          git fetch origin  
-         git reset \--hard origin/\<branchname\>
-
+         git reset \--hard origin/\<branchname\>  
          **Use reset \--hard with extreme caution as it permanently discards local commits and uncommitted changes on this branch.**  
-       * **Option C (Pull with Merge \- default pull behavior, may create merge commits):**  
+       * Option C (Pull with Merge \- default pull behavior, may create merge commits):  
          git checkout \<branchname\> \# e.g., testing or main  
          git fetch origin \# Ensure remote refs are up-to-date  
-         git pull origin \<branchname\> \# This typically does a fetch then merge
-
+         git pull origin \<branchname\> \# This typically does a fetch then merge  
     5. If you intend to develop, switch to the dev branch: git checkout dev. Local changes are expected and allowed there.  
 * **micro\_X shows warnings about being behind remote:**  
   * *Reason:* Your local protected branch is behind the remote.  
