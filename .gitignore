@@ -170,6 +170,7 @@ logs/
 # User-specific configuration files
 config/user_config.json
 config/user_command_categories.json
+config/user.tmux.conf
 
 # Command history file
 .micro_x_history

@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>micro_X Configuration Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for webkit browsers */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #2d3748; /* gray-800 */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a5568; /* gray-600 */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #718096; /* gray-500 */
+        }
+        /* Basic body styling */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for accordion */
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .accordion-content.open {
+            max-height: 1000px; /* Adjust as needed for content */
+        }
+        /* Ensure tooltips are positioned correctly if not fully handled by Flowbite default */
+        [data-tooltip-target] {
+            position: relative;
+        }
+        /* Basic tooltip visibility, Flowbite will handle the rest of the styling.
+           The classes for styling are applied directly to the tooltip div in the HTML. */
+        .tooltip {
+            transition: opacity 0.3s;
+        }
+
+        /* Toast Notification Styles */
+        #toastContainer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 300px; /* Max width */
+            max-width: calc(100vw - 40px); /* Ensure it doesn't overflow on small screens */
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            /* color: white; Default, will be overridden for warning */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+            word-wrap: break-word; /* Ensure long messages wrap */
+            position: relative; /* For progress bar positioning */
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        /* Tailwind color classes will be added directly by JS */
+
+        .toast-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background-color: rgba(255, 255, 255, 0.5); /* Light progress bar */
+            width: 100%;
+            animation: toast-progress-animation 5s linear forwards;
+        }
+        .toast.bg-yellow-500 .toast-progress { /* Tailwind yellow-500 is used in JS */
+             background-color: rgba(0, 0, 0, 0.2); /* Darker progress bar for yellow toast */
+        }
+        .toast.bg-yellow-400 .toast-progress { /* Tailwind yellow-400 is used in JS */
+             background-color: rgba(0, 0, 0, 0.2); /* Darker progress bar for yellow toast */
+        }
+
+
+        @keyframes toast-progress-animation {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js"></script>
+
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+
+    <div id="toastContainer"></div>
+
+    <header class="bg-gray-800 shadow-md p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-blue-400">micro_X Configuration Manager</h1>
+            <div class="flex space-x-2">
+                <button id="autoLoadBtn" class="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg text-sm transition duration-150" data-tooltip-target="tooltip-auto-load">Auto-Load from Project</button>
+                <div id="tooltip-auto-load" role="tooltip" class="absolute z-10 invisible inline-block px-3 py-2 text-sm font-medium text-white transition-opacity duration-300 bg-gray-900 rounded-lg shadow-sm opacity-0 tooltip dark:bg-gray-700">
+                    Attempts to load configs from ../../config/. Works best when served via HTTP from project's /tools/config_manager/ dir.
+                    <div class="tooltip-arrow" data-popper-arrow></div>
+                </div>
+                <button id="loadDefaultsBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg text-sm transition duration-150">Load Defaults (Reference)</button>
+                <button id="resetAllBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm transition duration-150">Reset All Changes</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 flex-grow">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <section id="userConfigSection" class="bg-gray-800 p-6 rounded-lg shadow-xl">
+                <h2 class="text-xl font-semibold mb-4 text-blue-300 border-b border-gray-700 pb-2">User General Configuration (`user_config.json`)</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="userConfigFile" class="block mb-1 text-sm font-medium text-gray-300">Upload `user_config.json` or Generate New:</label>
+                        <div class="flex gap-2 items-center">
+                            <input type="file" id="userConfigFile" accept=".json" class="block w-full file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer text-sm text-gray-400">
+                            <button id="generateNewUserConfigBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition duration-150 shrink-0 border-2 border-yellow-300">Generate New</button>
+                        </div>
+                    </div>
+                    <div id="userConfigEditor" class="space-y-3 p-3 bg-gray-700 rounded-md min-h-[200px]">
+                        <p class="text-gray-400 text-sm">Upload a `user_config.json` file to view and edit its settings, or generate a new one.</p>
+                    </div>
+                    <div class="flex gap-2 mt-4">
+                        <button id="downloadUserConfigBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50" disabled>Download File</button>
+                        <button id="saveUserConfigToProjectBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed" disabled data-tooltip-target="tooltip-save-project">
+                            <span class="button-text">Save to Project</span>
+                            <span class="button-loader hidden animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full" role="status" aria-hidden="true"></span>
+                        </button>
+                        <div id="tooltip-save-project" role="tooltip" class="absolute z-10 invisible inline-block px-3 py-2 text-sm font-medium text-white transition-opacity duration-300 bg-gray-900 rounded-lg shadow-sm opacity-0 tooltip dark:bg-gray-700">
+                            Saves to micro_X/config/ via local server. Requires server to be running.
+                            <div class="tooltip-arrow" data-popper-arrow></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="userCommandCategoriesSection" class="bg-gray-800 p-6 rounded-lg shadow-xl">
+                <h2 class="text-xl font-semibold mb-4 text-blue-300 border-b border-gray-700 pb-2">User Command Categories (`user_command_categories.json`)</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="userCategoriesFile" class="block mb-1 text-sm font-medium text-gray-300">Upload `user_command_categories.json` or Generate New:</label>
+                        <div class="flex gap-2 items-center">
+                            <input type="file" id="userCategoriesFile" accept=".json" class="block w-full file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer text-sm text-gray-400">
+                            <button id="generateNewUserCategoriesBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition duration-150 shrink-0 border-2 border-yellow-300">Generate New</button>
+                        </div>
+                    </div>
+                    <div id="userCategoriesEditor" class="space-y-3 p-3 bg-gray-700 rounded-md min-h-[200px]">
+                        <p class="text-gray-400 text-sm">Upload a `user_command_categories.json` file to manage your custom command categorizations, or generate a new one.</p>
+                    </div>
+                    <div class="flex gap-2 mt-4">
+                        <button id="downloadUserCategoriesBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50" disabled>Download File</button>
+                         <button id="saveUserCategoriesToProjectBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed" disabled data-tooltip-target="tooltip-save-project">
+                            <span class="button-text">Save to Project</span>
+                            <span class="button-loader hidden animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full" role="status" aria-hidden="true"></span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="defaultConfigsViewerSection" class="md:col-span-2 bg-gray-800 p-6 rounded-lg shadow-xl">
+                <h2 class="text-xl font-semibold mb-4 text-yellow-300 border-b border-gray-700 pb-2">Default Configurations (Reference)</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="defaultConfigFile" class="block mb-2 text-sm font-medium text-gray-300">Upload `default_config.json` (Optional):</label>
+                        <input type="file" id="defaultConfigFile" accept=".json" class="block w-full file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-yellow-600 file:text-white hover:file:bg-yellow-700 cursor-pointer text-sm text-gray-400">
+                        <div id="defaultConfigViewer" class="mt-2 p-3 bg-gray-700 rounded-md min-h-[100px] max-h-96 overflow-y-auto">
+                            <p class="text-gray-400 text-sm">Upload or click "Load Defaults" to view default general settings.</p>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="defaultCategoriesFile" class="block mb-2 text-sm font-medium text-gray-300">Upload `default_command_categories.json` (Optional):</label>
+                        <input type="file" id="defaultCategoriesFile" accept=".json" class="block w-full file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-yellow-600 file:text-white hover:file:bg-yellow-700 cursor-pointer text-sm text-gray-400">
+                        <div id="defaultCategoriesViewer" class="mt-2 p-3 bg-gray-700 rounded-md min-h-[100px] max-h-96 overflow-y-auto">
+                            <p class="text-gray-400 text-sm">Upload or click "Load Defaults" to view default command categorizations.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div id="messageArea" class="mt-6 p-3 bg-gray-700 text-gray-300 rounded-lg text-sm hidden"></div>
+
+    </main>
+
+    <footer class="bg-gray-800 text-center p-4 mt-auto">
+        <p class="text-sm text-gray-400">&copy; 2025 micro_X Configuration Manager. For use with the micro_X Shell project.</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof initFlowbite === 'function') {
+                initFlowbite();
+            }
+            console.log("micro_X Config Manager UI Initialized (Enhanced Feedback v5)");
+
+            const userConfigFileInput = document.getElementById('userConfigFile');
+            const downloadUserConfigBtn = document.getElementById('downloadUserConfigBtn');
+            const saveUserConfigToProjectBtn = document.getElementById('saveUserConfigToProjectBtn');
+            const userConfigEditor = document.getElementById('userConfigEditor');
+            const generateNewUserConfigBtn = document.getElementById('generateNewUserConfigBtn');
+
+            const userCategoriesFileInput = document.getElementById('userCategoriesFile');
+            const downloadUserCategoriesBtn = document.getElementById('downloadUserCategoriesBtn');
+            const saveUserCategoriesToProjectBtn = document.getElementById('saveUserCategoriesToProjectBtn');
+            const userCategoriesEditor = document.getElementById('userCategoriesEditor');
+            const generateNewUserCategoriesBtn = document.getElementById('generateNewUserCategoriesBtn');
+
+            const autoLoadBtn = document.getElementById('autoLoadBtn');
+            const loadDefaultsBtn = document.getElementById('loadDefaultsBtn');
+            const resetAllBtn = document.getElementById('resetAllBtn');
+            const defaultConfigFileInput = document.getElementById('defaultConfigFile');
+            const defaultConfigViewer = document.getElementById('defaultConfigViewer');
+            const defaultCategoriesFileInput = document.getElementById('defaultCategoriesFile');
+            const defaultCategoriesViewer = document.getElementById('defaultCategoriesViewer');
+            const toastContainer = document.getElementById('toastContainer');
+
+            let userConfigData = null;
+            let userCategoriesData = null;
+            let defaultGeneralConfigData = null;
+            let defaultCommandCategoriesData = null;
+
+            // --- FULL PRELOADED DATA OBJECTS ---
+            const configUpdateTips = {
+                'ai_models.primary_translator': "Main AI for NL to command. E.g., 'llama3.2:3b'.",
+                'ai_models.direct_translator': "Secondary AI for direct command generation. E.g., 'vitali87/shell-commands-qwen2-1.5b'.",
+                'ai_models.validator': "AI to check command validity. E.g., 'herawen/lisa:latest'.",
+                'ai_models.explainer': "AI to explain commands. E.g., 'llama3.2:3b'.",
+                'timeouts.tmux_poll_seconds': "Polling timeout for semi-interactive tmux commands.",
+                'timeouts.tmux_semi_interactive_sleep_seconds': "Sleep after semi-interactive tmux command.",
+                'timeouts.git_fetch_timeout': "Timeout for 'git fetch' in integrity checks.",
+                'behavior.input_field_height': "Lines for command input field.",
+                'behavior.default_category_for_unclassified': "Default category for unknown commands.",
+                'behavior.validator_ai_attempts': "Attempts for validator AI.",
+                'behavior.translation_validation_cycles': "Cycles for translation & validation.",
+                'behavior.ai_retry_delay_seconds': "Delay between AI API call retries.",
+                'behavior.ollama_api_call_retries': "Retries for Ollama API calls.",
+                'behavior.tui_detection_line_threshold_pct': "% lines with ANSI for TUI detection.",
+                'behavior.tui_detection_char_threshold_pct': "% chars being ANSI for TUI detection.",
+                'ui.max_prompt_length': "Max length of directory in prompt.",
+                'ui.enable_output_separator': "Enable visual separator between outputs.",
+                'ui.output_separator_character': "Char for output separator.",
+                'ui.output_separator_length': "Length of output separator.",
+                'ui.enable_startup_separator': "Enable separator after startup messages.",
+                'ui.startup_separator_string': "String for startup separator.",
+                'ui.enable_mouse_support': "Enable mouse support (may affect terminal text selection).",
+                'paths.tmux_log_base_path': "Base directory for temporary tmux logs.",
+                'ollama_service.executable_path': "Optional path to Ollama executable (null uses PATH).",
+                'ollama_service.auto_start_serve': "Auto-start 'ollama serve' if not detected.",
+                'ollama_service.startup_wait_seconds': "Wait time for 'ollama serve' to start.",
+                'ollama_service.server_check_retries': "Retries for Ollama server status check during startup.",
+                'ollama_service.server_check_interval_seconds': "Interval between Ollama server checks at startup.",
+                'integrity_check.protected_branches': "Git branches where integrity checks are enforced (e.g., ['main', 'testing']). Editable as a list of strings.",
+                'integrity_check.developer_branch': "Developer Git branch where checks are relaxed (e.g., 'dev').",
+                'integrity_check.halt_on_integrity_failure': "Halt if critical integrity checks fail on a protected branch.",
+                'integrity_check.allow_run_if_behind_remote': "Allow running on protected branch if only behind remote (shows warning)."
+            };
+            const PRELOADED_DEFAULT_CONFIG = {
+                "ai_models": { "primary_translator": "llama3.2:3b", "direct_translator": "vitali87/shell-commands-qwen2-1.5b", "validator": "herawen/lisa:latest", "explainer": "llama3.2:3b" },
+                "timeouts": { "tmux_poll_seconds": 300, "tmux_semi_interactive_sleep_seconds": 1, "git_fetch_timeout": 10 },
+                "behavior": { "input_field_height": 4, "default_category_for_unclassified": "semi_interactive", "validator_ai_attempts": 3, "translation_validation_cycles": 3, "ai_retry_delay_seconds": 1, "ollama_api_call_retries": 2, "tui_detection_line_threshold_pct": 30.0, "tui_detection_char_threshold_pct": 3.0 },
+                "ui": { "max_prompt_length": 20, "enable_output_separator": true, "output_separator_character": "─", "output_separator_length": 30, "enable_startup_separator": true, "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n", "enable_mouse_support": false },
+                "paths": { "tmux_log_base_path": "/tmp" },
+                "prompts": {
+                    "validator": {"system": "You are a Linux command validation assistant. Your task is to determine if a given string is likely a valid Linux command. If the string looks like a phrase rather than a linux command then the answer is no. If the string looks like a Linux command rather than a phrase then the answer is yes. Answer only with 'yes' or 'no'.", "user_template": "Is the following string likely a Linux command: '{command_text}'"},
+                    "primary_translator": {"system": "You are a helpful assistant that translates human language queries into a single, precise Linux command.\nStrictly enclose the Linux command within <bash></bash> tags.\nDo not add any other explanations, apologies, or text outside these tags.\nIf the request is ambiguous, unsafe, or cannot be translated into a single command, respond with only \"<unsafe>Cannot translate safely</unsafe>\" or a similar message within <unsafe> tags.", "user_template": "Translate to a single Linux command: \"{human_input}\"."},
+                    "direct_translator": {"system": "Translate the following user request into a single Linux command. Output only the command. Do not include any other text, explanations, or markdown formatting.", "user_template": "Translate to a single Linux command: \"{human_input}\"."},
+                    "explainer": {"system": "You are a helpful assistant that explains Linux commands in simple, clear terms. Describe what the command does, its main arguments/options shown, and any significant side effects or risks. Be concise. If the command is trivial, a very short explanation is fine. If it seems dangerous or complex, highlight that.", "user_template": "Explain the following Linux command: '{command_text}'"}
+                },
+                "ollama_service": {"executable_path": null, "auto_start_serve": true, "startup_wait_seconds": 10, "server_check_retries": 5, "server_check_interval_seconds": 2},
+                "integrity_check": {"protected_branches": ["main", "testing"], "developer_branch": "dev", "halt_on_integrity_failure": true, "allow_run_if_behind_remote": true }
+            };
+            const PRELOADED_DEFAULT_CATEGORIES = {
+                "simple": ["ls", "ls -lA", "ls -l", "ls -la", "pwd", "echo", "date", "echo $SHELL", "echo $PWD", "uname", "uname -a", "uname -m", "uname -s", "uname -r", "clear", "which", "which tmux", "cat /etc/os-release", "cat /etc/debian_version", "cat /etc/redhat-release", "ls -a", "ls -al", "echo \"hello\"; echo \"world\"", "mkdir new_directory", "mkdir -p path/to/new_directory", "touch new_file.txt", "cp source.txt destination.txt", "cp -r source_dir/ destination_dir/", "mv old_name.txt new_name.txt", "mv file.txt existing_dir/", "rm some_file.txt", "rm -f some_file.txt", "rmdir empty_directory", "df", "df -h", "df -i", "du -sh .", "du -sh /some/path", "free", "free -h", "free -m", "id", "whoami", "hostname", "uptime", "head somefile.txt", "head -n 5 somefile.txt", "tail -n 20 somefile.txt", "wc somefile.txt", "wc -l somefile.txt", "ps", "ps aux", "ps -ef", "pgrep processname", "pkill processname", "killall processname", "stat somefile.txt", "file somefile.txt", "basename /path/to/file.txt", "dirname /path/to/file.txt", "readlink -f some_link", "ln -s target_file link_name", "groups", "users", "w", "last -n 5", "history | tail -n 10", "getenforce", "sestatus", "systemctl is-active servicename", "systemctl is-enabled servicename", "systemctl list-units --type=service --state=running", "sudo ufw status", "sudo firewall-cmd --state", "sudo firewall-cmd --get-active-zones", "lsof -i :80", "lsof -p 1234", "dpkg -l packagename", "rpm -q packagename"],
+                "semi_interactive": ["less", "more", "tail", "tail micro_X.sh", "grep pattern file.txt", "grep -r pattern .", "nmap", "timedatectl list-timezones", "cat /proc/cpuinfo | grep 'model name'", "cat /proc/meminfo", "cat /proc/partitions", "ifconfig", "ip addr show", "ip route show", "ip link show", "netstat -an", "netstat -tulnp", "ss -tulnp", "lsb_release -a", "sudo apt update", "sudo apt list --upgradable", "sudo apt search packagename", "sudo apt show packagename", "sudo dnf check-update", "sudo dnf list --upgrades", "sudo dnf search packagename", "sudo dnf info packagename", "sudo yum check-update", "sudo yum list updates", "sudo yum search packagename", "sudo yum info packagename", "cat /boot/version", "cat /proc/version", "ls;pwd", "find . -name '*.py'", "find /var/log -name '*.log' -mtime -7", "ping google.com -c 4", "man ls", "git status", "git diff", "git diff --staged", "git log --oneline -n 10", "git branch", "git remote -v", "docker ps", "docker images", "docker logs container_name", "systemctl status sshd", "systemctl list-unit-files --type=service", "systemctl list-dependencies servicename", "journalctl -n 20", "journalctl -u servicename -n 50", "journalctl --since \"1 hour ago\"", "sudo ufw status numbered", "sudo firewall-cmd --list-all", "sudo firewall-cmd --list-services", "sudo firewall-cmd --list-ports", "fdisk -l", "lsblk", "blkid", "mount", "dpkg -L packagename", "rpm -ql packagename", "ls --help", "cp --help", "mv --help", "mkdir --help", "rm --help", "rmdir --help", "grep --help", "find --help", "awk --help", "sed --help", "tar --help", "gzip --help", "gunzip --help", "zip --help", "unzip --help", "head --help", "tail --help", "cat --help", "less --help", "more --help", "man --help", "pwd --help", "date --help", "clear --help", "which --help", "df --help", "du --help", "free --help", "ps --help", "kill --help", "pgrep --help", "pkill --help", "killall --help", "ping --help", "ifconfig --help", "ip --help", "netstat --help", "ss --help", "ssh --help", "scp --help", "rsync --help", "chmod --help", "chown --help", "sudo --help", "apt --help", "apt-get --help", "dpkg --help", "dnf --help", "yum --help", "rpm --help", "systemctl --help", "journalctl --help", "firewall-cmd --help", "ufw --help", "fdisk --help", "mkfs --help", "mount --help", "umount --help", "useradd --help", "usermod --help", "userdel --help", "groupadd --help", "docker --help", "git --help", "nmap --help", "nmap -sS -Pn 192.168.254.0/24", "nmap -sP 192.168.0.0/24 --script='http-server'", "nmap -sT -p80,443 192.168.0.0/24", "nmap -sT -p80,443 192.168.1.0/24", "nmap -sT 192.168.1.0/24", "nmap -sT -p80 192.168.254.0/24", "nmap -sP 192.168.1.0/24", "nmap -sT --open -Pn 192.168.1.0/24", "tar -cvf archive.tar /path/to/directory", "tar -xvf archive.tar", "zip -r archive.zip directory_to_zip", "unzip archive.zip", "make", "make --help", "gcc --help", "g++ --help", "python --help", "pip --help", "npm --help", "node --help"],
+                "interactive_tui": ["nano", "vim", "vi", "emacs -nw", "top", "htop", "ollama", "tail -f logs/micro_x.log", "ollama serve", "ssh user@hostname", "mc", "nmap -sT -P0 192.168.1.0/24", "nano config/command_categories.json", "ls && nano", "git commit", "git rebase -i HEAD~3", "sudo visudo", "alsamixer", "watch -n 1 'df -h'", "less +F /var/log/syslog", "sudo apt upgrade", "sudo apt full-upgrade", "sudo dnf upgrade", "sudo yum upgrade", "sudo fdisk /dev/sda", "sudo cfdisk /dev/sda", "sudo parted /dev/sda", "sudo ufw enable", "sudo ufw default deny incoming", "sudo systemctl edit servicename"]
+            };
+            // --- END OF FULL PRELOADED DATA OBJECTS ---
+
+
+            function showMessage(message, type = 'info', duration = 5000) { /* ... (same as v4) ... */
+                const toast = document.createElement('div');
+                toast.textContent = message;
+
+                let bgColorClass = 'bg-blue-600'; // Default for info
+                let textColorClass = 'text-white';
+
+                if (type === 'success') bgColorClass = 'bg-green-500';
+                else if (type === 'error') bgColorClass = 'bg-red-500';
+                else if (type === 'warning') {
+                    bgColorClass = 'bg-yellow-400';
+                    textColorClass = 'text-gray-800';
+                }
+                toast.className = `toast ${bgColorClass} ${textColorClass}`;
+
+                const progressBar = document.createElement('div');
+                progressBar.className = 'toast-progress';
+                progressBar.style.animationDuration = `${duration / 1000}s`;
+                if (type === 'warning') {
+                    progressBar.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
+                }
+                toast.appendChild(progressBar);
+                toastContainer.appendChild(toast);
+                setTimeout(() => { toast.classList.add('show'); }, 10);
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => {
+                        if (toast.parentNode === toastContainer) {
+                           toastContainer.removeChild(toast);
+                        }
+                    }, 300);
+                }, duration);
+            }
+
+            function setButtonLoading(buttonElement, isLoading, defaultText = "Save to Project") { /* ... (same as v4) ... */
+                const textSpan = buttonElement.querySelector('.button-text');
+                const loaderSpan = buttonElement.querySelector('.button-loader');
+
+                if (isLoading) {
+                    if(textSpan) textSpan.textContent = "Saving...";
+                    if(loaderSpan) loaderSpan.classList.remove('hidden');
+                    buttonElement.disabled = true;
+                } else {
+                    if(textSpan) textSpan.textContent = defaultText;
+                    if(loaderSpan) loaderSpan.classList.add('hidden');
+                    buttonElement.disabled = false;
+                }
+            }
+            function getDeepData(dataObject, pathArray, key) { /* ... (same as v4) ... */
+                let target = dataObject;
+                for (const segment of pathArray) {
+                    if (target && typeof target === 'object' && target.hasOwnProperty(segment)) {
+                        target = target[segment];
+                    } else {
+                        return undefined;
+                    }
+                }
+                return target && typeof target === 'object' && target.hasOwnProperty(key) ? target[key] : undefined;
+            }
+            function setDeepData(dataObject, pathArray, key, value) { /* ... (same as v4) ... */
+                if (!dataObject) return;
+                let target = dataObject;
+                for (const segment of pathArray) {
+                    if (!target[segment] || typeof target[segment] !== 'object') {
+                        target[segment] = {};
+                    }
+                    target = target[segment];
+                }
+                target[key] = value;
+                console.log(`Updated userConfigData.${pathArray.join('.')}${pathArray.length > 0 ? '.' : ''}${key} = `, value);
+            }
+            function handleFileUpload(fileInput, dataStoreSetter, editorElement, downloadButton, saveToProjectButton, configType, isDefaultViewer = false) { /* ... (same as v4, uses new showMessage) ... */
+                 fileInput.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            try {
+                                const jsonData = JSON.parse(e.target.result);
+                                dataStoreSetter(jsonData);
+                                if (isDefaultViewer) {
+                                    renderJsonViewer(editorElement, jsonData);
+                                } else {
+                                    if (configType === 'userConfig') {
+                                        renderUserConfigEditor(editorElement, jsonData);
+                                    } else if (configType === 'userCategories') {
+                                        renderUserCommandCategoriesEditor(editorElement, jsonData);
+                                    }
+                                    if(downloadButton) downloadButton.disabled = false;
+                                    if(saveToProjectButton) saveToProjectButton.disabled = false;
+                                }
+                                showMessage(`${file.name} loaded successfully.`, 'success');
+                            } catch (error) {
+                                console.error("Error parsing JSON:", error);
+                                showMessage(`Error parsing ${file.name}: ${error.message}`, 'error');
+                                dataStoreSetter(null);
+                                editorElement.innerHTML = `<p class="text-red-400 text-sm">Failed to load or parse ${file.name}. Ensure it's valid JSON.</p>`;
+                                if (!isDefaultViewer) {
+                                    if(downloadButton) downloadButton.disabled = true;
+                                    if(saveToProjectButton) saveToProjectButton.disabled = true;
+                                }
+                            }
+                        };
+                        reader.readAsText(file);
+                    }
+                });
+            }
+            function renderJsonViewer(element, data) { /* ... (same as v4) ... */
+                element.innerHTML = `<pre class="text-xs text-gray-300 whitespace-pre-wrap break-all p-2 bg-gray-600 rounded">${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            function createAccordionItem(title, contentElement, parentElementId, isOpen = false) { /* ... (same as v4) ... */
+                const accordionId = `accordion-${parentElementId}-${title.replace(/\s+/g, '-')}`;
+                const headerId = `header-${accordionId}`;
+                const contentId = `content-${accordionId}`;
+
+                const item = document.createElement('div');
+                item.classList.add('mb-2', 'border', 'border-gray-600', 'rounded-md', 'overflow-hidden');
+
+                const header = document.createElement('button');
+                header.setAttribute('type', 'button');
+                header.id = headerId;
+                header.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                header.setAttribute('aria-controls', contentId);
+                header.classList.add('flex', 'items-center', 'justify-between', 'w-full', 'p-3', 'font-medium', 'text-left', 'text-gray-300', 'bg-gray-600', 'hover:bg-gray-500', 'focus:ring-2', 'focus:ring-gray-500', 'transition-colors');
+                header.innerHTML = `
+                    <span>${title}</span>
+                    <svg class="w-3 h-3 transform ${isOpen ? 'rotate-180' : ''} shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5 5 1 1 5"/>
+                    </svg>
+                `;
+
+                const contentWrapper = document.createElement('div');
+                contentWrapper.id = contentId;
+                contentWrapper.classList.add('accordion-content', 'p-3', 'bg-gray-700', 'space-y-2');
+                if (isOpen) {
+                    contentWrapper.classList.add('open');
+                }
+                contentWrapper.setAttribute('aria-labelledby', headerId);
+                contentWrapper.appendChild(contentElement);
+
+                item.appendChild(header);
+                item.appendChild(contentWrapper);
+
+                header.addEventListener('click', () => {
+                    const isExpanded = header.getAttribute('aria-expanded') === 'true';
+                    header.setAttribute('aria-expanded', !isExpanded);
+                    contentWrapper.classList.toggle('open');
+                    header.querySelector('svg').classList.toggle('rotate-180');
+                });
+                return item;
+            }
+            function createFormElement(key, value, path, configType, tooltipText = null) { /* ... (same as v4) ... */
+                const elementId = `${configType}-${path.join('-')}${path.length > 0 ? '-' : ''}${key}`;
+                const div = document.createElement('div');
+                div.classList.add('mb-3', 'p-3', 'border-l-4', 'border-blue-600', 'bg-gray-750', 'rounded-r-md');
+
+                const label = document.createElement('label');
+                label.htmlFor = elementId;
+                label.textContent = key;
+                label.classList.add('text-sm', 'font-medium', 'text-gray-200', 'flex', 'items-center', 'mb-1');
+
+                if (tooltipText) {
+                    const tooltipIcon = document.createElement('span');
+                    tooltipIcon.classList.add('ml-2', 'text-gray-400', 'cursor-help', 'relative');
+                    tooltipIcon.innerHTML = `
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg>
+                        <span class="tooltip">${tooltipText}</span>`; // Flowbite might need data-tooltip-target and data-tooltip-placement on the icon
+                    label.appendChild(tooltipIcon);
+                }
+                div.appendChild(label);
+
+                let input;
+                const inputClasses = ['bg-gray-600', 'border', 'border-gray-500', 'text-gray-100', 'text-sm', 'rounded-lg', 'focus:ring-blue-500', 'focus:border-blue-500', 'block', 'w-full', 'p-2.5', 'placeholder-gray-400'];
+
+                if (typeof value === 'boolean') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.checked = value;
+                    input.id = elementId;
+                    input.classList.add('w-4', 'h-4', 'text-blue-500', 'bg-gray-700', 'border-gray-600', 'rounded', 'focus:ring-blue-600', 'focus:ring-offset-gray-800', 'focus:ring-2', 'ml-0', 'align-middle');
+                    const checkboxWrapper = document.createElement('div');
+                    checkboxWrapper.classList.add('mt-1', 'flex', 'items-center');
+                    const checkboxLabel = document.createElement('label');
+                    checkboxLabel.htmlFor = elementId;
+                    checkboxLabel.textContent = value ? ' Enabled' : ' Disabled';
+                    checkboxLabel.classList.add('ml-2', 'text-sm', 'text-gray-300');
+                    checkboxWrapper.appendChild(input);
+                    checkboxWrapper.appendChild(checkboxLabel);
+                    div.appendChild(checkboxWrapper);
+                    input.addEventListener('change', (e) => {
+                         checkboxLabel.textContent = e.target.checked ? ' Enabled' : ' Disabled';
+                    });
+                } else if (typeof value === 'number') {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.value = value;
+                    input.id = elementId;
+                    input.classList.add(...inputClasses);
+                } else if (key === 'system' || key === 'user_template' || (path.length > 0 && path[path.length-1] === 'prompts' && (key === 'system' || key === 'user_template')) || (typeof value === 'string' && value.includes('\n'))) {
+                    input = document.createElement('textarea');
+                    input.value = value;
+                    input.id = elementId;
+                    input.rows = Math.min(10, Math.max(3, value.split('\n').length + 1));
+                    input.classList.add(...inputClasses);
+                } else if (configType === 'userConfig' && key === 'protected_branches' && Array.isArray(value) && value.every(item => typeof item === 'string')) {
+                    const arrayEditorContainer = createArrayEditor(key, value, path, configType, 'Remove Branch', 'Add Branch');
+                    div.appendChild(arrayEditorContainer);
+                    input = null;
+                }
+                 else if (typeof value === 'string') {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = value;
+                    input.id = elementId;
+                    input.classList.add(...inputClasses);
+                } else {
+                    input = document.createElement('textarea');
+                    input.value = JSON.stringify(value, null, 2);
+                    input.id = elementId;
+                    input.rows = Math.min(10, Math.max(3, JSON.stringify(value, null, 2).split('\n').length + 1));
+                    input.classList.add(...inputClasses, 'font-mono', 'text-xs');
+                    const note = document.createElement('p');
+                    note.textContent = 'Complex value (e.g., array). Edit as JSON with care.';
+                    note.classList.add('text-xs', 'text-yellow-400', 'mt-1');
+                    div.appendChild(note);
+                }
+
+                if (input && typeof value !== 'boolean') {
+                    div.appendChild(input);
+                }
+
+                if (input) {
+                    input.addEventListener('change', (e) => {
+                        let changedValue;
+                        if (e.target.type === 'checkbox') {
+                            changedValue = e.target.checked;
+                        } else if (e.target.type === 'number') {
+                            changedValue = parseFloat(e.target.value);
+                            if (isNaN(changedValue)) changedValue = e.target.value;
+                        } else if (e.target.type === 'textarea' && !(key === 'system' || key === 'user_template' || (path.length > 0 && path[path.length-1] === 'prompts')) ) {
+                            try {
+                                changedValue = JSON.parse(e.target.value);
+                            } catch {
+                                changedValue = e.target.value;
+                                showMessage(`Warning: Value for '${key}' was not valid JSON. Saved as string.`, 'warning');
+                            }
+                        } else {
+                            changedValue = e.target.value;
+                        }
+                        setDeepData(userConfigData, path, key, changedValue);
+                    });
+                }
+                return div;
+            }
+            function createArrayEditor(key, arrayValue, path, configType, removeItemLabel, addItemLabel) { /* ... (same as v4) ... */
+                const container = document.createElement('div');
+                container.id = `array-editor-${configType}-${path.join('-')}-${key}`;
+                container.classList.add('space-y-2', 'p-2', 'bg-gray-600', 'rounded');
+
+                const listElement = document.createElement('div');
+                listElement.id = `array-list-${container.id}`;
+                container.appendChild(listElement);
+
+                const renderListItems = () => {
+                    listElement.innerHTML = '';
+                    const currentArray = getDeepData(userConfigData, path, key) || [];
+                    currentArray.forEach((item, index) => {
+                        const itemDiv = document.createElement('div');
+                        itemDiv.classList.add('flex', 'items-center', 'gap-2', 'mb-1');
+
+                        const itemInput = document.createElement('input');
+                        itemInput.type = 'text';
+                        itemInput.value = item;
+                        itemInput.classList.add('bg-gray-500', 'border', 'border-gray-400', 'text-gray-100', 'text-sm', 'rounded-lg', 'focus:ring-blue-500', 'focus:border-blue-500', 'block', 'w-full', 'p-1.5');
+                        itemInput.addEventListener('change', (e) => {
+                            const newArray = [...currentArray];
+                            newArray[index] = e.target.value;
+                            setDeepData(userConfigData, path, key, newArray);
+                        });
+
+                        const removeBtn = document.createElement('button');
+                        removeBtn.textContent = removeItemLabel || 'Remove';
+                        removeBtn.classList.add('bg-red-500', 'hover:bg-red-600', 'text-white', 'text-xs', 'font-semibold', 'py-1', 'px-2', 'rounded-md', 'shrink-0');
+                        removeBtn.addEventListener('click', () => {
+                            const newArray = [...currentArray];
+                            newArray.splice(index, 1);
+                            setDeepData(userConfigData, path, key, newArray);
+                            renderListItems();
+                        });
+
+                        itemDiv.appendChild(itemInput);
+                        itemDiv.appendChild(removeBtn);
+                        listElement.appendChild(itemDiv);
+                    });
+                };
+
+                const addBtn = document.createElement('button');
+                addBtn.textContent = addItemLabel || 'Add Item';
+                addBtn.classList.add('mt-2', 'bg-green-500', 'hover:bg-green-600', 'text-white', 'text-sm', 'font-semibold', 'py-1.5', 'px-3', 'rounded-md');
+                addBtn.addEventListener('click', () => {
+                    const currentArray = getDeepData(userConfigData, path, key) || [];
+                    const newArray = [...currentArray, ""];
+                    setDeepData(userConfigData, path, key, newArray);
+                    renderListItems();
+                });
+                container.appendChild(addBtn);
+
+                renderListItems();
+                return container;
+            }
+            function renderUserConfigEditor(element, data) { /* ... (same as v4) ... */
+                element.innerHTML = '';
+                const definedOrder = ['ai_models', 'timeouts', 'behavior', 'ui', 'paths', 'prompts', 'ollama_service', 'integrity_check'];
+                const allKeys = Object.keys(data);
+                const sortedKeys = definedOrder.filter(key => allKeys.includes(key));
+                const otherKeys = allKeys.filter(key => !definedOrder.includes(key)).sort();
+                const orderedKeys = [...sortedKeys, ...otherKeys];
+
+                orderedKeys.forEach(key => {
+                    if (data.hasOwnProperty(key)) {
+                        const value = data[key];
+                        const sectionContent = document.createElement('div');
+                        sectionContent.classList.add('space-y-3', 'pl-3');
+
+                        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                            for (const subKey in value) {
+                                if (value.hasOwnProperty(subKey)) {
+                                    const subValue = value[subKey];
+                                    const fullPathKey = `${key}.${subKey}`;
+                                    let tooltip = configUpdateTips[fullPathKey] || `Config: ${key} -> ${subKey}`;
+
+                                    if (key === 'prompts' && typeof subValue === 'object' && subValue !== null) {
+                                        const promptObject = subValue;
+                                        const promptAccordionContent = document.createElement('div');
+                                        promptAccordionContent.classList.add('space-y-2', 'pl-2');
+                                        promptAccordionContent.appendChild(createFormElement('system', promptObject.system, [key, subKey], 'userConfig', `System prompt for '${subKey}' AI role.`));
+                                        promptAccordionContent.appendChild(createFormElement('user_template', promptObject.user_template, [key, subKey], 'userConfig', `User prompt template for '${subKey}' AI role.`));
+                                        const promptAccordion = createAccordionItem(subKey, promptAccordionContent, `prompts-accordion-${key}`, false);
+                                        sectionContent.appendChild(promptAccordion);
+                                    } else {
+                                        sectionContent.appendChild(createFormElement(subKey, subValue, [key], 'userConfig', tooltip));
+                                    }
+                                }
+                            }
+                        } else {
+                           sectionContent.appendChild(createFormElement(key, value, [], 'userConfig', configUpdateTips[key]));
+                        }
+                        const accordionItem = createAccordionItem(key, sectionContent, 'userConfigEditor', key === 'ai_models' || key === 'integrity_check' || key === 'prompts');
+                        element.appendChild(accordionItem);
+                    }
+                });
+                if (typeof initFlowbite === 'function') {
+                    initFlowbite();
+                }
+            }
+            function renderUserCommandCategoriesEditor(element, data) { /* ... (uses new showMessage, same as v4 otherwise) ... */
+                element.innerHTML = '';
+                const categoryOrder = ['simple', 'semi_interactive', 'interactive_tui'];
+
+                const addCommandSection = document.createElement('div');
+                addCommandSection.classList.add('mb-6', 'p-4', 'bg-gray-750', 'rounded-lg', 'shadow');
+                addCommandSection.innerHTML = `
+                    <h3 class="text-lg font-semibold text-blue-300 mb-3">Add New Command</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label for="newCommandString">Command String:</label>
+                            <input type="text" id="newCommandString" placeholder="e.g., ls -lA" class="bg-gray-600 border border-gray-500 text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 placeholder-gray-400">
+                        </div>
+                        <div>
+                            <label for="newCommandCategory">Category:</label>
+                            <select id="newCommandCategory" class="bg-gray-600 border border-gray-500 text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                <option value="simple">simple</option>
+                                <option value="semi_interactive">semi_interactive</option>
+                                <option value="interactive_tui">interactive_tui</option>
+                            </select>
+                        </div>
+                        <button id="addCategoryCommandBtn" class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center transition duration-150">
+                            <svg class="w-4 h-4 mr-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.546.5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 9.546.5ZM13.2 11.85h-2.8v2.8a1 1 0 1 1-2 0v-2.8h-2.8a1 1 0 1 1 0-2h2.8v-2.8a1 1 0 1 1 2 0v2.8h2.8a1 1 0 1 1 0 2Z"/>
+                            </svg>
+                            Add Command
+                        </button>
+                    </div>`;
+                element.appendChild(addCommandSection);
+
+                const accordionParent = document.createElement('div');
+                accordionParent.classList.add('space-y-2');
+
+                categoryOrder.forEach(categoryKey => {
+                    if (data.hasOwnProperty(categoryKey)) {
+                        const commands = data[categoryKey] || [];
+                        const categoryContent = document.createElement('div');
+                        categoryContent.classList.add('space-y-1');
+
+                        if (commands.length === 0) {
+                            categoryContent.innerHTML = '<p class="text-gray-400 text-xs italic">(No user-defined commands in this category)</p>';
+                        } else {
+                            const ul = document.createElement('ul');
+                            ul.classList.add('list-none', 'pl-0', 'text-gray-300', 'space-y-1');
+                            commands.forEach(cmd => {
+                                const li = document.createElement('li');
+                                li.classList.add('flex', 'items-center', 'justify-between', 'group', 'p-1.5', 'hover:bg-gray-600', 'rounded-md');
+
+                                const cmdText = document.createElement('span');
+                                cmdText.textContent = cmd;
+                                cmdText.classList.add("text-sm", "font-mono", "text-gray-200", "break-all");
+                                li.appendChild(cmdText);
+
+                                const removeBtn = document.createElement('button');
+                                removeBtn.classList.add("text-red-500", "hover:text-red-400", "ml-3", "text-xs", "font-medium", "opacity-50", "group-hover:opacity-100", "transition-opacity", "p-1");
+                                removeBtn.innerHTML = '&Cross;';
+                                removeBtn.title = `Remove "${cmd}"`;
+                                removeBtn.addEventListener('click', () => {
+                                    updateCommandCategory('remove', categoryKey, cmd);
+                                });
+                                li.appendChild(removeBtn);
+                                ul.appendChild(li);
+                            });
+                            categoryContent.appendChild(ul);
+                        }
+                        const accordionItem = createAccordionItem(categoryKey, categoryContent, 'userCategoriesEditor', true);
+                        accordionParent.appendChild(accordionItem);
+                    }
+                });
+                element.appendChild(accordionParent);
+
+                document.getElementById('addCategoryCommandBtn').addEventListener('click', () => {
+                    const newCmdString = document.getElementById('newCommandString').value.trim();
+                    const newCmdCategory = document.getElementById('newCommandCategory').value;
+                    if (newCmdString && newCmdCategory) {
+                        updateCommandCategory('add', newCmdCategory, newCmdString);
+                        document.getElementById('newCommandString').value = '';
+                    } else {
+                        showMessage('Command string cannot be empty.', 'error');
+                    }
+                });
+            }
+            function updateCommandCategory(action, category, command) { /* ... (uses new showMessage, same as v4 otherwise) ... */
+                if (!userCategoriesData) {
+                    userCategoriesData = { 'simple': [], 'semi_interactive': [], 'interactive_tui': [] };
+                }
+                ['simple', 'semi_interactive', 'interactive_tui'].forEach(catKey => {
+                    if (!userCategoriesData[catKey]) userCategoriesData[catKey] = [];
+                });
+
+                if (action === 'add') {
+                    Object.keys(userCategoriesData).forEach(key => {
+                        const index = userCategoriesData[key].indexOf(command);
+                        if (index > -1) userCategoriesData[key].splice(index, 1);
+                    });
+                    if (!userCategoriesData[category].includes(command)) {
+                        userCategoriesData[category].push(command);
+                    }
+                    showMessage(`Command '${command}' added/moved to category '${category}'.`, 'success');
+                } else if (action === 'remove') {
+                    let removed = false;
+                    if (userCategoriesData[category]) {
+                        const index = userCategoriesData[category].indexOf(command);
+                        if (index > -1) {
+                            userCategoriesData[category].splice(index, 1);
+                            removed = true;
+                        }
+                    }
+                    if (removed) {
+                        showMessage(`Command '${command}' removed from category '${category}'.`, 'success');
+                    } else {
+                        showMessage(`Command '${command}' not found in category '${category}'. No action taken.`, 'warning');
+                    }
+                }
+                renderUserCommandCategoriesEditor(userCategoriesEditor, userCategoriesData);
+                downloadUserCategoriesBtn.disabled = userCategoriesData === null;
+                saveUserCategoriesToProjectBtn.disabled = userCategoriesData === null;
+            }
+
+            // --- Event Listeners ---
+            handleFileUpload(userConfigFileInput, (data) => userConfigData = data, userConfigEditor, downloadUserConfigBtn, saveUserConfigToProjectBtn, 'userConfig');
+            handleFileUpload(userCategoriesFileInput, (data) => userCategoriesData = data, userCategoriesEditor, downloadUserCategoriesBtn, saveUserCategoriesToProjectBtn, 'userCategories');
+            handleFileUpload(defaultConfigFileInput, (data) => defaultGeneralConfigData = data, defaultConfigViewer, null, null, 'defaultConfig', true);
+            handleFileUpload(defaultCategoriesFileInput, (data) => defaultCommandCategoriesData = data, defaultCategoriesViewer, null, null, 'defaultCategories', true);
+
+            generateNewUserConfigBtn.addEventListener('click', () => { /* ... (uses new showMessage) ... */
+                console.log("Generate New User Config button clicked.");
+                userConfigData = JSON.parse(JSON.stringify(PRELOADED_DEFAULT_CONFIG));
+                renderUserConfigEditor(userConfigEditor, userConfigData);
+                downloadUserConfigBtn.disabled = false;
+                saveUserConfigToProjectBtn.disabled = false;
+                showMessage('New user_config.json template generated from defaults.', 'success');
+            });
+
+            generateNewUserCategoriesBtn.addEventListener('click', () => { /* ... (uses new showMessage) ... */
+                console.log("Generate New User Categories button clicked.");
+                userCategoriesData = { "simple": [], "semi_interactive": [], "interactive_tui": [] };
+                renderUserCommandCategoriesEditor(userCategoriesEditor, userCategoriesData);
+                downloadUserCategoriesBtn.disabled = false;
+                saveUserCategoriesToProjectBtn.disabled = false;
+                showMessage('New empty user_command_categories.json template generated.', 'success');
+            });
+
+            autoLoadBtn.addEventListener('click', async () => { /* Uses more robust error display in .catch */
+                console.log("Auto-Load button clicked");
+                showMessage('Attempting to auto-load configurations from ../../config/ ...', 'info');
+
+                const filesToLoad = [
+                    { path: '../../config/user_config.json', setter: (data) => userConfigData = data, renderer: renderUserConfigEditor, editorElement: userConfigEditor, downloadBtn: downloadUserConfigBtn, saveBtn: saveUserConfigToProjectBtn, name: 'user_config.json' },
+                    { path: '../../config/user_command_categories.json', setter: (data) => userCategoriesData = data, renderer: renderUserCommandCategoriesEditor, editorElement: userCategoriesEditor, downloadBtn: downloadUserCategoriesBtn, saveBtn: saveUserCategoriesToProjectBtn, name: 'user_command_categories.json' },
+                    { path: '../../config/default_config.json', setter: (data) => defaultGeneralConfigData = data, renderer: renderJsonViewer, editorElement: defaultConfigViewer, name: 'default_config.json' },
+                    { path: '../../config/default_command_categories.json', setter: (data) => defaultCommandCategoriesData = data, renderer: renderJsonViewer, editorElement: defaultCategoriesViewer, name: 'default_command_categories.json' }
+                ];
+                let successMessages = [];
+                let errorMessages = [];
+
+                const loadPromises = filesToLoad.map(fileInfo =>
+                    fetch(fileInfo.path)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error ${response.status} for ${fileInfo.name}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            fileInfo.setter(data);
+                            fileInfo.renderer(fileInfo.editorElement, data);
+                            if (fileInfo.downloadBtn) fileInfo.downloadBtn.disabled = false;
+                            if (fileInfo.saveBtn) fileInfo.saveBtn.disabled = false;
+                            successMessages.push(`${fileInfo.name} loaded.`);
+                        })
+                        .catch(error => {
+                            console.error(`Full error object for ${fileInfo.name}:`, error);
+                            const detailedErrorMessage = `Failed to auto-load ${fileInfo.name} from ${fileInfo.path}.\nError: ${error.message}.\nEnsure server is running and file exists. Check console for more details.`;
+                            errorMessages.push(detailedErrorMessage);
+
+                            try {
+                                if (fileInfo.editorElement) {
+                                    fileInfo.editorElement.innerHTML = ''; // Clear first
+                                    const p = document.createElement('p');
+                                    p.className = 'text-red-400 text-sm whitespace-pre-wrap';
+                                    p.textContent = detailedErrorMessage;
+                                    fileInfo.editorElement.appendChild(p);
+                                }
+                                if (fileInfo.downloadBtn) fileInfo.downloadBtn.disabled = true;
+                                if (fileInfo.saveBtn) fileInfo.saveBtn.disabled = true;
+                            } catch (uiError) {
+                                console.error(`UI update error after failing to load ${fileInfo.name}:`, uiError);
+                            }
+                        })
+                );
+
+                await Promise.allSettled(loadPromises);
+
+                if (successMessages.length > 0 && errorMessages.length === 0) {
+                    showMessage(`Auto-Load: All requested files loaded successfully. (${successMessages.join(' ')})`, 'success');
+                } else if (successMessages.length > 0 && errorMessages.length > 0) {
+                    showMessage(`Auto-Load: Some files loaded (${successMessages.join(' ')}). Errors: ${errorMessages.join(' ')}`, 'warning');
+                } else if (errorMessages.length > 0) {
+                    showMessage(`Auto-Load Failed: ${errorMessages.join(' ')} Ensure the tool is served via HTTP and files exist. Check console.`, 'error');
+                } else {
+                    showMessage('Auto-Load: No files were processed or found. Check paths and server.', 'warning');
+                }
+                if (typeof initFlowbite === 'function') { initFlowbite(); }
+            });
+
+            saveUserConfigToProjectBtn.addEventListener('click', async () => { /* ... (same as v4, uses new showMessage & setButtonLoading) ... */
+                if (!userConfigData) {
+                    showMessage('No user config data to save.', 'warning');
+                    return;
+                }
+                setButtonLoading(saveUserConfigToProjectBtn, true);
+                try {
+                    const response = await fetch('/api/save/user_config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(userConfigData)
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        showMessage(result.message || 'user_config.json saved successfully to project!', 'success');
+                        setButtonLoading(saveUserConfigToProjectBtn, false, "Saved ✔");
+                        setTimeout(() => setButtonLoading(saveUserConfigToProjectBtn, false, "Save to Project"), 2000);
+                    } else {
+                        throw new Error(result.message || `Server error ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Error saving user_config.json to project:', error);
+                    showMessage(`Error saving user_config.json: ${error.message}. Ensure local server is running.`, 'error');
+                    setButtonLoading(saveUserConfigToProjectBtn, false);
+                }
+            });
+
+            saveUserCategoriesToProjectBtn.addEventListener('click', async () => { /* ... (same as v4, uses new showMessage & setButtonLoading) ... */
+                if (!userCategoriesData) {
+                    showMessage('No user categories data to save.', 'warning');
+                    return;
+                }
+                setButtonLoading(saveUserCategoriesToProjectBtn, true);
+                try {
+                    const response = await fetch('/api/save/user_categories', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(userCategoriesData)
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        showMessage(result.message || 'user_command_categories.json saved successfully to project!', 'success');
+                        setButtonLoading(saveUserCategoriesToProjectBtn, false, "Saved ✔");
+                        setTimeout(() => setButtonLoading(saveUserCategoriesToProjectBtn, false, "Save to Project"), 2000);
+                    } else {
+                        throw new Error(result.message || `Server error ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Error saving user_command_categories.json to project:', error);
+                    showMessage(`Error saving user_command_categories.json: ${error.message}. Ensure local server is running.`, 'error');
+                    setButtonLoading(saveUserCategoriesToProjectBtn, false);
+                }
+            });
+
+            downloadUserConfigBtn.addEventListener('click', () => { /* ... (same as v4, uses new showMessage) ... */
+                if (userConfigData) {
+                    const jsonDataStr = JSON.stringify(userConfigData, null, 2);
+                    const blob = new Blob([jsonDataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'user_config.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showMessage('`user_config.json` prepared for download.', 'success');
+                } else {
+                    showMessage('No user config data to download.', 'warning');
+                }
+            });
+
+            downloadUserCategoriesBtn.addEventListener('click', () => { /* ... (same as v4, uses new showMessage) ... */
+                if (userCategoriesData) {
+                    const jsonDataStr = JSON.stringify(userCategoriesData, null, 2);
+                    const blob = new Blob([jsonDataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'user_command_categories.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showMessage('`user_command_categories.json` prepared for download.', 'success');
+                } else {
+                    showMessage('No user categories data to download.', 'warning');
+                }
+            });
+
+            resetAllBtn.addEventListener('click', () => { /* ... (same as v4, uses new showMessage) ... */
+                console.log("Reset All button clicked.");
+                userConfigData = null;
+                userCategoriesData = null;
+                defaultGeneralConfigData = null;
+                defaultCommandCategoriesData = null;
+
+                userConfigEditor.innerHTML = '<p class="text-gray-400 text-sm">Upload a `user_config.json` file to view and edit its settings, or generate a new one.</p>';
+                userCategoriesEditor.innerHTML = '<p class="text-gray-400 text-sm">Upload a `user_command_categories.json` file to manage your custom command categorizations, or generate a new one.</p>';
+                defaultConfigViewer.innerHTML = '<p class="text-gray-400 text-sm">Upload or click "Load Defaults" to view default general settings.</p>';
+                defaultCategoriesViewer.innerHTML = '<p class="text-gray-400 text-sm">Upload or click "Load Defaults" to view default command categorizations.</p>';
+
+                userConfigFileInput.value = '';
+                userCategoriesFileInput.value = '';
+                defaultConfigFileInput.value = '';
+                defaultCategoriesFileInput.value = '';
+
+                downloadUserConfigBtn.disabled = true;
+                saveUserConfigToProjectBtn.disabled = true;
+                downloadUserCategoriesBtn.disabled = true;
+                saveUserCategoriesToProjectBtn.disabled = true;
+                showMessage('All configurations cleared from the UI.', 'info');
+            });
+
+            loadDefaultsBtn.addEventListener('click', () => { /* ... (same as v4, uses new showMessage) ... */
+                defaultGeneralConfigData = JSON.parse(JSON.stringify(PRELOADED_DEFAULT_CONFIG));
+                defaultCommandCategoriesData = JSON.parse(JSON.stringify(PRELOADED_DEFAULT_CATEGORIES));
+                renderJsonViewer(defaultConfigViewer, defaultGeneralConfigData);
+                renderJsonViewer(defaultCategoriesViewer, defaultCommandCategoriesData);
+                showMessage('Pre-loaded default configurations displayed for reference.', 'success');
+            });
+
+            if (typeof initFlowbite === 'function') {
+                initFlowbite();
+            }
+        });
+    </script>
+</body>
+</html>

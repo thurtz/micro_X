@@ -84,8 +84,7 @@ def load_configuration():
             "output_separator_character": "─",
             "output_separator_length": 30,
             "enable_startup_separator": True,
-            "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n",
-            "enable_mouse_support": False # Fallback default for mouse support
+            "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n", # Example with newline
         },
         "paths": {"tmux_log_base_path": "/tmp"},
         "prompts": {
@@ -129,13 +128,6 @@ def load_configuration():
         except Exception as e: logger.error(f"Error loading {user_config_path}: {e}.", exc_info=True)
     else: logger.info(f"{user_config_path} not found. No user general overrides applied.")
 
-    # Ensure critical UI keys exist after merging, especially new ones like enable_mouse_support
-    if "ui" not in config: config["ui"] = {}
-    if "enable_mouse_support" not in config["ui"]:
-        config["ui"]["enable_mouse_support"] = fallback_config["ui"]["enable_mouse_support"]
-        logger.info(f"UI config 'enable_mouse_support' was missing, set to fallback default: {config['ui']['enable_mouse_support']}")
-
-
 load_configuration() # Load config at startup
 
 def normal_input_accept_handler(buff):
@@ -161,14 +153,21 @@ def normal_input_accept_handler(buff):
         finally:
             if was_in_edit_mode:
                 logger.debug("Input was from edit mode; explicitly calling restore_normal_input_handler.")
+                # ---- MODIFICATION START ----
+                # Reset is_in_edit_mode in UIManager *before* calling restore_normal_input_handler
+                # This ensures the separator logic in restore_normal_input_handler sees the correct state.
                 if ui_manager_instance:
                     logger.debug(f"Before calling restore_normal_input_handler, ui_manager.is_in_edit_mode was {ui_manager_instance.is_in_edit_mode}. Resetting to False.")
                     ui_manager_instance.is_in_edit_mode = False 
+                # ---- MODIFICATION END ----
                 
                 if shell_engine_instance and shell_engine_instance.main_restore_normal_input_ref:
                     shell_engine_instance.main_restore_normal_input_ref()
                 else:
                     logger.warning("Could not call restore_normal_input_handler after edit mode submission: ref missing.")
+            # If not was_in_edit_mode, the normal flow through process_command in ShellEngine
+            # will eventually call restore_normal_input_handler. UIManager.set_normal_input_mode
+            # (called by restore_normal_input_handler) will correctly reset is_in_edit_mode.
 
     asyncio.create_task(_handle_input())
 
@@ -183,6 +182,9 @@ def restore_normal_input_handler():
     global ui_manager_instance, shell_engine_instance
     logger.debug("restore_normal_input_handler called.")
     if ui_manager_instance and shell_engine_instance:
+        # Add interaction separator if conditions are met
+        # This check now correctly sees is_in_edit_mode as False if coming from an edit mode submission
+        # because normal_input_accept_handler's finally block resets it before calling this.
         if ui_manager_instance.initial_prompt_settled and \
            ui_manager_instance.config.get("ui", {}).get("enable_output_separator", True) and \
            not ui_manager_instance.categorization_flow_active and \
@@ -191,6 +193,7 @@ def restore_normal_input_handler():
             logger.debug("Conditions met for adding interaction separator.")
             ui_manager_instance.add_interaction_separator()
 
+        # This call will also set ui_manager_instance.is_in_edit_mode to False, which is fine.
         ui_manager_instance.set_normal_input_mode(normal_input_accept_handler, shell_engine_instance.current_directory)
     elif not ui_manager_instance:
         logger.warning("restore_normal_input_handler: ui_manager_instance is None.")
@@ -231,12 +234,12 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
     if not await git_context_manager_instance.is_git_available():
         ui_manager_instance.append_output("⚠️ Git command not found. Integrity checks cannot be performed. Assuming developer mode.", style_class='error')
         logger.error("Git command not found. Integrity checks skipped. Defaulting to developer mode.")
-        return True, True 
+        return True, True # is_dev_mode=True, integrity_ok=True (as checks are skipped)
 
     if not await git_context_manager_instance.is_repository():
         ui_manager_instance.append_output(f"⚠️ Project directory '{SCRIPT_DIR}' is not a Git repository. Integrity checks cannot be performed. Assuming developer mode.", style_class='error')
         logger.error(f"Not a Git repository at '{SCRIPT_DIR}'. Integrity checks skipped. Defaulting to developer mode.")
-        return True, True 
+        return True, True # is_dev_mode=True, integrity_ok=True
 
     current_branch = await git_context_manager_instance.get_current_branch()
     head_commit = await git_context_manager_instance.get_head_commit_hash()
@@ -256,15 +259,15 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
             status_output_tuple = await git_context_manager_instance._run_git_command(["status", "--porcelain"])
             status_output_details = status_output_tuple[1] if status_output_tuple[0] else "Could not get detailed status."
             error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Uncommitted local changes or untracked files detected."
-            detail_msg = f"   Git status details:\n{status_output_details}" 
+            detail_msg = f"    Git status details:\n{status_output_details}" # Indented for clarity
             ui_manager_instance.append_output(error_msg, style_class='error')
-            ui_manager_instance.append_output(detail_msg, style_class='error') 
+            ui_manager_instance.append_output(detail_msg, style_class='error') # Keep style consistent for error block
             logger.critical(f"{error_msg}\n{detail_msg}")
             integrity_ok = False
         else:
             ui_manager_instance.append_output(f"✅ Working directory is clean for branch '{current_branch}'.", style_class='info')
 
-        if integrity_ok: 
+        if integrity_ok: # Only check remote sync if directory is clean
             comparison_status, local_h, remote_h, fetch_status = await git_context_manager_instance.compare_head_with_remote_tracking(current_branch)
             
             if fetch_status == "success":
@@ -273,7 +276,7 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
                     logger.info(f"Branch '{current_branch}' (Local: {local_h[:7] if local_h else 'N/A'}) is synced with remote (Remote: {remote_h[:7] if remote_h else 'N/A'}).")
                 elif comparison_status == "behind" and allow_run_if_behind:
                     warn_msg = f"⚠️ Your local branch '{current_branch}' is behind 'origin/{current_branch}'. New updates are available."
-                    suggest_msg = "   Suggestion: Run the '/update' command to get the latest version."
+                    suggest_msg = "    Suggestion: Run the '/update' command to get the latest version."
                     ui_manager_instance.append_output(warn_msg, style_class='warning')
                     ui_manager_instance.append_output(suggest_msg, style_class='info')
                     logger.warning(f"{warn_msg} Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}")
@@ -282,25 +285,25 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
                     if comparison_status == "behind" and not allow_run_if_behind:
                         status_description = "behind (and configuration disallows running)"
                     error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Local branch has '{status_description}' from 'origin/{current_branch}'."
-                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
+                    detail_msg = f"    Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
                     ui_manager_instance.append_output(error_msg, style_class='error')
                     ui_manager_instance.append_output(detail_msg, style_class='error')
                     logger.critical(f"{error_msg} {detail_msg}")
                     integrity_ok = False
-                else: 
+                else: # Should ideally not be reached if comparison_status is one of the expected values
                     error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Cannot reliably compare with remote after successful fetch. Status: {comparison_status}."
-                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
+                    detail_msg = f"    Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
                     ui_manager_instance.append_output(error_msg, style_class='error')
                     ui_manager_instance.append_output(detail_msg, style_class='error')
                     logger.critical(f"{error_msg} {detail_msg}")
                     integrity_ok = False
             elif fetch_status in ["timeout", "offline_or_unreachable"]:
                 ui_manager_instance.append_output(f"⚠️ Could not contact remote for branch '{current_branch}' (Reason: {fetch_status}). Comparing against local cache.", style_class='warning')
-                if comparison_status == "synced_local_cache" or comparison_status == "behind_local_cache": 
-                    ui_manager_instance.append_output(f"ℹ️ Branch '{current_branch}' is consistent with the last known state of 'origin/{current_branch}'. Running in offline-verified mode.", style_class='info')
+                if comparison_status == "synced_local_cache" or comparison_status == "behind_local_cache": # Allow running if synced or behind local cache
+                     ui_manager_instance.append_output(f"ℹ️ Branch '{current_branch}' is consistent with the last known state of 'origin/{current_branch}'. Running in offline-verified mode.", style_class='info')
                 elif comparison_status == "ahead_local_cache" or comparison_status == "diverged_local_cache":
                     error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): Local branch has unpushed changes or diverged from the last known remote state. Status: {comparison_status}"
-                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Last Known Remote: {remote_h[:7] if remote_h else 'N/A'}"
+                    detail_msg = f"    Local: {local_h[:7] if local_h else 'N/A'}, Last Known Remote: {remote_h[:7] if remote_h else 'N/A'}"
                     ui_manager_instance.append_output(error_msg, style_class='error')
                     ui_manager_instance.append_output(detail_msg, style_class='error')
                     logger.critical(f"{error_msg} {detail_msg}")
@@ -310,7 +313,7 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
                     ui_manager_instance.append_output(error_msg, style_class='error')
                     logger.critical(error_msg)
                     integrity_ok = False
-                else: 
+                else: # Other unexpected comparison status with local cache
                     error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): Error comparing with local cache. Status: {comparison_status}"
                     ui_manager_instance.append_output(error_msg, style_class='error')
                     logger.critical(error_msg)
@@ -325,8 +328,9 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
             logger.info(f"Integrity checks completed for branch '{current_branch}'. Final status: OK")
         elif halt_on_failure:
             logger.critical(f"Application integrity compromised on protected branch '{current_branch}'. Halting as per configuration.")
-    else: 
-        is_developer_mode = True 
+            # No explicit _exit_app_main() here, as main_async_runner will check integrity_ok and halt_on_failure
+    else: # Unrecognized branch
+        is_developer_mode = True # Assume dev mode for any other branch
         ui_manager_instance.append_output(f"ℹ️ Running on unrecognized branch/commit '{current_branch}'. Developer mode assumed. Integrity checks informational.", style_class='info')
         logger.info(f"Developer mode assumed for unrecognized branch/commit: '{current_branch}'.")
 
@@ -337,47 +341,53 @@ async def main_async_runner():
     """ Main asynchronous runner for the application. """
     global app_instance, ui_manager_instance, shell_engine_instance, git_context_manager_instance
 
+    # Initialize UIManager first as it's needed for startup messages
     ui_manager_instance = UIManager(config)
     ui_manager_instance.main_exit_app_ref = _exit_app_main
     ui_manager_instance.main_restore_normal_input_ref = restore_normal_input_handler
 
+    # Perform startup integrity checks
     is_developer_mode, integrity_checks_passed = await perform_startup_integrity_checks()
     integrity_config = config.get("integrity_check", {})
     halt_on_failure = integrity_config.get("halt_on_integrity_failure", True)
 
     if not is_developer_mode and not integrity_checks_passed and halt_on_failure:
         logger.critical("Halting micro_X due to failed integrity checks on a protected branch.")
-        _exit_app_main() 
-        return 
+        _exit_app_main() # This will attempt to exit the application
+        return # Stop further execution
 
+    # Initialize ShellEngine
     shell_engine_instance = ShellEngine(config, ui_manager_instance,
                                         category_manager_module=sys.modules['modules.category_manager'],
                                         ai_handler_module=sys.modules['modules.ai_handler'],
                                         ollama_manager_module=sys.modules['modules.ollama_manager'],
                                         main_exit_app_ref=_exit_app_main,
                                         main_restore_normal_input_ref=restore_normal_input_handler,
-                                        main_normal_input_accept_handler_ref=normal_input_accept_handler, 
+                                        main_normal_input_accept_handler_ref=normal_input_accept_handler, # Pass the ref
                                         is_developer_mode=is_developer_mode,
                                         git_context_manager_instance=git_context_manager_instance
                                         )
     
+    # Ensure Ollama service is ready (or attempt to start it)
     ollama_service_ready = await shell_engine_instance.ollama_manager_module.ensure_ollama_service(config, ui_manager_instance.append_output)
     if not ollama_service_ready:
         ui_manager_instance.append_output("⚠️ Ollama service is not available or failed to start. AI-dependent features will be affected.", style_class='error')
-        ui_manager_instance.append_output("   You can try '/ollama help' for manual control options.", style_class='info')
+        ui_manager_instance.append_output("    You can try '/ollama help' for manual control options.", style_class='info')
         logger.warning("Ollama service check failed or service could not be started.")
     else:
         ui_manager_instance.append_output("✅ Ollama service is active and ready.", style_class='success')
         logger.info("Ollama service is active.")
 
 
+    # Initialize Category Manager (after UIManager for append_output)
     init_category_manager(SCRIPT_DIR, CONFIG_DIR, ui_manager_instance.append_output)
     
     history = FileHistory(HISTORY_FILE_PATH)
     
+    # Determine initial prompt directory string
     home_dir = os.path.expanduser("~")
     max_prompt_len = config.get('ui', {}).get('max_prompt_length', 20)
-    current_dir_for_prompt = shell_engine_instance.current_directory 
+    current_dir_for_prompt = shell_engine_instance.current_directory # Get initial CWD from ShellEngine
     if current_dir_for_prompt == home_dir: initial_prompt_dir = "~"
     elif current_dir_for_prompt.startswith(home_dir + os.sep):
         rel_path = current_dir_for_prompt[len(home_dir)+1:]; full_rel_prompt = "~/" + rel_path
@@ -386,6 +396,7 @@ async def main_async_runner():
         base_name = os.path.basename(current_dir_for_prompt)
         initial_prompt_dir = base_name if len(base_name) <= max_prompt_len else "..." + base_name[-(max_prompt_len - 3):] if (max_prompt_len - 3) > 0 else "..."
 
+    # Welcome message handling
     initial_welcome_message = (
         "Welcome to micro_X Shell 🚀\n"
         "Type a Linux command, or try '/ai your query' (e.g., /ai list text files).\n"
@@ -393,21 +404,29 @@ async def main_async_runner():
         "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
         "Use '/ollama help' to manage the Ollama service.\n"
     )
-    initial_buffer_for_ui = list(ui_manager_instance.output_buffer) 
+    # The UIManager's output_buffer already contains startup messages from integrity checks, ollama checks etc.
+    # We want to ensure the welcome message is present, preferably at the top if the buffer was empty,
+    # or appended if there's already content.
+    initial_buffer_for_ui = list(ui_manager_instance.output_buffer) # Get current buffer content
 
+    # Check if the buffer is empty or only contains the welcome message already (idempotency)
     is_buffer_empty_or_just_welcome = not initial_buffer_for_ui or \
                                       (len(initial_buffer_for_ui) == 1 and initial_buffer_for_ui[0][1] == initial_welcome_message)
 
     if is_buffer_empty_or_just_welcome and not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
         initial_buffer_for_ui.insert(0, ('class:welcome', initial_welcome_message))
     elif not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
+        # If there's other content but no welcome message, append it.
+        # This might place it after startup separators if they are added before this point.
+        # Consider if startup separator should always be *after* all initial messages including this welcome.
         initial_buffer_for_ui.append(('class:welcome', initial_welcome_message))
 
 
+    # Initialize UI elements with potentially modified initial_buffer_for_ui
     layout_from_ui_manager = ui_manager_instance.initialize_ui_elements(
         initial_prompt_text=f"({initial_prompt_dir}) > ",
         history=history,
-        output_buffer_main=initial_buffer_for_ui 
+        output_buffer_main=initial_buffer_for_ui # Pass the potentially modified buffer
     )
 
     if ui_manager_instance and ui_manager_instance.input_field:
@@ -417,24 +436,24 @@ async def main_async_runner():
         _exit_app_main()
         return
 
+    # Final UI setup after elements are initialized
     if ui_manager_instance:
-        ui_manager_instance.initial_prompt_settled = True 
-        ui_manager_instance.last_output_was_separator = False 
+        ui_manager_instance.initial_prompt_settled = True # Mark that initial prompt is set
+        ui_manager_instance.last_output_was_separator = False # Reset separator flag
+        # Add UI Startup Separator (if enabled in config)
+        # This should come after all initial messages are potentially in the buffer.
         ui_manager_instance.add_startup_separator()
 
-    # Read mouse support configuration
-    enable_mouse = config.get("ui", {}).get("enable_mouse_support", False)
-    logger.info(f"Prompt Toolkit Application mouse_support will be set to: {enable_mouse}")
 
     app_instance = Application(
         layout=layout_from_ui_manager,
         key_bindings=ui_manager_instance.get_key_bindings(),
         style=ui_manager_instance.style,
-        full_screen=True,
-        mouse_support=enable_mouse # Use configured value
+        full_screen=False,
+        mouse_support=False
     )
     if ui_manager_instance:
-        ui_manager_instance.app = app_instance 
+        ui_manager_instance.app = app_instance # Give UIManager a reference to the app
 
     logger.info("micro_X Shell application starting.")
     await app_instance.run_async()
@@ -443,47 +462,51 @@ async def main_async_runner():
 
 def run_shell():
     """ Main entry point to run the shell application. """
-    logger.info("=" * 80) 
-    logger.info("  micro_X Session Started") 
+    # Log session start
+    logger.info("=" * 80) # Corrected to 80
+    logger.info("  micro_X Session Started") # Added leading spaces for consistency
     logger.info(f"  Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    logger.info("=" * 80) 
+    logger.info("=" * 80) # Corrected to 80
     try:
         asyncio.run(main_async_runner())
     except (EOFError, KeyboardInterrupt):
         print("\nExiting micro_X Shell. 👋"); logger.info("Exiting due to EOF or KeyboardInterrupt at run_shell level.")
     except SystemExit as e:
-        if e.code == 0: 
-            print("\nExiting micro_X Shell. 👋"); logger.info("Exiting micro_X Shell normally via SystemExit(0).")
+        if e.code == 0: # Graceful exit
+             print("\nExiting micro_X Shell. 👋"); logger.info("Exiting micro_X Shell normally via SystemExit(0).")
         else:
-            print(f"\nExiting micro_X Shell due to an issue (Code: {e.code}). Check logs at {LOG_FILE}"); logger.warning(f"Exiting micro_X Shell with code {e.code}.")
+             print(f"\nExiting micro_X Shell due to an issue (Code: {e.code}). Check logs at {LOG_FILE}"); logger.warning(f"Exiting micro_X Shell with code {e.code}.")
     except Exception as e:
         print(f"\nUnexpected critical error: {e}"); logger.critical("Critical error in run_shell or main_async_runner", exc_info=True)
     finally:
         global git_context_manager_instance
         if git_context_manager_instance :
+            # Attempt to log final git state if loop is running, otherwise log basic info
             loop = None
             try: loop = asyncio.get_running_loop()
-            except RuntimeError: loop = None 
+            except RuntimeError: loop = None # No running loop
 
             if loop and loop.is_running():
                 try:
+                    # These are async methods, ensure they are awaited or run correctly if loop is active
                     final_branch_future = asyncio.run_coroutine_threadsafe(git_context_manager_instance.get_current_branch(), loop)
                     final_commit_future = asyncio.run_coroutine_threadsafe(git_context_manager_instance.get_head_commit_hash(), loop)
+                    # Add a timeout to prevent hanging if the futures don't resolve quickly
                     final_branch = final_branch_future.result(timeout=0.5) 
                     final_commit = final_commit_future.result(timeout=0.5)
                     logger.info(f"micro_X Shell final state: Branch='{final_branch}', Commit='{final_commit[:7] if final_commit else 'N/A'}'")
                 except Exception as git_log_err:
                     logger.error(f"Error logging final git state during active loop: {git_log_err}")
-            else: 
-                logger.info(f"micro_X Shell final state (sync log attempt): Project Root='{git_context_manager_instance.project_root}' (Branch/commit info requires running loop for async calls)")
+            else: # Loop not running or not found, log basic info
+                 logger.info(f"micro_X Shell final state (sync log attempt): Project Root='{git_context_manager_instance.project_root}' (Branch/commit info requires running loop for async calls)")
 
         logger.info("micro_X Shell application stopped.")
-        logger.info("=" * 80) 
-        logger.info("  micro_X Session Ended") 
+        # Log session end
+        logger.info("=" * 80) # Corrected to 80
+        logger.info("  micro_X Session Ended") # Added leading spaces
         logger.info(f"  Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        logger.info("=" * 80) 
-        logging.shutdown() 
+        logger.info("=" * 80) # Corrected to 80
+        logging.shutdown() # Ensure all handlers are flushed
 
 if __name__ == "__main__":
     run_shell()
-# This is the main entry point for the micro_X shell application.

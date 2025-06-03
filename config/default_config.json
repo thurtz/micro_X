@@ -24,7 +24,10 @@
     "max_prompt_length": 20,
     "enable_output_separator": true,
     "output_separator_character": "─",
-    "output_separator_length": 30
+    "output_separator_length": 30,
+    "enable_startup_separator": true,
+    "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n",
+    "enable_mouse_support": false
   },
   "paths": {
     "tmux_log_base_path": "/tmp"

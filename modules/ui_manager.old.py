@@ -96,8 +96,8 @@ class UIManager:
                not self.is_in_edit_mode:
                 if self.input_field and self.input_field.multiline:
                     event.current_buffer.insert_text('\n')
-            elif self.input_field and self.input_field.multiline and self.is_in_edit_mode:
-                   event.current_buffer.insert_text('\n')
+            elif self.input_field and self.input_field.multiline and self.is_in_edit_mode: # Allow newline in edit mode too
+                    event.current_buffer.insert_text('\n')
 
 
         @self.kb.add('enter')
@@ -138,29 +138,29 @@ class UIManager:
         @self.kb.add('up')
         def _handle_up_arrow(event):
             if self.categorization_flow_active or self.confirmation_flow_active:
-                pass
+                pass # Do not interfere with flow-specific input handling if any
 
             buff = event.current_buffer
             doc = buff.document
-            if doc.cursor_position_row == 0:
+            if doc.cursor_position_row == 0: # Only go to history if at the first line of input
                 if buff.history_backward():
                     buff.document = Document(text=buff.text, cursor_position=len(buff.text))
                     event.app.invalidate()
-            else:
+            else: # Otherwise, just move cursor up within multiline input
                 buff.cursor_up()
 
         @self.kb.add('down')
         def _handle_down_arrow(event):
             if self.categorization_flow_active or self.confirmation_flow_active:
-                pass
+                pass # Do not interfere with flow-specific input handling if any
 
             buff = event.current_buffer
             doc = buff.document
-            if doc.cursor_position_row == doc.line_count - 1:
+            if doc.cursor_position_row == doc.line_count - 1: # Only go to history if at the last line
                 if buff.history_forward():
                     buff.document = Document(text=buff.text, cursor_position=len(buff.text))
                     event.app.invalidate()
-            else:
+            else: # Otherwise, just move cursor down
                 buff.cursor_down()
 
         logger.debug("UIManager: Keybindings registered.")
@@ -477,7 +477,6 @@ class UIManager:
         command_to_explain = self.confirmation_flow_state['command_to_confirm']
         self.append_output(f"\n🧠 Asking AI to explain: {command_to_explain}", style_class='ai-thinking')
 
-        # current_app_inst = self.get_app_instance() # Not needed here if only appending
         if self.app and hasattr(self.app, 'is_running') and self.app.is_running:
             self.app.invalidate()
 
@@ -514,9 +513,9 @@ class UIManager:
                 future_to_set.set_result({'action': 'execute', 'command': cmd_to_confirm})
             valid_choice_made = True
         elif response == 'ys':
-                 if future_to_set and not future_to_set.done():
-                    future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'simple'})
-                 valid_choice_made = True
+            if future_to_set and not future_to_set.done():
+                future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'simple'})
+            valid_choice_made = True
         elif response == 'ym':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'semi_interactive'})
@@ -542,7 +541,6 @@ class UIManager:
     # --- Core UI Methods ---
     def get_app_instance(self):
         """Returns the application instance if set by the main program."""
-        # self.app is set by main.py after Application is instantiated.
         if not self.app:
             logger.debug("UIManager.get_app_instance: self.app is not yet set by the main application.")
         return self.app
@@ -575,6 +573,11 @@ class UIManager:
             'startup-separator': 'bold #86c07c'
         })
         self.output_buffer = list(output_buffer_main)
+        # Log initial buffer content if any
+        for style, content in self.output_buffer:
+            logger.info(f"UI_OUTPUT_INITIAL_BUFFER: {content.strip()}")
+
+
         self.output_field = TextArea(
             text="".join([text_content for _, text_content in self.output_buffer]),
             style='class:output-field', scrollbar=True, focusable=False,
@@ -623,13 +626,19 @@ class UIManager:
             if not self.auto_scroll: self.auto_scroll = True
 
     def append_output(self, text: str, style_class: str = 'default', internal_call: bool = False):
+        # Log the text that is about to be appended to the UI output field
+        # Strip trailing newline for cleaner logs, as append_output ensures it later.
+        logger.info(f"UI_OUTPUT: {text.rstrip()}")
+
         if not self.output_field:
             logger.warning("UIManager.append_output called, but output_field is not initialized. Buffering message.")
             if not text.endswith('\n'): text += '\n'
             self.output_buffer.append((style_class, text))
+            # No need to log again here, already logged above
             return
 
         if not text.endswith('\n'): text += '\n'
+        
         self.output_buffer.append((style_class, text))
         plain_text_output = "".join([content for _, content in self.output_buffer])
         
@@ -645,19 +654,16 @@ class UIManager:
         if not internal_call:
             self.last_output_was_separator = False
 
-        # Directly use self.app for invalidation, only if it's set and the app is running
-        if self.app: # Check if self.app has been set by main.py
-            # Check if app is running (prompt_toolkit apps might not have is_running until run_async)
-            # A simple check for invalidate method existing is safer before run_async
+        if self.app: 
             if hasattr(self.app, 'invalidate'):
                 try:
                     if hasattr(self.app, 'is_running') and self.app.is_running:
                         logger.debug("UIManager.append_output: Invalidating running app.")
                         self.app.invalidate()
-                    elif not hasattr(self.app, 'is_running'): # App object exists but might not have is_running yet
+                    elif not hasattr(self.app, 'is_running'): 
                         logger.debug("UIManager.append_output: self.app is set but no is_running, attempting invalidate.")
                         self.app.invalidate()
-                    else: # App has is_running but it's false
+                    else: 
                         logger.debug("UIManager.append_output: self.app is set but not running. Invalidation skipped.")
                 except Exception as e:
                     logger.error(f"Error during app invalidation: {e}", exc_info=True)
@@ -728,17 +734,16 @@ class UIManager:
             full_rel_prompt = "~/" + relative_path
             if len(full_rel_prompt) <= max_prompt_len: dir_for_prompt = full_rel_prompt
             else:
-                chars_to_keep_at_end = max_prompt_len - (len("~/") + 3)
+                chars_to_keep_at_end = max_prompt_len - (len("~/") + 3) 
                 dir_for_prompt = "~/" + "..." + relative_path[-chars_to_keep_at_end:] if chars_to_keep_at_end > 0 else "~/..."
         else:
             path_basename = os.path.basename(current_directory_path)
             if len(path_basename) <= max_prompt_len: dir_for_prompt = path_basename
             else:
-                chars_to_keep_at_end = max_prompt_len - 3
+                chars_to_keep_at_end = max_prompt_len - 3 
                 dir_for_prompt = "..." + path_basename[-chars_to_keep_at_end:] if chars_to_keep_at_end > 0 else "..."
         self.current_prompt_text = f"({dir_for_prompt}) > "
-        # current_app_instance = self.get_app_instance() # Not strictly needed here if only changing text
-        if self.app and hasattr(self.app, 'invalidate'): # Check if app exists and can be invalidated
+        if self.app and hasattr(self.app, 'invalidate'): 
             if self.layout and self.input_field: self.app.layout.focus(self.input_field)
             self.app.invalidate()
 
@@ -752,7 +757,6 @@ class UIManager:
             self.input_field.multiline = self.config.get('behavior', {}).get('input_field_height', 3) > 1
             self.input_field.buffer.accept_handler = accept_handler_func
             self.input_field.buffer.reset()
-            # current_app_instance = self.get_app_instance()
             if self.app and hasattr(self.app, 'invalidate'):
                 if self.layout: self.app.layout.focus(self.input_field)
                 self.app.invalidate()
@@ -770,10 +774,9 @@ class UIManager:
 
         self.current_prompt_text = prompt_text
         if self.input_field:
-            self.input_field.multiline = False
+            self.input_field.multiline = False 
             self.input_field.buffer.accept_handler = accept_handler_func
             self.input_field.buffer.reset()
-            # current_app_instance = self.get_app_instance()
             if self.app and hasattr(self.app, 'invalidate'):
                 if self.layout: self.app.layout.focus(self.input_field)
                 self.app.invalidate()
@@ -792,7 +795,6 @@ class UIManager:
                 cursor_position=len(command_to_edit)
             )
             logger.info(f"UIManager: Input buffer set to '{command_to_edit}' for editing.")
-            # current_app_instance = self.get_app_instance()
             if self.app and hasattr(self.app, 'invalidate'):
                 if self.layout: self.app.layout.focus(self.input_field)
                 self.app.invalidate()
