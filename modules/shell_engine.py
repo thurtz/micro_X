@@ -278,7 +278,19 @@ class ShellEngine:
             # Get configuration values with defaults
             tmux_poll_timeout = self.config.get('timeouts', {}).get('tmux_poll_seconds', 300)
             tmux_sleep_after = self.config.get('timeouts', {}).get('tmux_semi_interactive_sleep_seconds', 1)
+            
+            # --- MODIFICATION START: Prioritize in-memory storage ---
+            # Default to the configured path
             tmux_log_base = self.config.get('paths', {}).get('tmux_log_base_path', '/tmp')
+            
+            # Check for /dev/shm (in-memory filesystem on most Linux systems)
+            shm_path = "/dev/shm"
+            if sys.platform.startswith('linux') and os.path.isdir(shm_path) and os.access(shm_path, os.W_OK):
+                tmux_log_base = shm_path
+                logger.debug(f"Using in-memory filesystem for tmux log: {shm_path}")
+            else:
+                logger.debug(f"Using disk-based filesystem for tmux log: {tmux_log_base}")
+            # --- MODIFICATION END ---
 
 
             if category == "semi_interactive":
@@ -476,17 +488,17 @@ class ShellEngine:
             ('class:help-title', "micro_X AI-Enhanced Shell - Help\n\n"),
             ('class:help-text', "Welcome to micro_X! An intelligent shell that blends traditional command execution with AI capabilities.\n"),
             ('class:help-header', "\nAvailable Commands:\n"),
-            ('class:help-command', "  /ai <query>            "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
-            ('class:help-example', "                           Example: /ai list all text files in current folder\n"),
-            ('class:help-command', "  /command <subcommand>  "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
-            ('class:help-example', "                           Type '/command help' for detailed options.\n"),
-            ('class:help-command', "  /ollama <subcommand>   "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"),
-            ('class:help-example', "                           Type '/ollama help' for detailed options.\n"),
-            ('class:help-command', "  /utils <script> [args] "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
-            ('class:help-example', "                           Type '/utils list' or '/utils <script_name> help' for details.\n"), # Updated
-            ('class:help-command', "  /update                "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
-            ('class:help-command', "  /help                  "), ('class:help-description', "- Display this help message.\n"),
-            ('class:help-command', "  exit | quit            "), ('class:help-description', "- Exit the micro_X shell.\n"),
+            ('class:help-command', "  /ai <query>             "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
+            ('class:help-example', "                          Example: /ai list all text files in current folder\n"),
+            ('class:help-command', "  /command <subcommand>   "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
+            ('class:help-example', "                          Type '/command help' for detailed options.\n"),
+            ('class:help-command', "  /ollama <subcommand>    "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"),
+            ('class:help-example', "                          Type '/ollama help' for detailed options.\n"),
+            ('class:help-command', "  /utils <script> [args]  "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
+            ('class:help-example', "                          Type '/utils list' or '/utils <script_name> help' for details.\n"), # Updated
+            ('class:help-command', "  /update                 "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
+            ('class:help-command', "  /help                   "), ('class:help-description', "- Display this help message.\n"),
+            ('class:help-command', "  exit | quit             "), ('class:help-description', "- Exit the micro_X shell.\n"),
             ('class:help-header', "\nDirect Commands:\n"),
             ('class:help-text', "  You can type standard Linux commands directly (e.g., 'ls -l', 'cd my_folder').\n"),
             ('class:help-text', "  Unknown commands will trigger an interactive categorization flow.\n"),
@@ -513,11 +525,11 @@ class ShellEngine:
             ("class:help-title", "Ollama Service Management - Help\n"),
             ("class:help-text", "Use these commands to manage the Ollama service used by micro_X.\n"),
             ("class:help-header", "\nAvailable /ollama Subcommands:\n"),
-            ("class:help-command", "  /ollama start        "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
-            ("class:help-command", "  /ollama stop         "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
-            ("class:help-command", "  /ollama restart      "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"), # Corrected quote here
-            ("class:help-command", "  /ollama status       "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
-            ("class:help-command", "  /ollama help         "), ("class:help-description", "- Displays this help message.\n"),
+            ("class:help-command", "  /ollama start       "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
+            ("class:help-command", "  /ollama stop        "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
+            ("class:help-command", "  /ollama restart     "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"), # Corrected quote here
+            ("class:help-command", "  /ollama status      "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
+            ("class:help-command", "  /ollama help        "), ("class:help-description", "- Displays this help message.\n"),
             ("class:help-text", "\nNote: These commands primarily interact with an Ollama instance managed by micro_X in a tmux session. ")
         ]
         help_output_string = "".join([text for _, text in help_text])
@@ -596,7 +608,7 @@ class ShellEngine:
         if is_help_request:
             self.ui_manager.append_output(f"📜 Requesting help for utility: {script_name_no_ext}", style_class='info')
         else:
-            self.ui_manager.append_output(f"🚀 Executing utility: {command_str_for_display}\n    (Working directory: {self.PROJECT_ROOT})", style_class='info')
+            self.ui_manager.append_output(f"🚀 Executing utility: {command_str_for_display}\n   (Working directory: {self.PROJECT_ROOT})", style_class='info')
         
         logger.info(f"Executing utility script: {command_to_execute_list} with cwd={self.PROJECT_ROOT}")
         if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
