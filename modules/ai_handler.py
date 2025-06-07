@@ -1,3 +1,67 @@
+# --- API DOCUMENTATION for modules/ai_handler.py ---
+#
+# **Purpose:** Handles all interactions with Ollama LLMs for translating natural
+# language to commands, validating command syntax, and explaining commands.
+#
+# **Public Functions:**
+#
+# async def is_valid_linux_command_according_to_ai(command_text: str, config_param: dict) -> bool | None:
+#     """
+#     Asks the Validator AI model if the given text is a likely Linux command.
+#
+#     Performs multiple validation attempts as configured and returns a boolean
+#     based on a majority vote of the AI's 'yes'/'no' responses.
+#
+#     Args:
+#         command_text (str): The string to validate.
+#         config_param (dict): The main application configuration object.
+#
+#     Returns:
+#         bool | None: True if the AI considers it a command, False if not.
+#                      None if the result is inconclusive after all attempts.
+#     """
+#
+# async def get_validated_ai_command(human_query: str, config_param: dict, append_output_func: callable, get_app_func: callable) -> tuple[str | None, str | None]:
+#     """
+#     The main entry point to translate a natural language query into a validated shell command.
+#
+#     This function orchestrates a multi-step process:
+#     1. It tries the 'primary_translator' AI to get a command.
+#     2. If successful, it validates the command using `is_valid_linux_command_according_to_ai`.
+#     3. If the primary translator fails or validation fails, it can fall back to a
+#        'direct_translator' AI if configured.
+#     4. This cycle repeats for a configured number of attempts.
+#
+#     Args:
+#         human_query (str): The user's natural language query.
+#         config_param (dict): The main application configuration object.
+#         append_output_func (callable): A reference to UIManager.append_output for UI updates.
+#         get_app_func (callable): A reference to UIManager.get_app_instance for UI invalidation.
+#
+#     Returns:
+#         tuple[str | None, str | None]: A tuple containing (validated_command, raw_ai_response).
+#                                        The command is None if no valid command could be produced.
+#                                        The raw response is the last candidate from the AI.
+#     """
+#
+# async def explain_linux_command_with_ai(command_to_explain: str, config_param: dict, append_output_func: callable) -> str | None:
+#     """
+#     Uses an AI model to provide a natural language explanation of a given command.
+#
+#     Args:
+#         command_to_explain (str): The command string to be explained.
+#         config_param (dict): The main application configuration object.
+#         append_output_func (callable): A reference to UIManager.append_output for UI updates.
+#
+#     Returns:
+#         str | None: The AI-generated explanation as a string, or a fallback message/None on error.
+#     """
+#
+# **Key Global Constants/Variables:**
+#   (None intended for direct external use)
+#
+# --- END API DOCUMENTATION ---
+
 #!/usr/bin/env python
 
 import asyncio

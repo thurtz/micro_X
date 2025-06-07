@@ -1,3 +1,34 @@
+# --- API DOCUMENTATION for modules/output_analyzer.py ---
+#
+# **Purpose:** Analyzes command output to detect TUI-like content by measuring the
+# density of ANSI escape codes. This helps prevent garbled text from being
+# printed to the main output area for commands that should be fully interactive.
+#
+# **Public Functions:**
+#
+# def is_tui_like_output(text_content: str, line_threshold_pct: float, char_threshold_pct: float) -> bool:
+#     """
+#     Analyzes text to determine if it's likely TUI-specific output.
+#
+#     It checks if the percentage of lines containing ANSI codes or the percentage
+#     of total characters that are part of ANSI codes exceeds given thresholds.
+#
+#     Args:
+#         text_content (str): The string content captured from a command's output.
+#         line_threshold_pct (float): The minimum percentage of lines that must
+#                                     contain ANSI codes to be flagged as TUI-like.
+#         char_threshold_pct (float): The minimum percentage of total characters
+#                                     that must be part of ANSI codes to be flagged.
+#
+#     Returns:
+#         bool: True if the output is determined to be TUI-like, False otherwise.
+#     """
+#
+# **Key Global Constants/Variables:**
+#   (None intended for direct external use)
+#
+# --- END API DOCUMENTATION ---
+
 #!/usr/bin/env python
 
 import re

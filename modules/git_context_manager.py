@@ -1,3 +1,56 @@
+# --- API DOCUMENTATION for modules/git_context_manager.py ---
+#
+# **Purpose:** Manages interactions with the Git repository for startup integrity
+# checks and gathering context about the project's state (branch, commit).
+#
+# **Public Classes:**
+#
+# class GitContextManager:
+#     """A class to abstract Git command interactions."""
+#
+#     def __init__(self, project_root: str | None = None, fetch_timeout: int = 10):
+#         """
+#         Args:
+#             project_root (str | None): The root directory of the project. If None,
+#                                        uses the current working directory.
+#             fetch_timeout (int): Timeout in seconds for git fetch operations.
+#         """
+#
+#     async def is_git_available(self) -> bool:
+#         """Checks if the 'git' executable is available in the system's PATH."""
+#
+#     async def is_repository(self) -> bool:
+#         """Checks if the project_root is a valid Git repository."""
+#
+#     async def get_current_branch(self) -> str | None:
+#         """Gets the current active branch name (e.g., "main", "dev").
+#         Returns 'HEAD' for a detached HEAD state."""
+#
+#     async def get_head_commit_hash(self) -> str | None:
+#         """Gets the commit hash of the current HEAD."""
+#
+#     async def is_working_directory_clean(self) -> bool:
+#         """Checks for uncommitted changes or untracked files."""
+#
+#     async def compare_head_with_remote_tracking(self, branch_name: str, remote_name: str = "origin") -> tuple[str | None, str | None, str | None, str]:
+#         """
+#         Compares HEAD with its remote-tracking branch, attempting to fetch first.
+#
+#         Returns:
+#             tuple[str | None, str | None, str | None, str]: A tuple containing
+#             (comparison_status, local_hash, remote_hash, fetch_attempt_status).
+#             Comparison Status can be: "synced", "ahead", "behind", "diverged",
+#             "synced_local_cache", "ahead_local_cache", "behind_local_cache",
+#             "diverged_local_cache", "no_upstream", "no_upstream_info_locally", "error".
+#             Fetch Status can be: "success", "timeout", "offline_or_unreachable",
+#             "other_error", "not_a_repo".
+#         """
+#
+# **Key Global Constants/Variables:**
+#   (None intended for direct external use)
+#
+# --- END API DOCUMENTATION ---
+
 # modules/git_context_manager.py
 
 import asyncio
