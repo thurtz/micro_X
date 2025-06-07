@@ -71,7 +71,7 @@ LOG_FILE_BASENAME = "micro_x.log"
 # Log message content markers (these are the exact strings logged by logger.info(), AFTER stripping)
 LOG_SEPARATOR_LINE_TEXT = "=" * 80 # Adjusted to match main.py's actual log output (was 68)
 LOG_SESSION_START_TEXT = "micro_X Session Started" 
-LOG_SESSION_END_TEXT = "micro_X Session Ended"    
+LOG_SESSION_END_TEXT = "micro_X Session Ended"   
 LOG_TIMESTAMP_PREFIX_TEXT = "Timestamp:" 
 
 # Regex to extract the message part from a log line
@@ -219,9 +219,9 @@ def _get_last_log_session(log_filepath: str) -> tuple[str, str]:
         msg3 = _get_message_from_log_line(lines[i+3])
         
         is_potential_end_block = (msg0 == LOG_SEPARATOR_LINE_TEXT or \
-                                   msg1 == LOG_SESSION_END_TEXT or \
-                                   (msg2 is not None and msg2.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
-                                   msg3 == LOG_SEPARATOR_LINE_TEXT)
+                                  msg1 == LOG_SESSION_END_TEXT or \
+                                  (msg2 is not None and msg2.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
+                                  msg3 == LOG_SEPARATOR_LINE_TEXT)
 
         # Conditional detailed logging for snapshot
         if i < 5 or i > len(lines) - 8 or is_potential_end_block : 
@@ -263,9 +263,9 @@ def _get_last_log_session(log_filepath: str) -> tuple[str, str]:
             msg3_s = _get_message_from_log_line(lines[i+3])
             
             is_potential_start_block = (msg0_s == LOG_SEPARATOR_LINE_TEXT or \
-                                         msg1_s == LOG_SESSION_START_TEXT or \
-                                         (msg2_s is not None and msg2_s.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
-                                         msg3_s == LOG_SEPARATOR_LINE_TEXT)
+                                        msg1_s == LOG_SESSION_START_TEXT or \
+                                        (msg2_s is not None and msg2_s.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
+                                        msg3_s == LOG_SEPARATOR_LINE_TEXT)
 
             if i > last_session_end_block_start_index - 4 - 10 or is_potential_start_block: # Log details for nearby or potential matches
                 parsing_debug_log.append(f"\nLogParser START SCAN (idx {i}):\n")
@@ -309,9 +309,9 @@ def _get_last_log_session(log_filepath: str) -> tuple[str, str]:
         msg3 = _get_message_from_log_line(lines[i+3])
         
         is_potential_active_start_block = (msg0 == LOG_SEPARATOR_LINE_TEXT or \
-                                            msg1 == LOG_SESSION_START_TEXT or \
-                                            (msg2 is not None and msg2.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
-                                            msg3 == LOG_SEPARATOR_LINE_TEXT)
+                                           msg1 == LOG_SESSION_START_TEXT or \
+                                           (msg2 is not None and msg2.startswith(LOG_TIMESTAMP_PREFIX_TEXT)) or \
+                                           msg3 == LOG_SEPARATOR_LINE_TEXT)
         
         if i < 5 or i > len(lines) - 8 or is_potential_active_start_block:
             parsing_debug_log.append(f"\nLogParser ACTIVE SCAN (idx {i}):\n")
@@ -345,7 +345,7 @@ def _get_last_log_session(log_filepath: str) -> tuple[str, str]:
     return "NONE", "".join(parsing_debug_log)
 
 # --- Main Function ---
-def generate_snapshot(summary_message=None, include_logs=False, summarize_modules=False):
+def generate_snapshot(summary_message=None, include_logs=False, summarize_modules=False, full_code_exceptions=None):
     """Generates a snapshot file."""
     project_root = get_project_root()
     utils_dir = os.path.join(project_root, "utils")
@@ -415,7 +415,17 @@ def generate_snapshot(summary_message=None, include_logs=False, summarize_module
 
     for relative_path in FILES_TO_INCLUDE:
         full_path = os.path.join(project_root, relative_path)
+        
+        # Default behavior
         is_summarizable_module = summarize_modules and relative_path in MODULE_FILES_TO_SUMMARIZE
+        
+        # New logic: Check for exceptions to the summarization rule
+        if is_summarizable_module and full_code_exceptions:
+            module_basename = os.path.basename(relative_path)
+            # Allow matching with or without the .py extension
+            if module_basename in full_code_exceptions or module_basename.replace('.py', '') in full_code_exceptions:
+                print(f"Info: Overriding summarization for '{relative_path}' due to --include-full-module flag.")
+                is_summarizable_module = False # Force full code inclusion for this module
         
         if is_summarizable_module:
             snapshot_content.append(f"# ==============================================================================\n")
@@ -481,12 +491,21 @@ if __name__ == "__main__":
         help="Summarize module files using their API documentation blocks\ninstead of including the full code to save tokens.",
         default=False
     )
+    parser.add_argument(
+        "--include-full-module",
+        nargs='+',  # This allows accepting one or more values
+        metavar='MODULE_NAME',
+        help="Specify module(s) to include in full, even when --summarize is active. "
+             "Provide just the filename, e.g., 'shell_engine.py' or 'shell_engine'.",
+        default=[]
+    )
     
     args = parser.parse_args()
     generated_file = generate_snapshot(
         summary_message=args.summary, 
         include_logs=args.include_logs,
-        summarize_modules=args.summarize
+        summarize_modules=args.summarize,
+        full_code_exceptions=args.include_full_module
     )
     if generated_file: print(f"\nSnapshot generation complete. File: {generated_file}")
     else: print("\nSnapshot generation failed.")
