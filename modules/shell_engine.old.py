@@ -1,3 +1,65 @@
+# --- API DOCUMENTATION for modules/shell_engine.py ---
+#
+# **Purpose:** Acts as the core orchestrator for the shell, processing user
+# input, managing state (like the current directory), and dispatching commands
+# for execution based on their category.
+#
+# **Public Classes:**
+#
+# class ShellEngine:
+#     """The main class for shell logic."""
+#
+#     def __init__(self, config, ui_manager, category_manager_module, ai_handler_module,
+#                  ollama_manager_module, main_exit_app_ref, main_restore_normal_input_ref,
+#                  main_normal_input_accept_handler_ref, is_developer_mode, git_context_manager_instance):
+#         """
+#         Initializes the ShellEngine with all necessary dependencies and callbacks.
+#
+#         Args:
+#             config (dict): The application configuration.
+#             ui_manager (UIManager): The instance of the UI manager.
+#             category_manager_module (module): A reference to the category_manager module.
+#             ai_handler_module (module): A reference to the ai_handler module.
+#             ollama_manager_module (module): A reference to the ollama_manager module.
+#             main_exit_app_ref (callable): Callback to the main application exit function.
+#             main_restore_normal_input_ref (callable): Callback to restore the UI to normal mode.
+#             main_normal_input_accept_handler_ref (callable): Callback for normal input submission.
+#             is_developer_mode (bool): Flag indicating if developer mode is active.
+#             git_context_manager_instance (GitContextManager): Instance for Git operations.
+#         """
+#
+#     async def handle_built_in_command(self, user_input: str) -> bool:
+#         """
+#         Handles built-in commands like /help, /exit, /update, /utils, /ollama, and /command.
+#
+#         This is the first check for any user input.
+#
+#         Returns:
+#             bool: True if the command was a built-in and was handled, False otherwise.
+#         """
+#
+#     async def submit_user_input(self, user_input: str, from_edit_mode: bool = False):
+#         """
+#         The main entry point for processing all user input that isn't a simple built-in.
+#
+#         It orchestrates the flow:
+#         1. Handles `/ai` queries by calling the AI handler.
+#         2. Processes direct command input from the user.
+#         3. For unknown commands, it uses the AI validator and may treat the input
+#            as a natural language query.
+#         4. Ultimately calls `process_command` to execute.
+#
+#         Args:
+#             user_input (str): The raw text from the user's input field.
+#             from_edit_mode (bool): True if the input is a resubmission after
+#                                    the user chose to modify an AI suggestion.
+#         """
+#
+# **Key Global Constants/Variables:**
+#   (None intended for direct external use)
+#
+# --- END API DOCUMENTATION ---
+
 # modules/shell_engine.py
 import asyncio
 import os
@@ -108,7 +170,7 @@ class ShellEngine:
             r'\brm\s+(?:-[a-zA-Z0-9]*f[a-zA-Z0-9]*|-f[a-zA-Z0-9]*)\s+/\s*(?:$|\.\.?\s*$|\*(?:\s.*|$))', # rm -rf / or rm -f / or rm -f / .. etc.
             r'\bmkfs\b', # Formatting commands
             r'\bdd\b\s+if=/dev/random', # Writing random data with dd
-            r'\bdd\b\s+if=/dev/zero',   # Writing zeros with dd
+            r'\bdd\b\s+if=/dev/zero',    # Writing zeros with dd
             r'\b(shutdown|reboot|halt|poweroff)\b', # System shutdown/reboot commands
             r'>\s*/dev/sd[a-z]+', # Redirecting output to a raw disk device
             r':\(\)\{:\|:&};:', # Fork bomb
@@ -231,7 +293,7 @@ class ShellEngine:
                 # Wrapped command: execute original, tee output to log, then sleep briefly
                 wrapped_command = f"bash -c '{escaped_command_str}' |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
                 
-                tmux_cmd_list_launch = ["tmux", "new-window", "-d", "-n", window_name, wrapped_command]
+                tmux_cmd_list_launch = ["tmux", "new-window", "-n", window_name, wrapped_command]
                 logger.info(f"Launching semi_interactive tmux: {' '.join(tmux_cmd_list_launch)} (log: {log_path})")
 
                 process_launch = await asyncio.create_subprocess_exec(
@@ -390,7 +452,7 @@ class ShellEngine:
                         logger.info("requirements.txt changed.")
                     self.ui_manager.append_output("💡 Restart micro_X for changes to take effect.", style_class='info')
                     if requirements_changed:
-                        self.ui_manager.append_output(f"💡 After restart, consider updating dependencies if not handled automatically:\n   cd \"{self.PROJECT_ROOT}\"\n   source .venv/bin/activate\n   pip install -r {self.REQUIREMENTS_FILENAME}", style_class='info')
+                        self.ui_manager.append_output(f"💡 After restart, consider updating dependencies if not handled automatically:\n  cd \"{self.PROJECT_ROOT}\"\n  source .venv/bin/activate\n  pip install -r {self.REQUIREMENTS_FILENAME}", style_class='info')
             else:
                 self.ui_manager.append_output(f"❌ Git pull failed.\nError:\n{pull_process_result.stderr.strip()}", style_class='error')
                 logger.error(f"Git pull failed. Stderr: {pull_process_result.stderr.strip()}")
@@ -511,15 +573,21 @@ class ShellEngine:
         args_for_script = parts[2:]
         command_to_execute_list = [sys.executable, script_path]
         
-        # Check if the first argument for the script is a help flag
+        # --- MODIFICATION START: Add --branch argument for config_manager ---
+        if script_name_no_ext == "config_manager" and self.git_context_manager_instance:
+            current_branch = await self.git_context_manager_instance.get_current_branch()
+            if current_branch:
+                command_to_execute_list.extend(["--branch", current_branch])
+            else:
+                # Fallback if branch cannot be determined, though config_manager.py has its own default
+                logger.warning("Could not determine current branch for config_manager utility.")
+                command_to_execute_list.extend(["--branch", "unknown"]) # Or let config_manager.py use its default
+        # --- MODIFICATION END ---
+        
         is_help_request = False
         if args_for_script and args_for_script[0].lower() in ["help", "-h", "--help"]:
             is_help_request = True
-            # For argparse compatibility, use --help
             command_to_execute_list.append("--help")
-            # Remove the help argument from args_for_script if it was 'help' so it's not passed twice
-            # or misinterpreted by scripts not using argparse for 'help' keyword.
-            # However, since we force --help, it's fine.
         else:
             command_to_execute_list.extend(args_for_script)
 
@@ -528,7 +596,7 @@ class ShellEngine:
         if is_help_request:
             self.ui_manager.append_output(f"📜 Requesting help for utility: {script_name_no_ext}", style_class='info')
         else:
-            self.ui_manager.append_output(f"🚀 Executing utility: {command_str_for_display}\n   (Working directory: {self.PROJECT_ROOT})", style_class='info')
+            self.ui_manager.append_output(f"🚀 Executing utility: {command_str_for_display}\n    (Working directory: {self.PROJECT_ROOT})", style_class='info')
         
         logger.info(f"Executing utility script: {command_to_execute_list} with cwd={self.PROJECT_ROOT}")
         if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
@@ -549,7 +617,7 @@ class ShellEngine:
                 self.ui_manager.append_output(f"✅ Utility '{script_filename}' completed.", style_class='success')
             
             if not is_help_request: # Log completion only if not a help request
-                 logger.info(f"Utility script '{script_path}' completed with code {process.returncode}. Args: {args_for_script}")
+                logger.info(f"Utility script '{script_path}' completed with code {process.returncode}. Args: {args_for_script}")
 
         except FileNotFoundError: self.ui_manager.append_output(f"❌ Error: Python interpreter ('{sys.executable}') or script ('{script_filename}') not found.", style_class='error'); logger.error(f"FileNotFoundError executing utility: {command_to_execute_list}", exc_info=True)
         except Exception as e: self.ui_manager.append_output(f"❌ Unexpected error executing utility '{script_filename}': {e}", style_class='error'); logger.error(f"Error executing utility script '{script_path}': {e}", exc_info=True)

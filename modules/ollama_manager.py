@@ -1,3 +1,52 @@
+# --- API DOCUMENTATION for modules/ollama_manager.py ---
+#
+# **Purpose:** Manages the `ollama serve` process lifecycle, including starting,
+# stopping, and checking the status of the Ollama service, typically within a
+# managed tmux session.
+#
+# **Public Functions:**
+#
+# async def ensure_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
+#     """
+#     Ensures the Ollama service is available, performing an automatic startup if needed.
+#
+#     This is the main entry point for the startup sequence in main.py. It checks if
+#     the server is running; if not, and if auto-start is enabled, it attempts
+#     to launch 'ollama serve' in a tmux session and waits for it to become responsive.
+#
+#     Args:
+#         main_config (dict): The main application configuration object.
+#         append_output_callback (callable): Reference to UIManager.append_output.
+#
+#     Returns:
+#         bool: True if the service is ready, False otherwise.
+#     """
+#
+# async def explicit_start_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
+#     """Handles the '/ollama start' command to explicitly start the service."""
+#
+# async def explicit_stop_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
+#     """Handles the '/ollama stop' command to explicitly stop the managed service."""
+#
+# async def explicit_restart_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
+#     """Handles the '/ollama restart' command."""
+#
+# async def get_ollama_status_info(main_config: dict, append_output_callback: callable):
+#     """Handles the '/ollama status' command, printing status info to the UI."""
+#
+# async def is_ollama_server_running() -> bool:
+#     """
+#     Checks if the Ollama server is running and responsive via an API call.
+#
+#     Returns:
+#         bool: True if the server is responsive, False otherwise.
+#     """
+#
+# **Key Global Constants/Variables:**
+#   (None intended for direct external use)
+#
+# --- END API DOCUMENTATION ---
+
 #!/usr/bin/env python
 
 import asyncio
