@@ -1,9 +1,17 @@
 {
   "ai_models": {
-    "primary_translator": "llama3.2:3b",
-    "direct_translator": "vitali87/shell-commands-qwen2-1.5b",
-    "validator": "herawen/lisa:latest",
-    "explainer": "llama3.2:3b"
+    "primary_translator": {
+      "model": "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
+    },
+    "direct_translator": {
+      "model": "vitali87/shell-commands-qwen2-1.5b-extended"
+    },
+    "validator": {
+      "model": "herawen/lisa"
+    },
+    "explainer": {
+      "model": "herawen/lisa"
+    }
   },
   "timeouts": {
     "tmux_poll_seconds": 300,
@@ -17,16 +25,17 @@
     "translation_validation_cycles": 3,
     "ai_retry_delay_seconds": 1,
     "ollama_api_call_retries": 2,
-    "tui_detection_line_threshold_pct": 30.0,
-    "tui_detection_char_threshold_pct": 3.0
+    "tui_detection_line_threshold_pct": 30,
+    "tui_detection_char_threshold_pct": 3,
+    "use_strict_extraction_for_primary_translator": false
   },
   "ui": {
     "max_prompt_length": 20,
     "enable_output_separator": true,
-    "output_separator_character": "─",
+    "output_separator_character": "\u2500",
     "output_separator_length": 30,
     "enable_startup_separator": true,
-    "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n",
+    "startup_separator_string": "\ud83d\ude80 micro_X Initialized & Ready \ud83d\ude80\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n",
     "enable_mouse_support": false
   },
   "paths": {
@@ -38,7 +47,7 @@
       "user_template": "Is the following string likely a Linux command: '{command_text}'"
     },
     "primary_translator": {
-      "system": "You are a helpful assistant that translates human language queries into a single, precise Linux command.\nStrictly enclose the Linux command within <bash></bash> tags.\nDo not add any other explanations, apologies, or text outside these tags.\nIf the request is ambiguous, unsafe, or cannot be translated into a single command, respond with only \"<unsafe>Cannot translate safely</unsafe>\" or a similar message within <unsafe> tags.",
+      "system": "Translate the following user request into a single Linux command. Output only the command. Do not include any other text, explanations, or markdown formatting.",
       "user_template": "Translate to a single Linux command: \"{human_input}\"."
     },
     "direct_translator": {
@@ -46,7 +55,7 @@
       "user_template": "Translate to a single Linux command: \"{human_input}\"."
     },
     "explainer": {
-      "system": "You are a helpful assistant that explains Linux commands in simple, clear terms. Describe what the command does, its main arguments/options shown, and any significant side effects or risks. Be concise. If the command is trivial, a very short explanation is fine. If it seems dangerous or complex, highlight that.",
+      "system": "You are a helpful assistant that explains Linux commands in simple, clear terms. Describe what the command does, its main arguments/options shown, and any significant side effects or risks. Be concise. If the command is trivial, a very short explanation is fine. If it seems dangerous or complex, highlight that and possibly suggest an alternative command.",
       "user_template": "Explain the following Linux command: '{command_text}'"
     }
   },
@@ -58,7 +67,10 @@
     "server_check_interval_seconds": 2
   },
   "integrity_check": {
-    "protected_branches": ["main", "testing"],
+    "protected_branches": [
+      "main",
+      "testing"
+    ],
     "developer_branch": "dev",
     "halt_on_integrity_failure": true,
     "allow_run_if_behind_remote": true

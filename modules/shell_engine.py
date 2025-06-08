@@ -7,56 +7,56 @@
 # **Public Classes:**
 #
 # class ShellEngine:
-#     """The main class for shell logic."""
+#     """The main class for shell logic."""
 #
-#     def __init__(self, config, ui_manager, category_manager_module, ai_handler_module,
-#                  ollama_manager_module, main_exit_app_ref, main_restore_normal_input_ref,
-#                  main_normal_input_accept_handler_ref, is_developer_mode, git_context_manager_instance):
-#         """
-#         Initializes the ShellEngine with all necessary dependencies and callbacks.
+#     def __init__(self, config, ui_manager, category_manager_module, ai_handler_module,
+#                  ollama_manager_module, main_exit_app_ref, main_restore_normal_input_ref,
+#                  main_normal_input_accept_handler_ref, is_developer_mode, git_context_manager_instance):
+#         """
+#         Initializes the ShellEngine with all necessary dependencies and callbacks.
 #
-#         Args:
-#             config (dict): The application configuration.
-#             ui_manager (UIManager): The instance of the UI manager.
-#             category_manager_module (module): A reference to the category_manager module.
-#             ai_handler_module (module): A reference to the ai_handler module.
-#             ollama_manager_module (module): A reference to the ollama_manager module.
-#             main_exit_app_ref (callable): Callback to the main application exit function.
-#             main_restore_normal_input_ref (callable): Callback to restore the UI to normal mode.
-#             main_normal_input_accept_handler_ref (callable): Callback for normal input submission.
-#             is_developer_mode (bool): Flag indicating if developer mode is active.
-#             git_context_manager_instance (GitContextManager): Instance for Git operations.
-#         """
+#         Args:
+#             config (dict): The application configuration.
+#             ui_manager (UIManager): The instance of the UI manager.
+#             category_manager_module (module): A reference to the category_manager module.
+#             ai_handler_module (module): A reference to the ai_handler module.
+#             ollama_manager_module (module): A reference to the ollama_manager module.
+#             main_exit_app_ref (callable): Callback to the main application exit function.
+#             main_restore_normal_input_ref (callable): Callback to restore the UI to normal mode.
+#             main_normal_input_accept_handler_ref (callable): Callback for normal input submission.
+#             is_developer_mode (bool): Flag indicating if developer mode is active.
+#             git_context_manager_instance (GitContextManager): Instance for Git operations.
+#         """
 #
-#     async def handle_built_in_command(self, user_input: str) -> bool:
-#         """
-#         Handles built-in commands like /help, /exit, /update, /utils, /ollama, and /command.
+#     async def handle_built_in_command(self, user_input: str) -> bool:
+#         """
+#         Handles built-in commands like /help, /exit, /update, /utils, /ollama, and /command.
 #
-#         This is the first check for any user input.
+#         This is the first check for any user input.
 #
-#         Returns:
-#             bool: True if the command was a built-in and was handled, False otherwise.
-#         """
+#         Returns:
+#             bool: True if the command was a built-in and was handled, False otherwise.
+#         """
 #
-#     async def submit_user_input(self, user_input: str, from_edit_mode: bool = False):
-#         """
-#         The main entry point for processing all user input that isn't a simple built-in.
+#     async def submit_user_input(self, user_input: str, from_edit_mode: bool = False):
+#         """
+#         The main entry point for processing all user input that isn't a simple built-in.
 #
-#         It orchestrates the flow:
-#         1. Handles `/ai` queries by calling the AI handler.
-#         2. Processes direct command input from the user.
-#         3. For unknown commands, it uses the AI validator and may treat the input
-#            as a natural language query.
-#         4. Ultimately calls `process_command` to execute.
+#         It orchestrates the flow:
+#         1. Handles `/ai` queries by calling the AI handler.
+#         2. Processes direct command input from the user.
+#         3. For unknown commands, it uses the AI validator and may treat the input
+#            as a natural language query.
+#         4. Ultimately calls `process_command` to execute.
 #
-#         Args:
-#             user_input (str): The raw text from the user's input field.
-#             from_edit_mode (bool): True if the input is a resubmission after
-#                                    the user chose to modify an AI suggestion.
-#         """
+#         Args:
+#             user_input (str): The raw text from the user's input field.
+#             from_edit_mode (bool): True if the input is a resubmission after
+#                                    the user chose to modify an AI suggestion.
+#         """
 #
 # **Key Global Constants/Variables:**
-#   (None intended for direct external use)
+#   (None intended for direct external use)
 #
 # --- END API DOCUMENTATION ---
 import asyncio
@@ -70,11 +70,35 @@ import logging
 import shutil
 import sys
 import hashlib
+import json
 from typing import Optional
 
 from modules.output_analyzer import is_tui_like_output
 
 logger = logging.getLogger(__name__)
+
+def _get_nested_config(config_dict, key_path):
+    """Safely retrieves a value from a nested dict using a dot-separated path."""
+    keys = key_path.split('.')
+    value = config_dict
+    for key in keys:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            return None # Key path not found
+    return value
+
+def _set_nested_config(config_dict, key_path, new_value):
+    """Safely sets a value in a nested dict using a dot-separated path."""
+    keys = key_path.split('.')
+    d = config_dict
+    for key in keys[:-1]:
+        if key in d and not isinstance(d[key], dict):
+            return False, f"Path conflict: '{key}' is not a dictionary."
+        d = d.setdefault(key, {})
+    
+    d[keys[-1]] = new_value
+    return True, None # Success
 
 class ShellEngine:
     def __init__(self, config, ui_manager,
@@ -82,8 +106,8 @@ class ShellEngine:
                  ai_handler_module=None,
                  ollama_manager_module=None,
                  main_exit_app_ref=None,
-                 main_restore_normal_input_ref=None, # For restoring UI after flows
-                 main_normal_input_accept_handler_ref=None, # For normal input submission
+                 main_restore_normal_input_ref=None,
+                 main_normal_input_accept_handler_ref=None,
                  is_developer_mode: bool = False,
                  git_context_manager_instance=None
                  ):
@@ -115,6 +139,7 @@ class ShellEngine:
         self.REQUIREMENTS_FILE_PATH = os.path.join(self.PROJECT_ROOT, self.REQUIREMENTS_FILENAME)
         self.UTILS_DIR_NAME = "utils"
         self.UTILS_DIR_PATH = os.path.join(self.PROJECT_ROOT, self.UTILS_DIR_NAME)
+        self.USER_CONFIG_FILE_PATH = os.path.join(self.PROJECT_ROOT, "config", "user_config.json")
 
         logger.info(f"ShellEngine initialized. Developer Mode: {self.is_developer_mode}")
         if self.git_context_manager_instance:
@@ -254,7 +279,7 @@ class ShellEngine:
                     log_path = temp_log_file.name
                     logger.debug(f"Using platform-agnostic temporary file for tmux log: {log_path}")
                 
-                    replacement_for_single_quote = "'\"'\"'" 
+                    replacement_for_single_quote = "'\"'\"'"
                     escaped_command_str = command_to_execute.replace("'", replacement_for_single_quote)
                     
                     wrapped_command = f"bash -c '{escaped_command_str}' |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
@@ -368,8 +393,8 @@ class ShellEngine:
         original_req_hash = self._get_file_hash(self.REQUIREMENTS_FILE_PATH)
         requirements_changed = False
         try:
-            branch_process_result = await asyncio.to_thread(subprocess.run, 
-                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'], 
+            branch_process_result = await asyncio.to_thread(subprocess.run,
+                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
                 cwd=self.PROJECT_ROOT, capture_output=True, text=True, check=True, errors='replace'
             )
             current_branch = branch_process_result.stdout.strip()
@@ -377,8 +402,8 @@ class ShellEngine:
             logger.info(f"Current git branch: {current_branch}")
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
 
-            pull_process_result = await asyncio.to_thread(subprocess.run, 
-                ['git', 'pull', 'origin', current_branch], 
+            pull_process_result = await asyncio.to_thread(subprocess.run,
+                ['git', 'pull', 'origin', current_branch],
                 cwd=self.PROJECT_ROOT, capture_output=True, text=True, errors='replace'
             )
             if pull_process_result.returncode == 0:
@@ -411,6 +436,93 @@ class ShellEngine:
         finally:
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
 
+    async def _handle_config_command(self, user_input_parts: list):
+        """Handles the /config command for runtime configuration management."""
+        append_output_func = self.ui_manager.append_output
+        cmd_help = (
+            "ℹ️ /config usage:\n"
+            "  list                         - Show current models and their specific AI options.\n"
+            "  get <key.path>               - Get a config value (e.g., ai_models.primary_translator.options.temperature).\n"
+            "  set <key.path> <value>       - Set a config value (e.g., set ai_models.validator.options.temperature 0.1).\n"
+            "  save                         - Save current AI model configurations to user_config.json.\n"
+            "  help                         - Show this help message."
+        )
+
+        if len(user_input_parts) < 2 or user_input_parts[1].lower() == 'help':
+            append_output_func(cmd_help, style_class='help-base')
+            return
+
+        subcommand = user_input_parts[1].lower()
+
+        if subcommand == 'list':
+            ai_models_config = self.config.get("ai_models", {})
+            append_output_func("Current AI Model Configurations:", style_class='info-header')
+            if ai_models_config:
+                for role, settings in ai_models_config.items():
+                    append_output_func(f"\n🔹 {role}:", style_class='info-subheader')
+                    # *** FIX: Handle both old string format and new dict format ***
+                    if isinstance(settings, dict):
+                        model_name = settings.get('model', 'N/A')
+                        options = settings.get('options')
+                        append_output_func(f"  - model: {model_name}", style_class='info-item')
+                        if options:
+                            append_output_func(f"  - options:", style_class='info-item')
+                            for key, val in options.items():
+                                append_output_func(f"    - {key}: {json.dumps(val)}", style_class='info-item')
+                        else:
+                            append_output_func(f"  - options: (Using Ollama model defaults)", style_class='info-item-empty')
+                    elif isinstance(settings, str):
+                        model_name = settings
+                        append_output_func(f"  - model: {model_name}", style_class='info-item')
+                        append_output_func(f"  - options: (Using Ollama model defaults)", style_class='info-item-empty')
+                    else:
+                        append_output_func(f"  (Invalid configuration for this role)", style_class='error')
+            else:
+                append_output_func("  (No AI models configured)", style_class='warning')
+
+        elif subcommand == 'get':
+            if len(user_input_parts) != 3:
+                append_output_func("❌ Usage: /config get <key.path>", style_class='error'); return
+            key_path = user_input_parts[2]
+            value = _get_nested_config(self.config, key_path)
+            if value is not None:
+                append_output_func(f"{key_path}: {json.dumps(value, indent=2)}", style_class='info')
+            else:
+                append_output_func(f"❌ Key '{key_path}' not found.", style_class='error')
+
+        elif subcommand == 'set':
+            if len(user_input_parts) < 4:
+                append_output_func("❌ Usage: /config set <key.path> <value>", style_class='error'); return
+            key_path, new_value_str = user_input_parts[2], ' '.join(user_input_parts[3:])
+            if not (key_path.startswith("ai_models.") and (".model" in key_path or ".options." in key_path)):
+                 append_output_func("❌ For safety, only model names and options can be set at runtime.", style_class='error'); return
+            try: typed_value = int(new_value_str)
+            except ValueError:
+                try: typed_value = float(new_value_str)
+                except ValueError:
+                    if new_value_str.lower() == 'true': typed_value = True
+                    elif new_value_str.lower() == 'false': typed_value = False
+                    else: typed_value = new_value_str
+            success, error_msg = _set_nested_config(self.config, key_path, typed_value)
+            if success: append_output_func(f"✅ Set '{key_path}' to {json.dumps(typed_value)}. (Not saved yet)", style_class='success')
+            else: append_output_func(f"❌ {error_msg}", style_class='error')
+
+        elif subcommand == 'save':
+            user_config = {}
+            try:
+                if os.path.exists(self.USER_CONFIG_FILE_PATH):
+                    with open(self.USER_CONFIG_FILE_PATH, 'r') as f: user_config = json.load(f)
+            except Exception as e:
+                append_output_func(f"❌ Could not read user_config.json: {e}", style_class='error'); return
+            user_config["ai_models"] = self.config.get("ai_models", {})
+            try:
+                with open(self.USER_CONFIG_FILE_PATH, 'w') as f: json.dump(user_config, f, indent=2)
+                append_output_func(f"✅ AI model configurations saved to {self.USER_CONFIG_FILE_PATH}", style_class='success')
+            except Exception as e:
+                append_output_func(f"❌ Failed to write to user_config.json: {e}", style_class='error')
+        else:
+            append_output_func(f"❌ Unknown /config subcommand: '{subcommand}'\n{cmd_help}", style_class='error')
+
     def _display_general_help(self):
         """Displays the general help message in the UI."""
         if not self.ui_manager: logger.error("display_general_help: UIManager not initialized."); return
@@ -418,17 +530,19 @@ class ShellEngine:
             ('class:help-title', "micro_X AI-Enhanced Shell - Help\n\n"),
             ('class:help-text', "Welcome to micro_X! An intelligent shell that blends traditional command execution with AI capabilities.\n"),
             ('class:help-header', "\nAvailable Commands:\n"),
-            ('class:help-command', "  /ai <query>             "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
-            ('class:help-example', "                          Example: /ai list all text files in current folder\n"),
-            ('class:help-command', "  /command <subcommand>   "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
-            ('class:help-example', "                          Type '/command help' for detailed options.\n"),
-            ('class:help-command', "  /ollama <subcommand>    "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"),
-            ('class:help-example', "                          Type '/ollama help' for detailed options.\n"),
-            ('class:help-command', "  /utils <script> [args]  "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
-            ('class:help-example', "                          Type '/utils list' or '/utils <script_name> help' for details.\n"),
-            ('class:help-command', "  /update                 "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
-            ('class:help-command', "  /help                   "), ('class:help-description', "- Display this help message.\n"),
-            ('class:help-command', "  exit | quit             "), ('class:help-description', "- Exit the micro_X shell.\n"),
+            ('class:help-command', "  /ai <query>              "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
+            ('class:help-example', "                           Example: /ai list all text files in current folder\n"),
+            ('class:help-command', "  /command <subcommand>    "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
+            ('class:help-example', "                           Type '/command help' for detailed options.\n"),
+            ('class:help-command', "  /config <subcommand>     "), ('class:help-description', "- Manage runtime AI configuration (e.g., temperature).\n"),
+            ('class:help-example', "                           Type '/config help' for detailed options.\n"),
+            ('class:help-command', "  /ollama <subcommand>     "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"),
+            ('class:help-example', "                           Type '/ollama help' for detailed options.\n"),
+            ('class:help-command', "  /utils <script> [args]   "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
+            ('class:help-example', "                           Type '/utils list' or '/utils <script_name> help' for details.\n"),
+            ('class:help-command', "  /update                  "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
+            ('class:help-command', "  /help                    "), ('class:help-description', "- Display this help message.\n"),
+            ('class:help-command', "  exit | quit              "), ('class:help-description', "- Exit the micro_X shell.\n"),
             ('class:help-header', "\nDirect Commands:\n"),
             ('class:help-text', "  You can type standard Linux commands directly (e.g., 'ls -l', 'cd my_folder').\n"),
             ('class:help-text', "  Unknown commands will trigger an interactive categorization flow.\n"),
@@ -454,11 +568,11 @@ class ShellEngine:
             ("class:help-title", "Ollama Service Management - Help\n"),
             ("class:help-text", "Use these commands to manage the Ollama service used by micro_X.\n"),
             ("class:help-header", "\nAvailable /ollama Subcommands:\n"),
-            ("class:help-command", "  /ollama start       "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
-            ("class:help-command", "  /ollama stop        "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
-            ("class:help-command", "  /ollama restart     "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"),
-            ("class:help-command", "  /ollama status      "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
-            ("class:help-command", "  /ollama help        "), ("class:help-description", "- Displays this help message.\n"),
+            ("class:help-command", "  /ollama start      "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
+            ("class:help-command", "  /ollama stop       "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
+            ("class:help-command", "  /ollama restart    "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"),
+            ("class:help-command", "  /ollama status     "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
+            ("class:help-command", "  /ollama help       "), ("class:help-description", "- Displays this help message.\n"),
             ("class:help-text", "\nNote: These commands primarily interact with an Ollama instance managed by micro_X in a tmux session. ")
         ]
         help_output_string = "".join([text for _, text in help_text])
@@ -466,7 +580,6 @@ class ShellEngine:
         logger.info("Displayed Ollama command help.")
 
     async def _handle_utils_command_async(self, full_command_str: str):
-        """Handles the /utils command to run scripts from the utils directory."""
         if not self.ui_manager: logger.error("handle_utils_command_async: UIManager not initialized."); return
         logger.info(f"Handling /utils command: {full_command_str}")
         self.ui_manager.append_output("🛠️ Processing /utils command...", style_class='info')
@@ -533,7 +646,7 @@ class ShellEngine:
         if is_help_request:
             self.ui_manager.append_output(f"📜 Requesting help for utility: {script_name_no_ext}", style_class='info')
         else:
-            self.ui_manager.append_output(f"🚀 Executing utility: {command_str_for_display}\n   (Working directory: {self.PROJECT_ROOT})", style_class='info')
+            self.ui_manager.append_output(f"🚀 Executing utility: {command_str_for_display}\n    (Working directory: {self.PROJECT_ROOT})", style_class='info')
         
         logger.info(f"Executing utility script: {command_to_execute_list} with cwd={self.PROJECT_ROOT}")
         if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
@@ -544,7 +657,7 @@ class ShellEngine:
             if process.stdout: self.ui_manager.append_output(f"{output_prefix}{process.stdout.strip()}"); has_output = True
             if process.stderr: self.ui_manager.append_output(f"Stderr from '{script_filename}':\n{process.stderr.strip()}", style_class='warning'); has_output = True
             
-            if not has_output and process.returncode == 0 and not is_help_request: 
+            if not has_output and process.returncode == 0 and not is_help_request:
                 self.ui_manager.append_output(f"{output_prefix}(No output)", style_class='info')
             
             if process.returncode != 0 and not is_help_request:
@@ -562,7 +675,6 @@ class ShellEngine:
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
 
     async def _handle_ollama_command_async(self, user_input_parts: list):
-        """Handles /ollama subcommands by calling the OllamaManager module."""
         if not self.ui_manager: logger.error("handle_ollama_command_async: UIManager not initialized."); return
         append_output_func = self.ui_manager.append_output
         logger.info(f"Handling /ollama command: {user_input_parts}")
@@ -574,7 +686,7 @@ class ShellEngine:
             success = await self.ollama_manager_module.explicit_start_ollama_service(self.config, append_output_func)
             if success:
                 append_output_func("✅ Ollama service start process initiated. Check status shortly.", style_class='success')
-                await self.ollama_manager_module.ensure_ollama_service(self.config, append_output_func) 
+                await self.ollama_manager_module.ensure_ollama_service(self.config, append_output_func)
             else: append_output_func("❌ Ollama service start process failed.", style_class='error')
         elif subcommand == "stop":
             append_output_func("⚙️ Attempting to stop Ollama service...", style_class='info')
@@ -593,15 +705,10 @@ class ShellEngine:
         else: append_output_func(f"❌ Unknown /ollama subcommand: '{subcommand}'.", style_class='error'); logger.warning(f"Unknown /ollama subcommand: {subcommand}")
 
     async def handle_built_in_command(self, user_input: str) -> bool:
-        """
-        Handles built-in commands like /help, exit, /update, /utils, /ollama, and /command.
-        """
         user_input_stripped = user_input.strip()
         logger.info(f"ShellEngine.handle_built_in_command received: '{user_input_stripped}'")
-
         if user_input_stripped.lower() in {"/help", "help"}:
-            self._display_general_help()
-            return True
+            self._display_general_help(); return True
         elif user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
             self.ui_manager.append_output("Exiting micro_X Shell 🚪", style_class='info')
             logger.info("Exit command received from built-in handler.")
@@ -611,11 +718,9 @@ class ShellEngine:
                 if app_instance and app_instance.is_running: app_instance.exit()
             return True
         elif user_input_stripped.lower() == "/update":
-            await self._handle_update_command()
-            return True
+            await self._handle_update_command(); return True
         elif user_input_stripped.startswith("/utils"):
-            await self._handle_utils_command_async(user_input_stripped)
-            return True
+            await self._handle_utils_command_async(user_input_stripped); return True
         elif user_input_stripped.startswith("/ollama"):
             try:
                 parts = user_input_stripped.split()
@@ -627,285 +732,109 @@ class ShellEngine:
         elif user_input_stripped.startswith("/command"):
             logger.info(f"Handling /command subsystem input: {user_input_stripped}")
             if not self.category_manager_module:
-                logger.error("Category Manager module not available to handle /command.")
+                logger.error("Category Manager module not available.")
                 self.ui_manager.append_output("❌ Internal Error: Command subsystem not available.", style_class='error')
                 return True
-
             action_result = self.category_manager_module.handle_command_subsystem_input(user_input_stripped)
-            
             if isinstance(action_result, dict) and action_result.get('action') == 'force_run':
-                command_to_run = action_result['command']
-                forced_category = action_result['category']
-                logger.info(f"/command run: Forcing execution of '{command_to_run}' as '{forced_category}'")
-                await self.process_command(
-                    command_str_original=command_to_run,
-                    original_user_input_for_display=user_input_stripped,
-                    forced_category=forced_category,
-                    is_ai_generated=False
-                )
+                await self.process_command(action_result['command'], user_input_stripped, forced_category=action_result['category'])
             return True
-            
+        elif user_input_stripped.startswith("/config"):
+            await self._handle_config_command(user_input_stripped.split()); return True
         return False
-
+        
     async def process_command(self, command_str_original: str, original_user_input_for_display: str,
                               ai_raw_candidate: Optional[str] = None,
                               original_direct_input_if_different: Optional[str] = None,
                               forced_category: Optional[str] = None,
                               is_ai_generated: bool = False):
-        """
-        Processes a command for execution, including categorization and AI confirmation if needed.
-        """
         if not self.ui_manager: logger.error("process_command: UIManager not initialized."); return
         append_output_func = self.ui_manager.append_output
         confirmation_result = None
-
         try:
             if is_ai_generated and not forced_category:
-                logger.info(f"AI generated command '{command_str_original}'. Initiating confirmation flow via UIManager.")
-                if not self.main_normal_input_accept_handler_ref:
-                    logger.error("CRITICAL: main_normal_input_accept_handler_ref is None in ShellEngine.")
-                    append_output_func("❌ Internal Error: Cannot handle command modification. Please restart.", style_class='error')
-                    return
-
-                confirmation_result = await self.ui_manager.prompt_for_command_confirmation(
-                    command_str_original,
-                    original_user_input_for_display,
-                    self.main_normal_input_accept_handler_ref 
-                )
+                confirmation_result = await self.ui_manager.prompt_for_command_confirmation(command_str_original, original_user_input_for_display, self.main_normal_input_accept_handler_ref)
                 action = confirmation_result.get('action')
-                confirmed_command = confirmation_result.get('command', command_str_original) 
-                chosen_category_from_confirmation = confirmation_result.get('category')
+                if action == 'edit_mode_engaged': return
+                elif action == 'execute_and_categorize':
+                    command_str_original = confirmation_result.get('command', command_str_original)
+                    forced_category = confirmation_result.get('category')
+                    self.category_manager_module.add_command_to_category(command_str_original, forced_category)
+                elif action == 'execute': command_str_original = confirmation_result.get('command', command_str_original)
+                elif action == 'cancel': self.ui_manager.append_output(f"❌ Execution of '{command_str_original}' cancelled.", style_class='info'); return
+                else: return
 
-                if action == 'edit_mode_engaged':
-                    append_output_func("⌨️ Command loaded into input field for editing. Press Enter to submit.", style_class='info')
-                    return 
-
-                if action == 'execute_and_categorize' and chosen_category_from_confirmation:
-                    append_output_func(f"✅ User confirmed execution of: {confirmed_command} (as {chosen_category_from_confirmation})", style_class='success')
-                    command_str_original = confirmed_command 
-                    logger.info(f"User chose to run '{command_str_original}' and categorize as '{chosen_category_from_confirmation}'.")
-                    self.category_manager_module.add_command_to_category(command_str_original, chosen_category_from_confirmation)
-                    forced_category = chosen_category_from_confirmation
-                elif action == 'execute':
-                    append_output_func(f"✅ User confirmed execution of: {confirmed_command}", style_class='success')
-                    command_str_original = confirmed_command 
-                elif action == 'cancel':
-                    append_output_func(f"❌ Execution of '{command_str_original}' cancelled.", style_class='info')
-                    logger.info(f"User cancelled execution of AI command: {command_str_original}")
-                    return
-                else: 
-                    if action is not None : 
-                        append_output_func(f"Internal error or unexpected action in confirmation flow ({action}). Aborting.", style_class='error')
-                        logger.error(f"Internal error in confirmation flow. Action: {action}")
-                    return
-            
-            category = forced_category
-            command_for_classification = command_str_original 
-            command_to_be_added_if_new = command_for_classification 
-
-            if not category: 
-                logger.debug(f"process_command: Classifying command_for_classification: '{command_for_classification}' (is_ai_generated: {is_ai_generated})")
-                category = self.category_manager_module.classify_command(command_for_classification)
-                logger.debug(f"process_command: classify_command returned: '{category}' for command '{command_for_classification}'")
-
-                if category == self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
-                    logger.info(f"Command '{command_for_classification}' uncategorized. Starting interactive flow via UIManager.")
-                    if not self.main_normal_input_accept_handler_ref: 
-                        logger.error("CRITICAL: main_normal_input_accept_handler_ref is None in ShellEngine.")
-                        append_output_func("❌ Internal Error: Cannot handle command modification during categorization. Please restart.", style_class='error')
-                        return
-
-                    categorization_result = await self.ui_manager.start_categorization_flow(
-                        command_for_classification, ai_raw_candidate, original_direct_input_if_different
-                    )
-                    action_cat = categorization_result.get('action')
-                    if action_cat == 'cancel_execution':
-                        append_output_func(f"Execution of '{command_for_classification}' cancelled.", style_class='info')
-                        logger.info(f"Execution of '{command_for_classification}' cancelled by user during categorization.")
-                        return
-                    elif action_cat == 'categorize_and_execute':
-                        command_to_be_added_if_new = categorization_result['command'] 
-                        chosen_cat_for_json = categorization_result['category']
-                        self.category_manager_module.add_command_to_category(command_to_be_added_if_new, chosen_cat_for_json)
-                        category = chosen_cat_for_json
-                        logger.info(f"Command '{command_to_be_added_if_new}' categorized as '{category}'.")
-                        if command_to_be_added_if_new != command_str_original: 
-                            logger.info(f"Using '{command_to_be_added_if_new}' for execution instead of original '{command_str_original}'.")
-                            command_str_original = command_to_be_added_if_new 
-                    else: 
-                        category = self.config['behavior']['default_category_for_unclassified']
-                        append_output_func(f"Executing '{command_for_classification}' as default '{category}'.", style_class='info')
-                        logger.info(f"Command '{command_for_classification}' executed with default category '{category}'.")
+            category = forced_category or self.category_manager_module.classify_command(command_str_original)
+            if category == self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
+                categorization_result = await self.ui_manager.start_categorization_flow(command_str_original, ai_raw_candidate, original_direct_input_if_different)
+                action_cat = categorization_result.get('action')
+                if action_cat == 'cancel_execution':
+                    append_output_func(f"Execution of '{command_str_original}' cancelled.", style_class='info'); return
+                elif action_cat == 'categorize_and_execute':
+                    command_str_original = categorization_result['command']
+                    category = categorization_result['category']
+                    self.category_manager_module.add_command_to_category(command_str_original, category)
+                else: category = self.config['behavior']['default_category_for_unclassified']
 
             command_to_execute_expanded = self.expand_shell_variables(command_str_original)
-            if command_str_original != command_to_execute_expanded:
-                logger.info(f"Expanded command: '{command_to_execute_expanded}' (original: '{command_str_original}')")
-                if command_to_execute_expanded != command_for_classification and command_to_execute_expanded != command_to_be_added_if_new:
-                    append_output_func(f"Expanded for execution: {command_to_execute_expanded}", style_class='info')
-
             command_to_execute_sanitized = self.sanitize_and_validate(command_to_execute_expanded, original_user_input_for_display)
-            if not command_to_execute_sanitized:
-                append_output_func(f"Command '{command_to_execute_expanded}' blocked.", style_class='security-warning')
-                logger.warning(f"Command '{command_to_execute_expanded}' blocked by sanitizer.")
-                return
+            if not command_to_execute_sanitized: return
 
-            logger.info(f"Final command for execution: '{command_to_execute_sanitized}', Category: '{category}'")
-            
             exec_message_prefix = "Executing"
             if forced_category:
                 if confirmation_result and confirmation_result.get('action') == 'execute_and_categorize':
                     exec_message_prefix = f"Executing (user categorized as {category})"
-                else: 
-                    exec_message_prefix = "Forced execution"
+                else: exec_message_prefix = "Forced execution"
             
             append_output_func(f"▶️ {exec_message_prefix} ({category} - {self.category_manager_module.CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style_class='executing')
-
-            if category == "simple":
-                await self.execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
-            else: 
-                await self.execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category)
-        
+            if category == "simple": await self.execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
+            else: await self.execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category)
         finally:
-            if self.ui_manager and \
-               not self.ui_manager.categorization_flow_active and \
-               not self.ui_manager.confirmation_flow_active and \
-               not self.ui_manager.is_in_edit_mode:
-                if self.main_restore_normal_input_ref:
-                    logger.debug("process_command.finally: Restoring normal input as no other flow is active.")
-                    self.main_restore_normal_input_ref()
+            if self.ui_manager and not self.ui_manager.categorization_flow_active and not self.ui_manager.confirmation_flow_active and not self.ui_manager.is_in_edit_mode:
+                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
 
     async def submit_user_input(self, user_input: str, from_edit_mode: bool = False):
-        """
-        Primary entry point for processing user input from the shell.
-        """
-        if not self.ui_manager: 
-            logger.error("submit_user_input: UIManager not initialized."); return
-
+        if not self.ui_manager: logger.error("submit_user_input: UIManager not initialized."); return
         user_input_stripped = user_input.strip()
-        logger.info(f"ShellEngine.submit_user_input received: '{user_input_stripped}', from_edit_mode: {from_edit_mode}")
-        if not user_input_stripped: 
-            if self.main_restore_normal_input_ref and from_edit_mode : self.main_restore_normal_input_ref()
+        if not user_input_stripped:
+            if self.main_restore_normal_input_ref and from_edit_mode: self.main_restore_normal_input_ref()
             return
 
         current_app_inst = self.ui_manager.get_app_instance()
-
         if user_input_stripped.startswith("/ai "):
-            ollama_is_ready = await self.ollama_manager_module.is_ollama_server_running()
-            if not ollama_is_ready:
-                self.ui_manager.append_output("⚠️ Ollama service is not available.", style_class='warning')
-                self.ui_manager.append_output("   Try '/ollama status' or '/ollama start'.", style_class='info')
-                logger.warning("Attempted /ai command while Ollama service is not ready.")
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
-                return
-
+            if not await self.ollama_manager_module.is_ollama_server_running():
+                self.ui_manager.append_output("⚠️ Ollama service is not available.", style_class='warning'); return
             human_query = user_input_stripped[len("/ai "):].strip()
-            if not human_query: 
-                self.ui_manager.append_output("⚠️ AI query empty.", style_class='warning')
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
-                return
-            
+            if not human_query: self.ui_manager.append_output("⚠️ AI query empty.", style_class='warning'); return
             self.ui_manager.append_output(f"🤖 AI Query: {human_query}", style_class='ai-query')
-            self.ui_manager.append_output(f"🧠 Thinking...", style_class='ai-thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
-
-            linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(
-                human_query, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance
-            )
-            if linux_command:
-                self.ui_manager.append_output(f"🤖 AI Suggests (validated): {linux_command}", style_class='ai-response')
-                display_source = f"'/ai {human_query}' -> {linux_command}"
-                await self.process_command(linux_command, display_source, ai_raw_candidate, None, is_ai_generated=True)
+            linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(human_query, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
+            if linux_command: await self.process_command(linux_command, f"'/ai {human_query}'", ai_raw_candidate, None, is_ai_generated=True)
             else:
                 self.ui_manager.append_output("🤔 AI could not produce a validated command.", style_class='warning')
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref() 
+                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
             return
 
         if from_edit_mode:
-            logger.info(f"Input '{user_input_stripped}' is from edit mode and not an /ai command. Processing directly.")
-            await self.process_command(user_input_stripped, user_input_stripped, 
-                                       ai_raw_candidate=None, 
-                                       original_direct_input_if_different=None, 
-                                       is_ai_generated=False)
-            return
+            await self.process_command(user_input_stripped, user_input_stripped); return
 
-        logger.debug(f"submit_user_input: Processing fresh direct command: '{user_input_stripped}'")
-        
         category = self.category_manager_module.classify_command(user_input_stripped)
-        logger.debug(f"submit_user_input: classify_command returned: '{category}' for command '{user_input_stripped}'")
-
         if category != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
-            logger.debug(f"Fresh direct input '{user_input_stripped}' is known: '{category}'.")
-            await self.process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
+            await self.process_command(user_input_stripped, user_input_stripped)
         else:
-            logger.debug(f"Fresh direct input '{user_input_stripped}' unknown. Validating with AI.")
-            ollama_is_ready = await self.ollama_manager_module.is_ollama_server_running()
-            if not ollama_is_ready:
-                self.ui_manager.append_output(f"⚠️ Ollama service not available for validation.", style_class='warning')
-                self.ui_manager.append_output(f"   Attempting direct categorization or try '/ollama status' or '/ollama start'.", style_class='info')
-                logger.warning(f"Ollama service not ready. Skipping AI validation for '{user_input_stripped}'.")
-                await self.process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
-                return
-
+            if not await self.ollama_manager_module.is_ollama_server_running():
+                await self.process_command(user_input_stripped, user_input_stripped); return
             self.ui_manager.append_output(f"🔎 Validating '{user_input_stripped}' with AI...", style_class='info')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
-            
             is_cmd_ai_says = await self.ai_handler_module.is_valid_linux_command_according_to_ai(user_input_stripped, self.config)
-            
-            has_space = ' ' in user_input_stripped
-            is_path_indicator = user_input_stripped.startswith(('/', './', '../'))
-            has_double_hyphen = '--' in user_input_stripped
-            has_single_hyphen_option = bool(re.search(r'(?:^|\s)-\w', user_input_stripped))
-            is_problematic_leading_dollar = False
-            if user_input_stripped.startswith('$'):
-                if len(user_input_stripped) == 1: is_problematic_leading_dollar = True
-                elif len(user_input_stripped) > 1 and user_input_stripped[1].isalnum() and user_input_stripped[1] != '{':
-                    is_problematic_leading_dollar = True
-            
-            is_command_syntax_present = is_path_indicator or has_double_hyphen or has_single_hyphen_option or \
-                                        ('$' in user_input_stripped and not is_problematic_leading_dollar)
-            
-            user_input_looks_like_phrase = False
-            if is_problematic_leading_dollar: user_input_looks_like_phrase = True
-            elif not has_space: user_input_looks_like_phrase = False 
-            elif is_command_syntax_present: user_input_looks_like_phrase = False
-            else: user_input_looks_like_phrase = True 
-
-            logger.debug(f"Input: '{user_input_stripped}', Validator AI: {is_cmd_ai_says}, Heuristic phrase: {user_input_looks_like_phrase}")
-
-            if is_cmd_ai_says is True and not user_input_looks_like_phrase:
-                self.ui_manager.append_output(f"✅ AI believes '{user_input_stripped}' is direct command. Categorizing.", style_class='success')
-                logger.info(f"Validator AI confirmed '{user_input_stripped}' as command (not phrase).")
-                await self.process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
-            else: 
-                log_msg = ""; ui_msg = ""; ui_style = 'ai-thinking'
-                if is_cmd_ai_says is False:
-                    log_msg = f"Validator AI suggests '{user_input_stripped}' not command."; ui_msg = f"💬 AI suggests '{user_input_stripped}' not direct command. Trying as NL query..."
-                elif is_cmd_ai_says is True and user_input_looks_like_phrase: 
-                    log_msg = f"Validator AI confirmed '{user_input_stripped}' as command, but looks like phrase. Trying as NL query..."; ui_msg = f"💬 AI validated '{user_input_stripped}' as command, but looks like phrase. Trying as NL query..."
-                else: 
-                    log_msg = f"Validator AI for '{user_input_stripped}' inconclusive."; ui_msg = f"⚠️ AI validation for '{user_input_stripped}' inconclusive. Trying as NL query..."; ui_style = 'warning'
-                
-                logger.info(f"{log_msg} Treating as natural language.")
-                self.ui_manager.append_output(ui_msg, style_class=ui_style)
-                if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
-
-                ollama_is_ready_for_translation = await self.ollama_manager_module.is_ollama_server_running() 
-                if not ollama_is_ready_for_translation:
-                    self.ui_manager.append_output("⚠️ Ollama service not available for translation.", style_class='warning')
-                    self.ui_manager.append_output("   Try '/ollama status' or '/ollama start'.", style_class='info')
-                    logger.warning("Ollama service not ready. Skipping NL translation.")
-                    await self.process_command(user_input_stripped, user_input_stripped, None, None, is_ai_generated=False)
-                    return
-
-                linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(
-                    user_input_stripped, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance
-                )
+            is_command_syntax_present = '--' in user_input_stripped or bool(re.search(r'(?:^|\s)-\w', user_input_stripped))
+            if is_cmd_ai_says is True and not (' ' in user_input_stripped and not is_command_syntax_present):
+                await self.process_command(user_input_stripped, user_input_stripped)
+            else:
+                self.ui_manager.append_output("Trying as NL query...", style_class='ai-thinking')
+                linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(user_input_stripped, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
                 if linux_command:
-                    self.ui_manager.append_output(f"🤖 AI Translated & Validated to: {linux_command}", style_class='ai-response')
-                    display_source = f"'{user_input_stripped}' -> {linux_command}"
-                    original_direct_for_prompt = user_input_stripped if linux_command != user_input_stripped else None
-                    await self.process_command(linux_command, display_source, ai_raw_candidate, original_direct_for_prompt, is_ai_generated=True)
+                    await self.process_command(linux_command, f"'{user_input_stripped}'", ai_raw_candidate, user_input_stripped, is_ai_generated=True)
                 else:
-                    self.ui_manager.append_output(f"🤔 AI could not produce validated command for '{user_input_stripped}'. Trying original as direct command.", style_class='warning')
-                    logger.info(f"Validated AI translation failed for '{user_input_stripped}'.")
-                    await self.process_command(user_input_stripped, user_input_stripped, ai_raw_candidate, None, is_ai_generated=False)
+                    self.ui_manager.append_output("🤔 AI failed. Trying original as direct command.", style_class='warning')
+                    await self.process_command(user_input_stripped, user_input_stripped, ai_raw_candidate)
