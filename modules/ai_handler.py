@@ -73,7 +73,7 @@ import logging
 # This logger will be specific to the ai_handler module
 logger = logging.getLogger(__name__)
 
-# --- AI Integration Constants (Moved from main.py) ---
+# --- AI Integration Constants ---
 _COMMAND_PATTERN_STRING = (
     r"<bash>\s*'(.*?)'\s*</bash>|<bash>\s*(.*?)\s*</bash>|<bash>\s*`(.*?)`\s*</bash>|"
     r"```bash\s*\n([\s\S]*?)\n```|<code>\s*'(.*?)'\s*</code>|<code>\s*(.*?)\s*</code>|"
@@ -89,23 +89,32 @@ try:
     logger.debug(f"COMMAND_PATTERN compiled with {COMMAND_PATTERN.groups} groups (expected {EXPECTED_GROUPS}).")
     if COMMAND_PATTERN.groups != EXPECTED_GROUPS:
         logger.error(f"CRITICAL: COMMAND_PATTERN groups mismatch: {COMMAND_PATTERN.groups} vs {EXPECTED_GROUPS}.")
-        COMMAND_PATTERN = None 
+        COMMAND_PATTERN = None
 except re.error as e:
     logger.critical(f"Failed to compile COMMAND_PATTERN regex: {e}", exc_info=True)
-    COMMAND_PATTERN = None 
-    EXPECTED_GROUPS = 0 
+    COMMAND_PATTERN = None
+    EXPECTED_GROUPS = 0
 
 _COMMAND_EXTRACT_GROUPS = list(range(1, EXPECTED_GROUPS)) if EXPECTED_GROUPS > 0 and COMMAND_PATTERN else []
 _UNSAFE_TAG_CONTENT_GROUP = EXPECTED_GROUPS if EXPECTED_GROUPS > 0 and COMMAND_PATTERN else -1
 
 _INNER_TAG_EXTRACT_PATTERN = re.compile(r"^\s*<([a-zA-Z0-9_:]+)(?:\s+[^>]*)?>([\s\S]*?)<\/\1>\s*$", re.DOTALL)
 
-# --- AI Helper Functions (Moved and Adapted from main.py) ---
+# --- AI Helper Functions ---
+
+def _is_ai_refusal(text: str) -> bool:
+    """
+    Checks if a given text is likely an AI refusal to generate a command.
+    """
+    # NEW: Centralized refusal check.
+    # This checks the beginning of the string for common refusal phrases.
+    refusal_prefixes = ("sorry", "i cannot", "unable to", "cannot translate", "i am unable to")
+    return text.lower().strip().startswith(refusal_prefixes)
 
 def _clean_extracted_command(extracted_candidate: str) -> str:
     """Applies common cleaning steps to a potential command string."""
     processed_candidate = extracted_candidate.strip()
-    original_for_log = processed_candidate 
+    original_for_log = processed_candidate
 
     inner_match = _INNER_TAG_EXTRACT_PATTERN.match(processed_candidate)
     if inner_match:
@@ -125,12 +134,12 @@ def _clean_extracted_command(extracted_candidate: str) -> str:
             processed_candidate = processed_candidate[1:-1].strip()
             logger.debug(f"Stripped outer backticks: '{original_for_log}' -> '{processed_candidate}'")
 
-    if (processed_candidate.lower().startswith("bash ") or processed_candidate.lower().startswith("sh ")) and len(processed_candidate) > 6: 
+    if (processed_candidate.lower().startswith("bash ") or processed_candidate.lower().startswith("sh ")) and len(processed_candidate) > 6:
         prefix_len = 5 if processed_candidate.lower().startswith("bash ") else 3
         potential_inner_cmd = processed_candidate[prefix_len:].strip()
-        if potential_inner_cmd.startswith("<") and potential_inner_cmd.endswith(">") and len(potential_inner_cmd) >=2: 
+        if potential_inner_cmd.startswith("<") and potential_inner_cmd.endswith(">") and len(potential_inner_cmd) >=2:
             inner_cmd_content = potential_inner_cmd[1:-1].strip()
-            if not any(c in inner_cmd_content for c in '<>|&;'): 
+            if not any(c in inner_cmd_content for c in '<>|&;'):
                 logger.debug(f"Stripped '{processed_candidate[:prefix_len]}<cmd>' pattern: '{original_for_log}' -> '{inner_cmd_content}'")
                 processed_candidate = inner_cmd_content
             else:
@@ -138,7 +147,7 @@ def _clean_extracted_command(extracted_candidate: str) -> str:
 
     if len(processed_candidate) >= 2 and processed_candidate.startswith("<") and processed_candidate.endswith(">"):
         inner_content = processed_candidate[1:-1].strip()
-        if not any(c in inner_content for c in '<>|&;'): 
+        if not any(c in inner_content for c in '<>|&;'):
             logger.debug(f"Stripped general angle brackets: '{original_for_log}' -> '{inner_content}'")
             processed_candidate = inner_content
         else:
@@ -152,18 +161,17 @@ def _clean_extracted_command(extracted_candidate: str) -> str:
 
     logger.debug(f"After cleaning: '{original_for_log}' -> '{cleaned_linux_command}'")
 
-    refusal_prefixes = ("sorry", "i cannot", "unable to", "cannot translate", "i am unable to")
-    if cleaned_linux_command and not cleaned_linux_command.lower().startswith(refusal_prefixes):
-        return cleaned_linux_command
-    else:
-        if cleaned_linux_command: 
-            logger.debug(f"Command discarded after cleaning (AI refusal): '{original_for_log}' -> '{cleaned_linux_command}'")
+    # MODIFIED: The refusal check is now primarily handled at a higher level,
+    # but we keep it here as a defense-in-depth for tagged content that might still contain a refusal.
+    if _is_ai_refusal(cleaned_linux_command):
+        logger.debug(f"Command discarded after cleaning (AI refusal): '{original_for_log}' -> '{cleaned_linux_command}'")
         return ""
-
+    else:
+        return cleaned_linux_command
 
 async def is_valid_linux_command_according_to_ai(command_text: str, config_param: dict) -> bool | None:
-    """Asks the Validator AI model if the given text is a valid Linux command."""
-    if not command_text or len(command_text) < 2 or len(command_text) > 200: 
+    # ... (existing function is unchanged)
+    if not command_text or len(command_text) < 2 or len(command_text) > 200:
         logger.debug(f"Skipping AI validation for command_text of length {len(command_text)}: '{command_text}'")
         return None
 
@@ -171,7 +179,7 @@ async def is_valid_linux_command_according_to_ai(command_text: str, config_param
     validator_user_prompt = config_param['prompts']['validator']['user_template'].format(command_text=command_text)
     validator_model = config_param['ai_models']['validator']
     validator_attempts = config_param['behavior']['validator_ai_attempts']
-    retry_delay = config_param['behavior']['ai_retry_delay_seconds'] / 2 
+    retry_delay = config_param['behavior']['ai_retry_delay_seconds'] / 2
 
     responses = []
     for i in range(validator_attempts):
@@ -196,11 +204,11 @@ async def is_valid_linux_command_according_to_ai(command_text: str, config_param
             elif is_no and not is_yes:
                 responses.append(False)
             else:
-                responses.append(None) 
+                responses.append(None)
                 logger.warning(f"Validator AI unclear answer (attempt {i+1}): '{ai_answer}'")
         except Exception as e:
             logger.error(f"Error calling Validator AI (attempt {i+1}) for '{command_text}': {e}", exc_info=True)
-            responses.append(None) 
+            responses.append(None)
 
         if i < validator_attempts - 1 and (len(responses) <= i+1 or responses[-1] is None):
             await asyncio.sleep(retry_delay)
@@ -250,15 +258,16 @@ async def _interpret_and_clean_tagged_ai_output(human_input: str, config_param: 
 
             match = COMMAND_PATTERN.search(ai_response)
             if match:
+                # This logic is mostly unchanged, but now focuses only on extraction
                 if _UNSAFE_TAG_CONTENT_GROUP != -1 and COMMAND_PATTERN.groups >= _UNSAFE_TAG_CONTENT_GROUP and match.group(_UNSAFE_TAG_CONTENT_GROUP) is not None:
                     unsafe_message = match.group(_UNSAFE_TAG_CONTENT_GROUP).strip()
                     logger.warning(f"Primary AI indicated unsafe query: '{human_input}'. Message: '{unsafe_message}'")
                     append_output_func(f"⚠️ AI (Primary) Refusal: {unsafe_message}", style_class='ai-unsafe')
-                    return None, ai_response 
+                    return None, ai_response
 
                 for group_index in _COMMAND_EXTRACT_GROUPS:
                     if COMMAND_PATTERN.groups >= group_index and (extracted_candidate := match.group(group_index)) is not None:
-                        if raw_candidate_from_regex is None: 
+                        if raw_candidate_from_regex is None:
                             raw_candidate_from_regex = extracted_candidate.strip()
                         cleaned_linux_command = _clean_extracted_command(extracted_candidate)
                         if cleaned_linux_command:
@@ -267,13 +276,22 @@ async def _interpret_and_clean_tagged_ai_output(human_input: str, config_param: 
                 
                 logger.warning(f"Primary AI matched pattern but no valid command extracted. Raw: {ai_response}, Match: '{match.group(0)}'")
             else:
-                logger.error(f"Primary AI response did not match expected patterns. Response: {ai_response}")
-            
+                # MODIFICATION: If no pattern matches, check if the whole response is a refusal.
+                if _is_ai_refusal(ai_response):
+                    logger.warning(f"Primary AI refused query (no tags): '{human_input}'. Message: '{ai_response}'")
+                    append_output_func(f"⚠️ AI (Primary) Refusal: {ai_response}", style_class='ai-unsafe')
+                    # Return the refusal message as the raw candidate for context.
+                    return None, ai_response
+                else:
+                    logger.error(f"Primary AI response did not match expected patterns. Response: {ai_response}")
+
+            # This part is now only reached if a pattern matched but extraction failed,
+            # or if it didn't match and wasn't a refusal. We should retry.
             if attempt < ollama_call_retries:
                 logger.info(f"Retrying Primary AI call (parsing/match fail) (attempt {attempt + 2}/{ollama_call_retries+1}) for '{human_input}'.")
                 await asyncio.sleep(retry_delay)
                 continue
-            else: 
+            else:
                 logger.error(f"Primary AI parsing/match failed after {ollama_call_retries+1} attempts. Last response: {ai_response}")
                 return None, raw_candidate_from_regex if raw_candidate_from_regex is not None else ai_response
 
@@ -283,12 +301,12 @@ async def _interpret_and_clean_tagged_ai_output(human_input: str, config_param: 
             append_output_func(f"❌ Ollama API Error (Primary): {error_message}", style_class='error')
             logger.error(f"Ollama API Error (Primary): {e_resp}", exc_info=True)
             if attempt == ollama_call_retries: return None, raw_candidate_from_regex
-        except ollama.RequestError as e_req: 
+        except ollama.RequestError as e_req:
             current_attempt_exception = e_req
             append_output_func(f"❌ Ollama Connection Error (Primary): {e_req}", style_class='error')
             logger.error(f"Ollama Connection Error (Primary): {e_req}", exc_info=True)
             if attempt == ollama_call_retries: return None, raw_candidate_from_regex
-        except Exception as e_gen: 
+        except Exception as e_gen:
             current_attempt_exception = e_gen
             append_output_func(f"❌ AI Processing Error (Primary): {e_gen}", style_class='error')
             logger.exception(f"Unexpected error in _interpret_and_clean_tagged_ai_output for '{human_input}'")
@@ -303,9 +321,8 @@ async def _interpret_and_clean_tagged_ai_output(human_input: str, config_param: 
     logger.error(f"_interpret_and_clean_tagged_ai_output exhausted retries for '{human_input}'. Last exception: {last_exception_in_ollama_call}")
     return None, raw_candidate_from_regex
 
-
 async def _get_direct_ai_output(human_input: str, config_param: dict, append_output_func, get_app_func) -> tuple[str | None, str | None]:
-    """Calls secondary translation AI, cleans response."""
+    # ... (existing function is unchanged, but could also benefit from the same refusal check)
     direct_translator_model = config_param['ai_models'].get('direct_translator')
     if not direct_translator_model:
         logger.info("_get_direct_ai_output skipped: No direct_translator_model configured.")
@@ -338,13 +355,18 @@ async def _get_direct_ai_output(human_input: str, config_param: dict, append_out
             if cleaned_linux_command:
                 logger.debug(f"_get_direct_ai_output returning: Cleaned='{cleaned_linux_command}', Raw='{raw_response_content}'")
                 return cleaned_linux_command, raw_response_content
-            else: 
+            else:
+                # Also check for refusal here if cleaning results in an empty string
+                if _is_ai_refusal(raw_response_content):
+                     logger.warning(f"Direct AI refused query (after cleaning). Raw: {raw_response_content}")
+                     return None, raw_response_content
+                
                 logger.warning(f"Direct AI response resulted in empty command after cleaning. Raw: {raw_response_content}")
                 if attempt < ollama_call_retries:
-                    await asyncio.sleep(retry_delay) 
+                    await asyncio.sleep(retry_delay)
                     continue
-                else: 
-                    return None, raw_response_content 
+                else:
+                    return None, raw_response_content
 
         except ollama.ResponseError as e_resp:
             current_attempt_exception = e_resp
@@ -372,27 +394,24 @@ async def _get_direct_ai_output(human_input: str, config_param: dict, append_out
     logger.error(f"_get_direct_ai_output exhausted retries for '{human_input}'. Last exception: {last_exception_in_ollama_call}")
     return None, raw_response_content
 
-
+# The rest of the file (get_validated_ai_command, explain_linux_command_with_ai) remains unchanged.
 async def get_validated_ai_command(human_query: str, config_param: dict, append_output_func, get_app_func) -> tuple[str | None, str | None]:
-    """
-    Attempts to get a validated Linux command using primary and secondary AI translators.
-    Passes append_output_func and get_app_func for UI updates.
-    """
+    # ... (existing function is unchanged)
     logger.info(f"Attempting validated translation for: '{human_query}'")
     last_raw_candidate_primary = None
     last_raw_candidate_secondary = None
-    last_cleaned_command_attempt = None 
+    last_cleaned_command_attempt = None
 
     translation_cycles = config_param['behavior']['translation_validation_cycles']
     retry_delay = config_param['behavior']['ai_retry_delay_seconds']
     primary_model_name = config_param['ai_models']['primary_translator']
-    secondary_model_name = config_param['ai_models'].get('direct_translator') 
+    secondary_model_name = config_param['ai_models'].get('direct_translator')
 
     for i in range(translation_cycles):
         append_output_func(f"🧠 AI translation & validation cycle {i+1}/{translation_cycles} for: '{human_query}'", style_class='ai-thinking')
         if get_app_func().is_running : get_app_func().invalidate()
 
-        append_output_func(f"    P-> Trying Primary Translator ({primary_model_name})...", style_class='ai-thinking-detail')
+        append_output_func(f"     P-> Trying Primary Translator ({primary_model_name})...", style_class='ai-thinking-detail')
         logger.debug(f"Cycle {i+1}: Trying primary translator.")
         cleaned_command_p, raw_candidate_p = await _interpret_and_clean_tagged_ai_output(human_query, config_param, append_output_func, get_app_func)
         if raw_candidate_p is not None: last_raw_candidate_primary = raw_candidate_p
@@ -409,7 +428,7 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
             elif is_valid_by_validator is False:
                 logger.warning(f"Validator rejected primary: '{cleaned_command_p}'")
                 append_output_func(f"  P-> ❌ AI Validator rejected: '{cleaned_command_p}'.", style_class='warning')
-            else: 
+            else:
                 logger.warning(f"Validator inconclusive for primary: '{cleaned_command_p}'")
                 append_output_func(f"  P-> ⚠️ AI Validator inconclusive for: '{cleaned_command_p}'.", style_class='warning')
         else:
@@ -417,7 +436,7 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
             append_output_func(f"  P-> Primary translation failed.", style_class='warning')
 
         if secondary_model_name:
-            append_output_func(f"    S-> Trying Secondary Translator ({secondary_model_name})...", style_class='ai-thinking-detail')
+            append_output_func(f"     S-> Trying Secondary Translator ({secondary_model_name})...", style_class='ai-thinking-detail')
             logger.debug(f"Cycle {i+1}: Trying secondary translator.")
             cleaned_command_s, raw_candidate_s = await _get_direct_ai_output(human_query, config_param, append_output_func, get_app_func)
             if raw_candidate_s is not None: last_raw_candidate_secondary = raw_candidate_s
@@ -434,7 +453,7 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
                 elif is_valid_by_validator is False:
                     logger.warning(f"Validator rejected secondary: '{cleaned_command_s}'")
                     append_output_func(f"  S-> ❌ AI Validator rejected: '{cleaned_command_s}'.", style_class='warning')
-                else: 
+                else:
                     logger.warning(f"Validator inconclusive for secondary: '{cleaned_command_s}'")
                     append_output_func(f"  S-> ⚠️ AI Validator inconclusive for: '{cleaned_command_s}'.", style_class='warning')
             else:
@@ -446,7 +465,7 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
         if i < translation_cycles - 1:
             append_output_func(f"Retrying translation & validation cycle {i+2}/{translation_cycles}...", style_class='ai-thinking')
             await asyncio.sleep(retry_delay)
-        else: 
+        else:
             logger.error(f"All {translation_cycles} translation cycles failed for '{human_query}'.")
             append_output_func(f"❌ AI failed to produce validated command after {translation_cycles} cycles.", style_class='error')
             final_raw_candidate = last_raw_candidate_secondary if last_raw_candidate_secondary is not None else last_raw_candidate_primary
@@ -456,11 +475,8 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
 
     return None, None
 
-
 async def explain_linux_command_with_ai(command_to_explain: str, config_param: dict, append_output_func) -> str | None:
-    """
-    Uses an AI model to explain a given Linux command.
-    """
+    # ... (existing function is unchanged)
     logger.info(f"Requesting AI explanation for command: '{command_to_explain}'")
     if not command_to_explain:
         return "Cannot explain an empty command."
@@ -496,7 +512,7 @@ async def explain_linux_command_with_ai(command_to_explain: str, config_param: d
                 return explanation
             else:
                 logger.warning(f"Explainer AI returned an empty response for '{command_to_explain}'.")
-                if attempt == ollama_call_retries: 
+                if attempt == ollama_call_retries:
                     return "AI Explainer returned an empty response."
         except ollama.ResponseError as e_resp:
             error_message = e_resp.error if hasattr(e_resp, 'error') else str(e_resp)
