@@ -116,9 +116,9 @@ echo ""
 echo "--- Installing Ollama Models ---"
 if command_exists ollama; then
     MODELS=(
-        "llama3.2:3b"
-        "vitali87/shell-commands-qwen2-1.5b"
-        "herawen/lisa:latest"
+        "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
+        "vitali87/shell-commands-qwen2-1.5b-extended"
+        "herawen/lisa"
     )
     for model in "${MODELS[@]}"; do
         echo "Pulling Ollama model: $model ..."

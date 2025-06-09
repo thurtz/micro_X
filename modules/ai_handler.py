@@ -70,7 +70,6 @@ import ollama # Assuming ollama is installed and accessible
 import logging
 
 # --- Logging Setup ---
-# This logger will be specific to the ai_handler module
 logger = logging.getLogger(__name__)
 
 # --- AI Integration Constants ---
@@ -103,11 +102,7 @@ _INNER_TAG_EXTRACT_PATTERN = re.compile(r"^\s*<([a-zA-Z0-9_:]+)(?:\s+[^>]*)?>([\
 # --- AI Helper Functions ---
 
 def _is_ai_refusal(text: str) -> bool:
-    """
-    Checks if a given text is likely an AI refusal to generate a command.
-    """
-    # NEW: Centralized refusal check.
-    # This checks the beginning of the string for common refusal phrases.
+    """Checks if a given text is likely an AI refusal to generate a command."""
     refusal_prefixes = ("sorry", "i cannot", "unable to", "cannot translate", "i am unable to")
     return text.lower().strip().startswith(refusal_prefixes)
 
@@ -161,23 +156,38 @@ def _clean_extracted_command(extracted_candidate: str) -> str:
 
     logger.debug(f"After cleaning: '{original_for_log}' -> '{cleaned_linux_command}'")
 
-    # MODIFIED: The refusal check is now primarily handled at a higher level,
-    # but we keep it here as a defense-in-depth for tagged content that might still contain a refusal.
     if _is_ai_refusal(cleaned_linux_command):
         logger.debug(f"Command discarded after cleaning (AI refusal): '{original_for_log}' -> '{cleaned_linux_command}'")
         return ""
     else:
         return cleaned_linux_command
 
+
 async def is_valid_linux_command_according_to_ai(command_text: str, config_param: dict) -> bool | None:
-    # ... (existing function is unchanged)
+    """Asks the Validator AI model if the given text is a valid Linux command."""
     if not command_text or len(command_text) < 2 or len(command_text) > 200:
         logger.debug(f"Skipping AI validation for command_text of length {len(command_text)}: '{command_text}'")
         return None
 
     validator_system_prompt = config_param['prompts']['validator']['system']
     validator_user_prompt = config_param['prompts']['validator']['user_template'].format(command_text=command_text)
-    validator_model = config_param['ai_models']['validator']
+    
+    # FIX: Robustly get model config, handling both old (str) and new (dict) formats
+    validator_model_config = config_param.get('ai_models', {}).get('validator', {})
+    if isinstance(validator_model_config, dict):
+        validator_model = validator_model_config.get('model')
+        validator_options = validator_model_config.get('options')
+    elif isinstance(validator_model_config, str):
+        validator_model = validator_model_config
+        validator_options = None
+    else:
+        validator_model = None
+        validator_options = None
+
+    if not validator_model:
+        logger.error("Validator AI model name not configured.")
+        return None
+
     validator_attempts = config_param['behavior']['validator_ai_attempts']
     retry_delay = config_param['behavior']['ai_retry_delay_seconds'] / 2
 
@@ -185,14 +195,17 @@ async def is_valid_linux_command_according_to_ai(command_text: str, config_param
     for i in range(validator_attempts):
         logger.info(f"To Validator AI (model: {validator_model}, attempt {i+1}/{validator_attempts}): '{command_text}'")
         try:
-            response = await asyncio.to_thread(
-                ollama.chat,
-                model=validator_model,
-                messages=[
+            chat_kwargs = {
+                "model": validator_model,
+                "messages": [
                     {'role': 'system', 'content': validator_system_prompt},
                     {'role': 'user', 'content': validator_user_prompt}
                 ]
-            )
+            }
+            if validator_options:
+                chat_kwargs['options'] = validator_options
+
+            response = await asyncio.to_thread(ollama.chat, **chat_kwargs)
             ai_answer = response['message']['content'].strip().lower()
             logger.debug(f"Validator AI response (attempt {i+1}) for '{command_text}': '{ai_answer}'")
 
@@ -233,7 +246,23 @@ async def _interpret_and_clean_tagged_ai_output(human_input: str, config_param: 
         return None, None
 
     raw_candidate_from_regex = None
-    ollama_model = config_param['ai_models']['primary_translator']
+    
+    # FIX: Robustly get model config
+    primary_translator_config = config_param.get('ai_models', {}).get('primary_translator', {})
+    if isinstance(primary_translator_config, dict):
+        ollama_model = primary_translator_config.get('model')
+        model_options = primary_translator_config.get('options')
+    elif isinstance(primary_translator_config, str):
+        ollama_model = primary_translator_config
+        model_options = None
+    else:
+        ollama_model = None
+        model_options = None
+        
+    if not ollama_model:
+        logger.error("Primary Translator AI model name not configured.")
+        return None, None
+        
     system_prompt = config_param['prompts']['primary_translator']['system']
     user_prompt_template = config_param['prompts']['primary_translator']['user_template']
     retry_delay = config_param['behavior']['ai_retry_delay_seconds']
@@ -245,20 +274,41 @@ async def _interpret_and_clean_tagged_ai_output(human_input: str, config_param: 
         try:
             logger.info(f"To Primary AI (model: {ollama_model}, attempt {attempt + 1}/{ollama_call_retries+1}): '{human_input}'")
             user_prompt = user_prompt_template.format(human_input=human_input)
-            response = await asyncio.to_thread(
-                ollama.chat,
-                model=ollama_model,
-                messages=[
+            
+            chat_kwargs = {
+                "model": ollama_model,
+                "messages": [
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': user_prompt}
                 ]
-            )
+            }
+            if model_options:
+                chat_kwargs['options'] = model_options
+
+            response = await asyncio.to_thread(ollama.chat, **chat_kwargs)
+            
             ai_response = response['message']['content'].strip()
             logger.debug(f"Raw Primary AI response (attempt {attempt + 1}): {ai_response}")
 
+            # Get the new configuration switch value
+            use_strict_extraction = config_param.get('behavior', {}).get('use_strict_extraction_for_primary_translator', True)
+
+            # If strict extraction is OFF, treat it like the direct translator and return early
+            if not use_strict_extraction:
+                logger.info("Strict extraction for primary translator is OFF. Treating output as direct.")
+                cleaned_linux_command = _clean_extracted_command(ai_response)
+                if cleaned_linux_command:
+                    return cleaned_linux_command, ai_response
+                else:
+                    # Handle case where cleaning results in an empty command (e.g., it was an AI refusal)
+                    if _is_ai_refusal(ai_response):
+                        logger.warning(f"Primary AI refused query (direct mode): '{human_input}'. Message: '{ai_response}'")
+                        append_output_func(f"⚠️ AI (Primary) Refusal: {ai_response}", style_class='ai-unsafe')
+                    return None, ai_response
+
+            # --- Existing logic for strict extraction (if use_strict_extraction is True) ---
             match = COMMAND_PATTERN.search(ai_response)
             if match:
-                # This logic is mostly unchanged, but now focuses only on extraction
                 if _UNSAFE_TAG_CONTENT_GROUP != -1 and COMMAND_PATTERN.groups >= _UNSAFE_TAG_CONTENT_GROUP and match.group(_UNSAFE_TAG_CONTENT_GROUP) is not None:
                     unsafe_message = match.group(_UNSAFE_TAG_CONTENT_GROUP).strip()
                     logger.warning(f"Primary AI indicated unsafe query: '{human_input}'. Message: '{unsafe_message}'")
@@ -276,17 +326,13 @@ async def _interpret_and_clean_tagged_ai_output(human_input: str, config_param: 
                 
                 logger.warning(f"Primary AI matched pattern but no valid command extracted. Raw: {ai_response}, Match: '{match.group(0)}'")
             else:
-                # MODIFICATION: If no pattern matches, check if the whole response is a refusal.
                 if _is_ai_refusal(ai_response):
                     logger.warning(f"Primary AI refused query (no tags): '{human_input}'. Message: '{ai_response}'")
                     append_output_func(f"⚠️ AI (Primary) Refusal: {ai_response}", style_class='ai-unsafe')
-                    # Return the refusal message as the raw candidate for context.
                     return None, ai_response
                 else:
                     logger.error(f"Primary AI response did not match expected patterns. Response: {ai_response}")
 
-            # This part is now only reached if a pattern matched but extraction failed,
-            # or if it didn't match and wasn't a refusal. We should retry.
             if attempt < ollama_call_retries:
                 logger.info(f"Retrying Primary AI call (parsing/match fail) (attempt {attempt + 2}/{ollama_call_retries+1}) for '{human_input}'.")
                 await asyncio.sleep(retry_delay)
@@ -321,11 +367,23 @@ async def _interpret_and_clean_tagged_ai_output(human_input: str, config_param: 
     logger.error(f"_interpret_and_clean_tagged_ai_output exhausted retries for '{human_input}'. Last exception: {last_exception_in_ollama_call}")
     return None, raw_candidate_from_regex
 
+
 async def _get_direct_ai_output(human_input: str, config_param: dict, append_output_func, get_app_func) -> tuple[str | None, str | None]:
-    # ... (existing function is unchanged, but could also benefit from the same refusal check)
-    direct_translator_model = config_param['ai_models'].get('direct_translator')
+    """Calls secondary translation AI, cleans response."""
+    # FIX: Robustly get model config
+    direct_translator_config = config_param.get('ai_models', {}).get('direct_translator', {})
+    if isinstance(direct_translator_config, dict):
+        direct_translator_model = direct_translator_config.get('model')
+        model_options = direct_translator_config.get('options')
+    elif isinstance(direct_translator_config, str):
+        direct_translator_model = direct_translator_config
+        model_options = None
+    else:
+        direct_translator_model = None
+        model_options = None
+
     if not direct_translator_model:
-        logger.info("_get_direct_ai_output skipped: No direct_translator_model configured.")
+        logger.info("_get_direct_ai_output skipped: No direct_translator model configured.")
         return None, None
 
     system_prompt = config_param['prompts']['direct_translator']['system']
@@ -340,14 +398,18 @@ async def _get_direct_ai_output(human_input: str, config_param: dict, append_out
         try:
             logger.info(f"To Direct AI (model: {direct_translator_model}, attempt {attempt + 1}/{ollama_call_retries+1}): '{human_input}'")
             user_prompt = user_prompt_template.format(human_input=human_input)
-            response = await asyncio.to_thread(
-                ollama.chat,
-                model=direct_translator_model,
-                messages=[
+
+            chat_kwargs = {
+                "model": direct_translator_model,
+                "messages": [
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': user_prompt}
                 ]
-            )
+            }
+            if model_options:
+                chat_kwargs['options'] = model_options
+
+            response = await asyncio.to_thread(ollama.chat, **chat_kwargs)
             raw_response_content = response['message']['content'].strip()
             logger.debug(f"Raw Direct AI response (attempt {attempt + 1}): {raw_response_content}")
 
@@ -356,10 +418,9 @@ async def _get_direct_ai_output(human_input: str, config_param: dict, append_out
                 logger.debug(f"_get_direct_ai_output returning: Cleaned='{cleaned_linux_command}', Raw='{raw_response_content}'")
                 return cleaned_linux_command, raw_response_content
             else:
-                # Also check for refusal here if cleaning results in an empty string
                 if _is_ai_refusal(raw_response_content):
-                     logger.warning(f"Direct AI refused query (after cleaning). Raw: {raw_response_content}")
-                     return None, raw_response_content
+                        logger.warning(f"Direct AI refused query (after cleaning). Raw: {raw_response_content}")
+                        return None, raw_response_content
                 
                 logger.warning(f"Direct AI response resulted in empty command after cleaning. Raw: {raw_response_content}")
                 if attempt < ollama_call_retries:
@@ -394,9 +455,11 @@ async def _get_direct_ai_output(human_input: str, config_param: dict, append_out
     logger.error(f"_get_direct_ai_output exhausted retries for '{human_input}'. Last exception: {last_exception_in_ollama_call}")
     return None, raw_response_content
 
-# The rest of the file (get_validated_ai_command, explain_linux_command_with_ai) remains unchanged.
+
 async def get_validated_ai_command(human_query: str, config_param: dict, append_output_func, get_app_func) -> tuple[str | None, str | None]:
-    # ... (existing function is unchanged)
+    """
+    Attempts to get a validated Linux command using primary and secondary AI translators.
+    """
     logger.info(f"Attempting validated translation for: '{human_query}'")
     last_raw_candidate_primary = None
     last_raw_candidate_secondary = None
@@ -404,14 +467,19 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
 
     translation_cycles = config_param['behavior']['translation_validation_cycles']
     retry_delay = config_param['behavior']['ai_retry_delay_seconds']
-    primary_model_name = config_param['ai_models']['primary_translator']
-    secondary_model_name = config_param['ai_models'].get('direct_translator')
+
+    primary_model_config = config_param.get('ai_models', {}).get('primary_translator', {})
+    primary_model_name = primary_model_config.get('model', 'N/A') if isinstance(primary_model_config, dict) else primary_model_config
+    
+    secondary_model_config = config_param.get('ai_models', {}).get('direct_translator', {})
+    secondary_model_name = secondary_model_config.get('model') if isinstance(secondary_model_config, dict) else secondary_model_config
+
 
     for i in range(translation_cycles):
         append_output_func(f"🧠 AI translation & validation cycle {i+1}/{translation_cycles} for: '{human_query}'", style_class='ai-thinking')
         if get_app_func().is_running : get_app_func().invalidate()
 
-        append_output_func(f"     P-> Trying Primary Translator ({primary_model_name})...", style_class='ai-thinking-detail')
+        append_output_func(f"      P-> Trying Primary Translator ({primary_model_name})...", style_class='ai-thinking-detail')
         logger.debug(f"Cycle {i+1}: Trying primary translator.")
         cleaned_command_p, raw_candidate_p = await _interpret_and_clean_tagged_ai_output(human_query, config_param, append_output_func, get_app_func)
         if raw_candidate_p is not None: last_raw_candidate_primary = raw_candidate_p
@@ -436,7 +504,7 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
             append_output_func(f"  P-> Primary translation failed.", style_class='warning')
 
         if secondary_model_name:
-            append_output_func(f"     S-> Trying Secondary Translator ({secondary_model_name})...", style_class='ai-thinking-detail')
+            append_output_func(f"      S-> Trying Secondary Translator ({secondary_model_name})...", style_class='ai-thinking-detail')
             logger.debug(f"Cycle {i+1}: Trying secondary translator.")
             cleaned_command_s, raw_candidate_s = await _get_direct_ai_output(human_query, config_param, append_output_func, get_app_func)
             if raw_candidate_s is not None: last_raw_candidate_secondary = raw_candidate_s
@@ -475,13 +543,25 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
 
     return None, None
 
+
 async def explain_linux_command_with_ai(command_to_explain: str, config_param: dict, append_output_func) -> str | None:
-    # ... (existing function is unchanged)
+    """Uses an AI model to explain a given Linux command."""
     logger.info(f"Requesting AI explanation for command: '{command_to_explain}'")
     if not command_to_explain:
         return "Cannot explain an empty command."
 
-    explainer_model = config_param.get('ai_models', {}).get('explainer')
+    # FIX: Robustly get model config
+    explainer_config = config_param.get('ai_models', {}).get('explainer', {})
+    if isinstance(explainer_config, dict):
+        explainer_model = explainer_config.get('model')
+        model_options = explainer_config.get('options')
+    elif isinstance(explainer_config, str):
+        explainer_model = explainer_config
+        model_options = None
+    else:
+        explainer_model = None
+        model_options = None
+
     explainer_prompts = config_param.get('prompts', {}).get('explainer')
 
     if not explainer_model or not explainer_prompts:
@@ -498,14 +578,19 @@ async def explain_linux_command_with_ai(command_to_explain: str, config_param: d
     for attempt in range(ollama_call_retries + 1):
         try:
             logger.info(f"To Explainer AI (model: {explainer_model}, attempt {attempt + 1}/{ollama_call_retries + 1}): '{command_to_explain}'")
-            response = await asyncio.to_thread(
-                ollama.chat,
-                model=explainer_model,
-                messages=[
+            
+            chat_kwargs = {
+                "model": explainer_model,
+                "messages": [
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': user_prompt}
                 ]
-            )
+            }
+            if model_options:
+                chat_kwargs['options'] = model_options
+
+            response = await asyncio.to_thread(ollama.chat, **chat_kwargs)
+            
             explanation = response['message']['content'].strip()
             logger.debug(f"Explainer AI response: {explanation}")
             if explanation:

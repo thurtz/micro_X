@@ -93,12 +93,12 @@ echo ""
 echo "--- Installing Ollama Models (Requires Ollama server to be running) ---"
 if command_exists ollama; then
     MODELS=(
-        "llama3.2:3b" # Smaller model, more likely to run on device
-        "vitali87/shell-commands-qwen2-1.5b"
-        "herawen/lisa:latest"
+        "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
+        "vitali87/shell-commands-qwen2-1.5b-extended"
+        "herawen/lisa"
     )
     echo "Note: Pulling models can take a significant amount of time and storage."
-    echo "The llama3.2:3b model is approximately 1.6GB."
+    echo "The models needed can total approximately 5GB."
     read -p "Do you want to proceed with pulling these models now? (y/N) " pull_models_choice
     if [[ "$pull_models_choice" =~ ^[Yy]$ ]]; then
         for model in "${MODELS[@]}"; do
