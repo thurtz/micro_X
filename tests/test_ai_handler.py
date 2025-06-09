@@ -40,9 +40,6 @@ clean_command_test_cases = [
 
     # AI refusal phrases
     ("Sorry, I cannot fulfill that request.", ""),
-    # This test WILL FAIL until _clean_extracted_command in ai_handler.py is fixed
-    # to correctly identify "I am unable to..." as a refusal.
-    # The expected output "" is the DESIRED behavior of the function.
     ("I am unable to generate that command.", ""),
     ("Cannot translate safely", ""),
     # _clean_extracted_command does not strip <unsafe> tags as per its current tag list.
@@ -63,7 +60,7 @@ clean_command_test_cases = [
 
     # Edge cases
     ("", ""),
-    ("   ", ""),
+    ("    ", ""),
     ("<bash></bash>", ""),
     ("<code> </code>", ""),
 

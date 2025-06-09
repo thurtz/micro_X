@@ -32,19 +32,14 @@ Before using micro\_X, ensure it has been properly installed and configured. Ple
 
 If you wish to work with or test different branches of micro\_X simultaneously without them interfering with each other, you can clone the repository into separate directories. This is particularly useful for developers or advanced users.
 
-1. **Clone for main branch (Stable):**  
-   git clone https://github.com/thurtz/micro\_X.git micro\_X-main  
-   cd micro\_X-main  
-   \# git checkout main \# Usually already on main after clone  
-   ./setup.sh \# Run setup within this directory
+1. # **Clone for main branch (Stable):**    **git clone https://github.com/thurtz/micro\_X.git micro\_X-main**    **cd micro\_X-main**    **git checkout main \# Usually already on main after clone**    **./setup.sh \# Run setup within this directory**
 
-2. **Clone for testing branch:**  
+2. Clone for testing branch:  
    git clone https://github.com/thurtz/micro\_X.git micro\_X-testing  
    cd micro\_X-testing  
    git checkout testing  
-   ./setup.sh \# Run setup within this directory
-
-3. **Clone for dev branch (Development):**  
+   ./setup.sh \# Run setup within this directory  
+3. Clone for dev branch (Development):  
    git clone https://github.com/thurtz/micro\_X.git micro\_X-dev  
    cd micro\_X-dev  
    git checkout dev  
@@ -59,17 +54,13 @@ Each of these directories (micro\_X-main, micro\_X-testing, micro\_X-dev) will t
   1. Activates the Python virtual environment.  
   2. Starts micro\_X (i.e., main.py) *inside a dedicated tmux session* (usually named micro\_X). This provides the most integrated experience.  
 * **Desktop Shortcut (Linux Mint):** If you used the setup script and installed the desktop entry, clicking "micro\_X" in your application menu will typically run the micro\_X.sh script from the directory it was installed from.  
-* **Manual Method (python3 main.py):** You can run micro\_X directly by following these steps:  
+* **Manual Method:** You can run micro\_X directly by following these steps:  
   1. Navigate to its directory.  
   2. Activate the virtual environment:  
-     source .venv/bin/activate
+     source .venv/bin/activate  
+  3. Launch a tmux session specific for micro\_X: tmux \-f config/.tmux.conf new-session \-A \-s micro\_X
 
-  3. Launch a tmux session specific for micro\_X (optional, but recommended for full feature parity if not using micro\_X.sh):  
-     tmux \-f config/.tmux.conf new-session \-A \-s micro\_X
-
-  4. Then run python3 main.py (from within that tmux session if you started one, or directly if you skipped step 3).
-
-**Note on tmux features with manual launch outside of the micro\_X tmux session:** If you launch main.py directly (without step 3, or outside the session started by micro\_X.sh), micro\_X itself will not be running inside a tmux session. However, commands categorized as semi\_interactive or interactive\_tui will still attempt to launch in new, independent tmux windows/sessions.
+**Note on tmux features with manual launch outside of the micro\_X tmux session:** If you launch main.py directly (without step 3, or outside the session started by micro\_X.sh), micro\_X itself will not be running inside a tmux session. However, commands categorized as semi\_interactive or interactive\_tui will still attempt to launch in new, independent tmux windows/sessions. The [main.py](http://main.py) micro\_X shell may not function on its own outside of a tmux environment launched specifically for its own setup.
 
 #### **2.5. Startup Behavior (Integrity Checks & Developer Mode)**
 
@@ -121,25 +112,23 @@ To translate a natural language query into a command:
    * Send your query to the configured AI translator(s).  
    * The translated command will be validated by another AI model.  
    * You'll see messages like "🤖 AI Query: ...", "🧠 Thinking...", "🤖 AI Suggests (validated): ...".  
-4. **Command Confirmation Flow:** If the AI successfully generates and validates a command, you will be prompted to confirm its execution:  
+4. Command Confirmation Flow: If the AI successfully generates and validates a command, you will be prompted to confirm its execution:  
    🤖 AI proposed command (from: /ai your query \-\> suggested\_command):  
    👉 suggested\_command  
    Action: \[Y\]es (Exec, prompt if new) | \[Ys\] Simple & Run | \[Ym\] Semi-Interactive & Run | \[Yi\] TUI & Run | \[E\]xplain | \[M\]odify | \[C\]ancel?  
-   \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/E/M/C):
-
+   \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/E/M/C):  
    Your options are:  
    * **Y or yes**: Execute the command. If the command is unknown to micro\_X's categorization system, you will be prompted to categorize it next (see section 4.3).  
    * **Ys**: Execute the command AND categorize it as simple.  
    * **Ym**: Execute the command AND categorize it as semi\_interactive.  
    * **Yi**: Execute the command AND categorize it as interactive\_tui.  
-   * **E or explain**: Ask the AI to explain what the suggested\_command does. After the explanation, you will be prompted again to execute, modify, or cancel.  
+   * E or explain: Ask the AI to explain what the suggested\_command does. After the explanation, you will be prompted again to execute, modify, or cancel.  
      🧠 Asking AI to explain: suggested\_command  
      💡 AI Explanation:  
      The command 'suggested\_command' does XYZ...  
      Command to consider: suggested\_command  
      Action: \[Y\]es (Exec, prompt if new) | \[Ys\] Simple & Run | \[Ym\] Semi-Interactive & Run | \[Yi\] TUI & Run | \[M\]odify | \[C\]ancel?  
-     \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/M/C):
-
+     \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/M/C):  
    * **M or modify**: The suggested\_command will be loaded into your input field, allowing you to edit it before pressing Enter to submit the modified version.  
    * **C or cancel (or N or no)**: Abort the execution. The command will not run.
 
@@ -152,7 +141,7 @@ When micro\_X encounters a command it hasn't seen before (either typed directly,
   * **semi\_interactive**: For commands that might run for a while, produce a lot of output, or have some minimal interactivity that doesn't require full TUI control (e.g., apt update, a long script, ping google.com). These are run in a new tmux window. Their output is captured and displayed in micro\_X after the command finishes or the tmux window closes/times out.  
     * **Smart Output Handling:** If a semi\_interactive command produces output resembling a full-screen TUI application, micro\_X avoids displaying garbled output and suggests re-categorizing to interactive\_tui.  
   * **interactive\_tui**: For fully interactive terminal applications (e.g., nano, vim, htop, ssh user@host). These are run in a new tmux window that micro\_X effectively hands control to. When you exit the application (and thus the tmux window), you'll return to micro\_X.  
-* **Categorization Prompt (Example for a directly typed unknown command):**  
+* Categorization Prompt (Example for a directly typed unknown command):  
   Command 'my\_new\_script.sh \--verbose' is not categorized. Choose an action:  
   1: simple (Direct output in micro\_X)  
   2: semi\_interactive (Output in micro\_X after tmux run (may be interactive))  
@@ -160,8 +149,7 @@ When micro\_X encounters a command it hasn't seen before (either typed directly,
   M: Modify command before categorizing  
   D: Execute as default 'semi\_interactive' (once, no save)  
   C: Cancel categorization & execution  
-  \[Categorize\] Action (1-3/M/D/C):
-
+  \[Categorize\] Action (1-3/M/D/C):  
   Enter your choice. If you choose 1, 2, or 3, the command and its category will be saved in config/user\_command\_categories.json.
 
 #### **4.4. Managing Command Categories (/command subsystem)**
@@ -174,7 +162,7 @@ You can manage your saved command categorizations:
   * Example: /command add "my\_backup\_script.sh" 2 (for semi\_interactive)  
 * /command remove "\<full\_command\_string\>": Removes a command from your explicit user categorizations. It may then revert to a default category or become unknown.  
 * /command move "\<full\_command\_string\>" \<new\_category\_name\_or\_number\>: Moves a command to a different category in your settings.  
-* /command run \<cat\_num|cat\_name\> "\<cmd\>": Force runs a command with a specific category for this instance without saving the categorization.  
+* /command run \<cat\_num|cat\_name\> "": Force runs a command with a specific category for this instance without saving the categorization.  
 * /command help: Shows these usage instructions and category descriptions.  
   Remember to quote command strings if they contain spaces.
 
@@ -188,7 +176,20 @@ micro\_X provides commands to manage the Ollama service it relies on for AI feat
 * /ollama restart: Attempts to stop and then restart the managed ollama serve process.  
 * /ollama help: Displays help information for these subcommands.
 
-#### **4.6. Using Utility Scripts (/utils command)**
+#### **4.6. Managing Runtime AI Configuration (/config command)**
+
+You can view and modify parts of the AI configuration without restarting micro\_X.
+
+* /config list: Shows the current models and any specific options (e.g., temperature) set for each AI role (translator, validator, explainer).  
+* /config get \<key.path\>: Displays the value of a specific configuration key.  
+  * Example: /config get ai\_models.primary\_translator.model  
+* /config set \<key.path\> : Sets a new value for a configuration key at runtime. For safety, this is limited to AI model names and their options.  
+  * Example: /config set ai\_models.explainer.model llama3:latest  
+  * Example: /config set ai\_models.primary\_translator.options.temperature 0.5  
+* /config save: Saves the current runtime ai\_models configurations to your user\_config.json file, making them persistent.  
+* /config help: Shows usage instructions for these subcommands.
+
+#### **4.7. Using Utility Scripts (/utils command)**
 
 micro\_X comes with helpful utility scripts located in the utils/ directory.
 
@@ -196,10 +197,13 @@ micro\_X comes with helpful utility scripts located in the utils/ directory.
 * /utils \<script\_name\> \[args...\]: Executes the specified utility script.  
   * Example: /utils generate\_tree  
   * Example: /utils generate\_snapshot \--summary "My snapshot"  
+* **Web Config Manager**: A key utility is the web-based configuration manager.  
+  * Example: /utils config\_manager \--start  
+    This will start a local web server (in a managed tmux session) and open a web page in your browser, allowing you to easily view and edit user\_config.json and user\_command\_categories.json.  
 * /utils \<script\_name\> help (or **\-h**, **\--help**): Displays the help message for a specific utility script, showing its available arguments.  
   * Example: /utils generate\_snapshot help
 
-#### **4.7. Chained Commands**
+#### **4.8. Chained Commands**
 
 micro\_X supports AI translation and execution of chained commands (e.g., ls \-l | grep .txt && echo "Found").
 
@@ -240,7 +244,7 @@ micro\_X uses tmux (a terminal multiplexer) to run commands categorized as semi\
   * micro\_X itself runs inside a main tmux session (e.g., named micro\_X).  
   * semi\_interactive and interactive\_tui commands will create *new windows within this main session*.  
 * **If micro\_X was launched with python3 main.py directly:**  
-  * semi\_interactive and interactive\_tui commands will typically create *new, independent tmux sessions*.
+  * semi\_interactive and interactive\_tui commands will create *new, independent tmux sessions* or not work at all.
 
 **Behavior of tmux-based commands:**
 
@@ -274,7 +278,7 @@ If a command in a tmux window becomes unresponsive:
 #### **6.3. Handling Processes that Lock Up tmux Windows**
 
 1. **Identify PID:** Detach from tmux (Ctrl+b d). Use ps aux | grep \<command\_name\> or htop in a standard terminal.  
-2. **Kill Process:** kill \<PID\> (or kill \-9 \<PID\> with caution).  
+2. **Kill Process:** kill (or kill \-9 with caution).  
 3. **Clean tmux Window:** The tmux window might show "Pane is dead." Close it with Ctrl+b x.
 
 ### **7\. Security Considerations**
@@ -303,21 +307,18 @@ If a command in a tmux window becomes unresponsive:
   * **Message: "Local branch has 'ahead'/'diverged' from 'origin/'." or "Local branch is behind 'origin/'."** (Note: "behind" with allow\_run\_if\_behind\_remote: true will only warn, but you might want to sync.)  
     * *Reason:* Your local branch is not synchronized with the remote. It might have local commits not on the remote, the remote might have new commits, or both might have diverged. For main and testing, your local branch should typically mirror the remote.  
     * *Solution:*  
-      1. **Fetch latest remote data:**  
-         git fetch origin
-
+      1. Fetch latest remote data:  
+         git fetch origin  
       2. **Choose a synchronization strategy:**  
-         * **To update and align your local branch (recommended for main/testing if behind or slightly diverged, aiming for linear history):**  
-           git checkout \<branchname\>  \# e.g., testing or main  
-           git rebase origin/\<branchname\>
-
+         * To update and align your local branch (recommended for main/testing if behind or slightly diverged, aiming for linear history):  
+           git checkout \# e.g., testing or main  
+           git rebase origin/  
            This replays any (unexpected) local commits on top of the latest remote version. If there are no local commits, it fast-forwards your branch. Conflicts may need to be resolved if local commits existed and conflict with remote changes.  
-           A common shortcut for fetch then rebase is: git pull \--rebase origin \<branchname\>  
+           A common shortcut for fetch then rebase is: git pull \--rebase origin  
          * To force your local branch to exactly match the remote, discarding ALL local differences (commits and uncommitted changes on this branch):  
            This is often the simplest solution if your local main or testing branch has commits it shouldn't or is ahead/diverged and you just want it to mirror the remote.  
-           git checkout \<branchname\>  \# e.g., testing or main  
-           git reset \--hard origin/\<branchname\>
-
+           git checkout \# e.g., testing or main  
+           git reset \--hard origin/  
            **Use reset \--hard with extreme caution as it permanently discards local work on the branch.**  
          * If you were ahead with commits that are valid and should be on the remote main or testing (unusual for this workflow, usually means a PR was missed):  
            Consult your team. Pushing directly to protected branches is often restricted. Usually, these changes should go through the dev \-\> testing \-\> main PR process. If you need to preserve these commits locally while resetting, consider creating a new branch from your current main/testing before resetting: git branch my-backup-branch  
@@ -326,6 +327,6 @@ If a command in a tmux window becomes unresponsive:
   * **If micro\_X closes too quickly to read the error message on startup, always check logs/micro\_x.log for detailed error information.**  
 * **micro\_X shows warnings about being "behind remote" (on main or testing branch):**  
   * *Reason:* The remote repository has updates that your local branch does not.  
-  * *Solution:* Run /update from within micro\_X, or open a standard terminal in the project directory and run git pull origin \<branchname\>. micro\_X will typically continue to run in this scenario (if allow\_run\_if\_behind\_remote is true).
+  * *Solution:* Run /update from within micro\_X, or open a standard terminal in the project directory and run git pull origin . micro\_X will typically continue to run in this scenario (if allow\_run\_if\_behind\_remote is true).
 
 This guide should help you navigate and utilize the features of micro\_X more effectively. Happy shelling\!

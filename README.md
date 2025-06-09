@@ -22,10 +22,10 @@ micro\_X provides a text-based user interface (TUI) where you can:
 
 ## **Key Features**
 
-* **Natural Language to Command Translation:** Uses a configurable "primary\_translator" Ollama model for initial translation (default example: llama3.2:3b).  
-* **Optional Secondary Direct Translator:** Can leverage a configurable "direct\_translator" model specialized in direct command output (default example: vitali87/shell-commands-qwen2-1.5b) as a fallback or alternative.  
-* **AI-Powered Command Validation:** Employs a configurable "validator" Ollama model (default example: herawen/lisa:latest) to assess command validity.  
-* **AI-Powered Command Explanation:** Before executing an AI-generated command, you can request an explanation from a configurable "explainer" Ollama model (default example: llama3.2:3b) to understand its purpose and potential impact.  
+* **Natural Language to Command Translation:** Uses a configurable "primary\_translator" Ollama model for initial translation (default example: vitali87/shell-commands-qwen2-1.5b-q8\_0-extended).  
+* **Optional Secondary Direct Translator:** Can leverage a configurable "direct\_translator" model specialized in direct command output (default example: vitali87/shell-commands-qwen2-1.5b-extended) as a fallback or alternative.  
+* **AI-Powered Command Validation:** Employs a configurable "validator" Ollama model (default example: herawen/lisa) to assess command validity.  
+* **AI-Powered Command Explanation:** Before executing an AI-generated command, you can request an explanation from a configurable "explainer" Ollama model (default example: herawen/lisa) to understand its purpose and potential impact.  
 * **Interactive Command Confirmation:** For AI-generated commands, micro\_X prompts for user action:  
   * \[Y\]es: Execute the command (will prompt for categorization if the command is new).  
   * \[Ys\] Simple & Run: Execute and categorize the command as 'simple'.  
@@ -43,6 +43,9 @@ micro\_X provides a text-based user interface (TUI) where you can:
 * **Ollama Service Management (/ollama command):**  
   * Control the Ollama service directly from micro\_X.  
   * Subcommands: start, stop, restart, status, help.  
+* **Runtime AI Configuration (/config command):**  
+  * View and modify AI model settings (e.g., model name, temperature) at runtime.  
+  * Save runtime changes to your user configuration file.  
 * **Branch-Aware Integrity & Developer Mode:**  
   * **Developer Mode:** Automatically activated when running from the dev branch or if integrity checks cannot be performed (e.g., not a git repository). In this mode, integrity checks are informational or bypassed, allowing development and local modifications without interruption.  
   * **Protected Mode:** Active when running from main or testing branches. Performs startup integrity checks:  
@@ -95,20 +98,17 @@ Detailed manual instructions and prerequisites for each platform are also availa
 * Ollama ([ollama.com](https://ollama.com/)) installed and running.  
 * **Required Ollama Models (Examples \- these are configurable):**  
   * Pull via ollama pull \<model\_name\> (e.g., ollama pull llama3.2:3b)  
-  * Primary Translator (e.g., llama3.2:3b)  
-  * Direct Translator (e.g., vitali87/shell-commands-qwen2-1.5b)  
-  * Validator (e.g., herawen/lisa:latest)  
-  * Explainer (e.g., llama3.2:3b)
+  * Primary Translator (e.g., shell-commands-qwen2-1.5b-q8\_0-extended)  
+  * Direct Translator (e.g., vitali87/shell-commands-qwen2-1.5b-extended)  
+  * Validator (e.g., herawen/lisa)  
+  * Explainer (e.g., herawen/lisa)
 
 **Managing Multiple Branches (Optional):**
 
 If you want to work with or test different branches simultaneously, you can clone the repository into separate directories:
 
-1. Main Branch (Stable):  
-   git clone https://github.com/thurtz/micro\_X.git micro\_X-main  
-   cd micro\_X-main  
-   \# git checkout main \# Usually already on main  
-   ./setup.sh \# Run setup within this directory  
+1. # **Main Branch (Stable):**    **git clone https://github.com/thurtz/micro\_X.git micro\_X-main**    **cd micro\_X-main**    **git checkout main \# Usually already on main**    **./setup.sh \# Run setup within this directory**
+
 2. Testing Branch:  
    git clone https://github.com/thurtz/micro\_X.git micro\_X-testing  
    cd micro\_X-testing  
@@ -169,7 +169,7 @@ micro\_X's behavior at startup is influenced by the current Git branch:
 
 * **Direct Commands:** Type any Linux command and press Enter (e.g., ls \-l).  
 * Forced AI Translation (/ai): Prefix your query with /ai.  
-  (\~) \> /ai list all python files in my documents folder  
+  (\~) \> /ai list text files  
   If the AI suggests a command, you'll be prompted to confirm, explain, modify, or cancel it.  
 * Natural language (without the use of /ai) will go through validation and translation rather than just translation. If the AI suggests a command, you'll be prompted to confirm, explain, modify, or cancel it.  
 * Command Management (/command): Use /command help for options to add, remove, list, or move categorized commands.  
@@ -179,6 +179,10 @@ micro\_X's behavior at startup is influenced by the current Git branch:
   (\~) \> /ollama status  
   (\~) \> /ollama start  
   (\~) \> /ollama help  
+* Configuration Management (/config): Manage runtime AI settings.  
+  (\~) \> /config list  
+  (\~) \> /config set ai\_models.explainer.options.temperature 0.2  
+  (\~) \> /config save  
 * Utilities (/utils): Run scripts from the utils directory.  
   (\~) \> /utils list  
   (\~) \> /utils generate\_tree  
@@ -198,6 +202,7 @@ micro\_X's behavior at startup is influenced by the current Git branch:
 micro\_X uses a hierarchical configuration system (fallback \-\> default \-\> user):
 
 * **Default Configuration:** config/default\_config.json (AI models, prompts, timeouts, behavior, integrity check settings).  
+  * **AI Models:** Model definitions are now objects supporting model names and options: "primary\_translator": {"model": "model-name", "options": {"temperature": 0.7}}.  
 * **User Configuration:** config/user\_config.json (Your overrides).  
 * **Default Command Categories:** config/default\_command\_categories.json.  
 * **User Command Categories:** config/user\_command\_categories.json (Your categorizations).  
@@ -221,25 +226,25 @@ micro\_X uses a hierarchical configuration system (fallback \-\> default \-\> us
     1. Open a standard terminal in your micro\_X project directory.  
     2. Check status: git status  
     3. If you have local changes you don't want:  
-       * Stash them (to potentially reapply later): git stash  
-       * Discard them permanently: git reset \--hard HEAD (Warning: This permanently deletes uncommitted changes).  
+    * Stash them (to potentially reapply later): git stash  
+    * Discard them permanently: git reset \--hard HEAD (Warning: This permanently deletes uncommitted changes).  
     4. **To sync your local branch with the remote (e.g., testing or main):**  
-       * Option A (Rebase \- for a linear history, often preferred):  
-         git checkout \<branchname\> \# e.g., testing or main  
-         git fetch origin  
-         git rebase origin/\<branchname\>  
-         This fetches the latest remote changes and reapplies any local commits on top. If you have no local commits (which should be the case on main or testing), it will fast-forward your branch to match the remote if it's behind.  
-         A more concise way to do fetch and rebase is: git pull \--rebase origin \<branchname\>  
-       * Option B (Reset Hard \- to exactly match remote, discarding ALL local differences):  
-         If your local branch is ahead or has diverged with commits you want to discard to make it identical to the remote:  
-         git checkout \<branchname\> \# e.g., testing or main  
-         git fetch origin  
-         git reset \--hard origin/\<branchname\>  
-         **Use reset \--hard with extreme caution as it permanently discards local commits and uncommitted changes on this branch.**  
-       * Option C (Pull with Merge \- default pull behavior, may create merge commits):  
-         git checkout \<branchname\> \# e.g., testing or main  
-         git fetch origin \# Ensure remote refs are up-to-date  
-         git pull origin \<branchname\> \# This typically does a fetch then merge  
+    * Option A (Rebase \- for a linear history, often preferred):  
+      git checkout \# e.g., testing or main  
+      git fetch origin  
+      git rebase origin/  
+      This fetches the latest remote changes and reapplies any local commits on top. If you have no local commits (which should be the case on main or testing), it will fast-forward your branch to match the remote if it's behind.  
+      A more concise way to do fetch and rebase is: git pull \--rebase origin  
+    * Option B (Reset Hard \- to exactly match remote, discarding ALL local differences):  
+      If your local branch is ahead or has diverged with commits you want to discard to make it identical to the remote:  
+      git checkout \# e.g., testing or main  
+      git fetch origin  
+      git reset \--hard origin/  
+      Use reset \--hard with extreme caution as it permanently discards local commits and uncommitted changes on this branch.  
+    * Option C (Pull with Merge \- default pull behavior, may create merge commits):  
+      git checkout \# e.g., testing or main  
+      git fetch origin \# Ensure remote refs are up-to-date  
+      git pull origin \# This typically does a fetch then merge  
     5. If you intend to develop, switch to the dev branch: git checkout dev. Local changes are expected and allowed there.  
 * **micro\_X shows warnings about being behind remote:**  
   * *Reason:* Your local protected branch is behind the remote.  
@@ -249,7 +254,7 @@ micro\_X uses a hierarchical configuration system (fallback \-\> default \-\> us
 
 * Enhanced parsing for AI output.  
 * More sophisticated security sandboxing options.  
-* User-configurable AI parameters (temperature, etc.) directly via commands.  
+* Additional User-configurable AI parameters (temperature, etc.) directly via commands.  
 * Plugin system for extending functionality.  
 * GPG signature verification for commits/tags on the main branch as part of integrity checks.
 
