@@ -97,8 +97,8 @@ Detailed manual instructions and prerequisites for each platform are also availa
 * **Git:** Required for updates and the new integrity check features.  
 * Ollama ([ollama.com](https://ollama.com/)) installed and running.  
 * **Required Ollama Models (Examples \- these are configurable):**  
-  * Pull via ollama pull \<model\_name\> (e.g., ollama pull llama3.2:3b)  
-  * Primary Translator (e.g., shell-commands-qwen2-1.5b-q8\_0-extended)  
+  * Pull via ollama pull \<model\_name\> (e.g., ollama pull herawen/lisa)  
+  * Primary Translator (e.g., vitali87/shell-commands-qwen2-1.5b-q8\_0-extended)  
   * Direct Translator (e.g., vitali87/shell-commands-qwen2-1.5b-extended)  
   * Validator (e.g., herawen/lisa)  
   * Explainer (e.g., herawen/lisa)
@@ -107,7 +107,7 @@ Detailed manual instructions and prerequisites for each platform are also availa
 
 If you want to work with or test different branches simultaneously, you can clone the repository into separate directories:
 
-1. # **Main Branch (Stable):**    **git clone https://github.com/thurtz/micro\_X.git micro\_X-main**    **cd micro\_X-main**    **git checkout main \# Usually already on main**    **./setup.sh \# Run setup within this directory**
+1. # **Main Branch (Stable): git clone [https://github.com/thurtz/micro](https://github.com/thurtz/micro)\_X.git micro\_X-main cd micro\_X-main git checkout main \# Usually already on main ./setup.sh \# Run setup within this directory**
 
 2. Testing Branch:  
    git clone https://github.com/thurtz/micro\_X.git micro\_X-testing  

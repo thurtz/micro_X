@@ -75,7 +75,12 @@ def load_configuration():
     
     # Define a comprehensive fallback configuration
     fallback_config = {
-        "ai_models": {"primary_translator": "llama3.2:3b", "direct_translator": "vitali87/shell-commands-qwen2-1.5b", "validator": "herawen/lisa:latest", "explainer": "llama3.2:3b"},
+        "ai_models": {
+            "primary_translator": {"model": "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"},
+            "direct_translator": {"model": "vitali87/shell-commands-qwen2-1.5b-extended"},
+            "validator": {"model": "herawen/lisa"},
+            "explainer": {"model": "herawen/lisa"}
+        },
         "timeouts": {"tmux_poll_seconds": 300, "tmux_semi_interactive_sleep_seconds": 1, "git_fetch_timeout": 10},
         "behavior": {"input_field_height": 3, "default_category_for_unclassified": "simple", "validator_ai_attempts": 3, "translation_validation_cycles": 3, "ai_retry_delay_seconds": 1, "ollama_api_call_retries": 2, "tui_detection_line_threshold_pct": 30.0, "tui_detection_char_threshold_pct": 3.0, "use_strict_extraction_for_primary_translator": True},
         "ui": {
