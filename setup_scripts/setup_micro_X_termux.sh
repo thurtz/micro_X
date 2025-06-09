@@ -98,7 +98,7 @@ if command_exists ollama; then
         "herawen/lisa"
     )
     echo "Note: Pulling models can take a significant amount of time and storage."
-    echo "The llama3.2:3b model is approximately 1.6GB."
+    echo "The models needed can total approximately 5GB."
     read -p "Do you want to proceed with pulling these models now? (y/N) " pull_models_choice
     if [[ "$pull_models_choice" =~ ^[Yy]$ ]]; then
         for model in "${MODELS[@]}"; do
