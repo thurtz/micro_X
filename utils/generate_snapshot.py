@@ -49,7 +49,8 @@ FILES_TO_INCLUDE = [
     "docs/micro_X_Code_Quality_Review.md",
     "docs/micro_X_Code_Quality_Review_Accomplishments.md",
     "docs/ai_interaction_rules.md",
-    "docs/development_principles.md" # Added the new development principles file
+    "docs/development_principles.md", # Added the new development principles file
+    "micro_X-A_Technical_Whitepaper.md"
 ]
 
 # List of module files that can be summarized to their API documentation.

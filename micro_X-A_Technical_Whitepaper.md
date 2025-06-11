@@ -2,7 +2,7 @@
 
 ### **A Technical Whitepaper**
 
-Version: 1.2 (Reflecting Snapshot 2025-06-09)  
+Version: 1.3 (Reflecting Snapshot 2025-06-11)  
 Project Repository: https://github.com/thurtz/micro\_X.git
 
 ### **Abstract**
@@ -41,17 +41,17 @@ A typical user interaction follows a refined, state-aware flow:
 **2.2. Core Modules**
 
 * **main.py:** The application entry point. Handles startup, initialization of managers, and the main asyncio event loop.  
-* **shell\_engine.py:** The central orchestrator. Manages application state (e.g., current directory), handles built-in commands, and dispatches tasks to other modules.  
-* **ui\_manager.py:** A standout module that manages the entire prompt\_toolkit TUI. It implements complex, stateful asynchronous flows for user interactions like categorization and confirmation, ensuring the UI remains responsive.  
+* **shell\_engine.py:** The central orchestrator. Manages application state (e.g., current directory), handles built-in commands, and dispatches tasks to other modules. Its command handling for tmux has been hardened for greater reliability with special characters.  
+* **ui\_manager.py:** A standout module that manages the entire prompt\_toolkit TUI. It implements complex, stateful asynchronous flows for user interactions like categorization and confirmation, with recent improvements to prevent race conditions during flow cancellation, ensuring the UI remains responsive and stable.  
 * **ai\_handler.py:** Encapsulates all logic for interacting with Ollama LLMs, including multi-model prompting, output parsing, and cleaning.  
 * **category\_manager.py:** Manages the classification of commands by merging default and user-defined configurations.  
 * **ollama\_manager.py:** A utility module that abstracts the management of the ollama serve process, including starting, stopping, and status checking within a dedicated tmux session.  
-* **git\_context\_manager.py:** Provides a clean interface for Git commands, used exclusively for the startup integrity checks.  
+* **git\_context\_manager.py:** Provides a clean interface for Git commands, used exclusively for the startup integrity checks. This module has been enhanced for more nuanced error reporting (e.g., distinguishing network timeouts from offline status).  
 * **output\_analyzer.py:** A specialized module that heuristically detects TUI screen control codes in command output.
 
 ### **3\. Key Features in Detail**
 
-* **Startup Integrity & Developer Mode:** To ensure reliability, micro\_X performs Git integrity checks on startup. On main and testing branches, it will halt if it detects uncommitted local changes or a diverged state from the remote repository. On the dev branch or feature branches, it automatically enters a permissive "Developer Mode," bypassing these checks.  
+* **Startup Integrity & Developer Mode:** To ensure reliability, micro\_X performs Git integrity checks on startup. On main and testing branches, it will halt if it detects uncommitted local changes or a diverged state from the remote repository. On the dev branch or feature branches, it automatically enters a permissive "Developer Mode," bypassing these checks. The system can now more accurately diagnose git fetch issues, improving the reliability of this check.  
 * **Web-Based Configuration Manager:** Launched via /utils config\_manager \--start, this tool provides an intuitive web interface for editing user\_config.json and user\_command\_categories.json, significantly lowering the barrier for user customization.  
 * **Interactive AI Command Confirmation Flow:** This critical safety feature ensures no AI-generated command runs without explicit user approval. The ability to ask for an **\[E\]xplanation** from an AI before execution is a powerful tool for learning and security.  
 * **Intelligent Command Categorization:** micro\_X learns how commands behave. By categorizing commands, it knows to run a text editor like vim in a fully interactive tmux window while capturing the output of a long-running script like apt update in the background.  
@@ -74,17 +74,18 @@ A typical user interaction follows a refined, state-aware flow:
 
 ### **5\. Testing and Validation**
 
-The project maintains a high standard of quality, enforced by a comprehensive testing suite built with pytest. As of the latest snapshot, the suite includes **144 passing tests** that cover core logic, asynchronous operations, and complex UI flows, utilizing pytest-asyncio and pytest-mock to ensure reliability and prevent regressions.
+The project maintains a high standard of quality, enforced by a comprehensive testing suite built with pytest. As of the latest snapshot, the suite includes **152 passing tests** that cover core logic, asynchronous operations, complex UI flows, and Git context management. This extensive test coverage, utilizing pytest-asyncio and pytest-mock, is crucial for ensuring reliability and preventing regressions.
 
 ### **6\. Current Status and Accomplishments**
 
-As of snapshot 2025-06-09, micro\_X is a mature and stable application with a rich feature set. Key accomplishments include:
+As of snapshot 2025-06-11, micro\_X is a mature and stable application that has undergone a targeted quality hardening phase. Key accomplishments include:
 
 * A fully functional, end-to-end AI pipeline for command translation, validation, and explanation.  
 * Robust, stateful UI flows for user confirmation and command categorization.  
 * A novel startup integrity check system to ensure operational stability on protected branches.  
 * A user-friendly web GUI for easy configuration.  
-* Comprehensive, passing test suite and detailed documentation.
+* **Code Quality Hardening:** Successfully completed a focused effort to improve stability, including fixing race conditions in the UI, hardening tmux command execution, improving the accuracy of Git status checks, and expanding the automated test suite.  
+* **Comprehensive Test Suite:** A suite of 152 passing tests provides a strong foundation of reliability.
 
 ### **7\. Future Directions**
 
