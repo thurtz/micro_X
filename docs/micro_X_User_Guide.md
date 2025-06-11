@@ -32,20 +32,18 @@ Before using micro\_X, ensure it has been properly installed and configured. Ple
 
 If you wish to work with or test different branches of micro\_X simultaneously without them interfering with each other, you can clone the repository into separate directories. This is particularly useful for developers or advanced users.
 
-1. **Clone for main branch (Stable):**  
-   git clone https://github.com/thurtz/micro\_X.git micro\_X-main  
+1. Clone for main branch (Stable):  
+   git clone [https://github.com/thurtz/micro\_X.git](https://github.com/thurtz/micro_X.git) micro\_X-main  
    cd micro\_X-main  
    git checkout main \# Usually already on main by default  
-   ./setup.sh \# Run setup within this directory
-
-2. **Clone for testing branch:**  
-   git clone https://github.com/thurtz/micro\_X.git micro\_X-testing  
+   ./setup.sh \# Run setup within this directory  
+2. Clone for testing branch:  
+   git clone [https://github.com/thurtz/micro\_X.git](https://github.com/thurtz/micro_X.git) micro\_X-testing  
    cd micro\_X-testing  
    git checkout testing  
-   ./setup.sh \# Run setup within this directory
-
-3. **Clone for dev branch (Development):**  
-   git clone https://github.com/thurtz/micro\_X.git micro\_X-dev  
+   ./setup.sh \# Run setup within this directory  
+3. Clone for dev branch (Development):  
+   git clone [https://github.com/thurtz/micro\_X.git](https://github.com/thurtz/micro_X.git) micro\_X-dev  
    cd micro\_X-dev  
    git checkout dev  
    ./setup.sh \# Run setup within this directory
@@ -62,8 +60,7 @@ Each of these directories (micro\_X-main, micro\_X-testing, micro\_X-dev) will t
 * **Manual Method:** You can run micro\_X directly by following these steps:  
   1. Navigate to its directory.  
   2. Activate the virtual environment:  
-     source .venv/bin/activate
-
+     source .venv/bin/activate  
   3. Launch a tmux session specific for micro\_X: tmux \-f config/.tmux.conf new-session \-A \-s micro\_X
 
 **Note on tmux features with manual launch outside of the micro\_X tmux session:** If you launch main.py directly (without step 3, or outside the session started by micro\_X.sh), micro\_X itself will not be running inside a tmux session. However, commands categorized as semi\_interactive or interactive\_tui will still attempt to launch in new, independent tmux windows/sessions. The main.py micro\_X shell may not function on its own outside of a tmux environment launched specifically for its own setup.
@@ -118,25 +115,23 @@ To translate a natural language query into a command:
    * Send your query to the configured AI translator(s).  
    * The translated command will be validated by another AI model.  
    * You'll see messages like "🤖 AI Query: ...", "🧠 Thinking...", "🤖 AI Suggests (validated): ...".  
-4. **Command Confirmation Flow**: If the AI successfully generates and validates a command, you will be prompted to confirm its execution:  
+4. Command Confirmation Flow: If the AI successfully generates and validates a command, you will be prompted to confirm its execution:  
    🤖 AI proposed command (from: /ai your query \-\> suggested\_command):  
-      👉 suggested\_command  
+   👉 suggested\_command  
    Action: \[Y\]es (Exec, prompt if new) | \[Ys\] Simple & Run | \[Ym\] Semi-Interactive & Run | \[Yi\] TUI & Run | \[E\]xplain | \[M\]odify | \[C\]ancel?  
-   \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/E/M/C): 
-
+   \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/E/M/C):  
    Your options are:  
    * **Y** or **yes**: Execute the command. If the command is unknown to micro\_X's categorization system, you will be prompted to categorize it next (see section 4.3).  
    * **Ys**: Execute the command AND categorize it as simple.  
    * **Ym**: Execute the command AND categorize it as semi\_interactive.  
    * **Yi**: Execute the command AND categorize it as interactive\_tui.  
-   * **E** or **explain**: Ask the AI to explain what the suggested\_command does. After the explanation, you will be prompted again to execute, modify, or cancel.  
+   * E or explain: Ask the AI to explain what the suggested\_command does. After the explanation, you will be prompted again to execute, modify, or cancel.  
      🧠 Asking AI to explain: suggested\_command  
      💡 AI Explanation:  
      The command 'suggested\_command' does XYZ...  
      Command to consider: suggested\_command  
      Action: \[Y\]es (Exec, prompt if new) | \[Ys\] Simple & Run | \[Ym\] Semi-Interactive & Run | \[Yi\] TUI & Run | \[M\]odify | \[C\]ancel?  
-     \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/M/C): 
-
+     \[Confirm AI Cmd\] Choice (Y/Ys/Ym/Yi/M/C):  
    * **M** or **modify**: The suggested\_command will be loaded into your input field, allowing you to edit it before pressing Enter to submit the modified version.  
    * **C** or **cancel** (or **N** or **no**): Abort the execution. The command will not run.
 
@@ -149,16 +144,15 @@ When micro\_X encounters a command it hasn't seen before (either typed directly,
   * **semi\_interactive**: For commands that might run for a while, produce a lot of output, or have some minimal interactivity that doesn't require full TUI control (e.g., apt update, a long script, ping google.com). These are run in a new tmux window. Their output is captured and displayed in micro\_X after the command finishes or after a configurable poll timeout (tmux\_poll\_seconds in your config) is reached.  
     * **Smart Output Handling**: If a semi\_interactive command produces output resembling a full-screen TUI application, micro\_X avoids displaying garbled output and suggests re-categorizing to interactive\_tui.  
   * **interactive\_tui**: For fully interactive terminal applications (e.g., nano, vim, htop, ssh user@host). These are run in a new tmux window that micro\_X effectively hands control to. When you exit the application (and thus the tmux window), you'll return to micro\_X.  
-* **Categorization Prompt** (Example for a directly typed unknown command):  
+* Categorization Prompt (Example for a directly typed unknown command):  
   Command 'my\_new\_script.sh \--verbose' is not categorized. Choose an action:  
-  1: simple           (Direct output in micro\_X)  
+  1: simple (Direct output in micro\_X)  
   2: semi\_interactive (Output in micro\_X after tmux run (may be interactive))  
-  3: interactive\_tui  (Full interactive tmux session)  
+  3: interactive\_tui (Full interactive tmux session)  
   M: Modify command before categorizing  
   D: Execute as default 'semi\_interactive' (once, no save)  
   C: Cancel categorization & execution  
-  \[Categorize\] Action (1-3/M/D/C): 
-
+  \[Categorize\] Action (1-3/M/D/C):  
   Enter your choice. If you choose 1, 2, or 3, the command and its category will be saved in config/user\_command\_categories.json.
 
 #### **4.4. Managing Command Categories (/command subsystem)**
@@ -289,7 +283,7 @@ If a command in a tmux window becomes unresponsive:
 #### **6.3. Handling Processes that Lock Up tmux Windows**
 
 1. **Identify PID:** Detach from tmux (Ctrl+b d). Use ps aux | grep \<command\_name\> or htop in a standard terminal.  
-2. **Kill Process:** kill \<PID\> (or kill \-9 \<PID\> with caution).  
+2. **Kill Process:** kill (or kill \-9 with caution).  
 3. **Clean tmux Window:** The tmux window might show "Pane is dead." Close it with Ctrl+b x.
 
 ### **7\. Security Considerations**
@@ -321,18 +315,14 @@ If a command in a tmux window becomes unresponsive:
       1. Fetch latest remote data: git fetch origin  
       2. Choose a synchronization strategy:  
          * To update and align your local branch (recommended for main/testing if behind or slightly diverged, aiming for linear history):  
-           git checkout \<branch\_name\>  \# e.g., testing or main  
-           git rebase origin/\<branch\_name\>
-
+           git checkout \<branch\_name\> \# e.g., testing or main  
+           git rebase origin/\<branch\_name\>  
            This replays any (unexpected) local commits on top of the latest remote version. If there are no local commits, it fast-forwards your branch. Conflicts may need to be resolved if local commits existed and conflict with remote changes. A common shortcut for fetch then rebase is: git pull \--rebase origin \<branch\_name\>  
          * To force your local branch to exactly match the remote, discarding ALL local differences (commits and uncommitted changes on this branch):  
            This is often the simplest solution if your local main or testing branch has commits it shouldn't or is ahead/diverged and you just want it to mirror the remote.  
-           git checkout \<branch\_name\>  \# e.g., testing or main  
-           git reset \--hard origin/\<branch\_name\>
-
+           git checkout \<branch\_name\> \# e.g., testing or main  
+           git reset \--hard origin/\<branch\_name\>  
            **Use reset \--hard with extreme caution** as it permanently discards local work on the branch.  
-         * If you were ahead with commits that are valid and should be on the remote main or testing (unusual for this workflow, usually means a PR was missed):  
-           Consult your team. Pushing directly to protected branches is often restricted. Usually, these changes should go through the dev \-\> testing \-\> main PR process. If you need to preserve these commits locally while resetting, consider creating a new branch from your current main/testing before resetting: git branch my-backup-branch  
   * **Message:** "Cannot reliably compare with remote. Status: no\_upstream/fetch\_failed/error."  
     * **Reason & Solution:** Check internet, git branch \-vv for upstream tracking, git fetch origin for errors. Consult logs/micro\_x.log.  
   * If micro\_X closes too quickly to read the error message on startup, **always check logs/micro\_x.log for detailed error information.**  
@@ -353,7 +343,7 @@ micro\_X uses a powerful and flexible configuration system. While some settings 
 
 A key setting in user\_config.json (under the behavior section) that you might want to adjust is use\_strict\_extraction\_for\_primary\_translator.
 
-* When set to true (the default for some models), micro\_X will strictly look for commands inside \<bash\>...\</bash\> tags from the primary AI translator. This is reliable for models trained to use these tags.  
+* When set to true (the default for some models), micro\_X will strictly look for commands inside ... tags from the primary AI translator. This is reliable for models trained to use these tags.  
 * When set to false, it treats the AI's entire output as the potential command. This can improve compatibility with models that are good at generating commands but don't consistently use the specific tags.
 
 This guide should help you navigate and utilize the features of micro\_X more effectively. Happy shelling\!
