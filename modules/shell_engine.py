@@ -7,56 +7,56 @@
 # **Public Classes:**
 #
 # class ShellEngine:
-#     """The main class for shell logic."""
+#     """The main class for shell logic."""
 #
-#     def __init__(self, config, ui_manager, category_manager_module, ai_handler_module,
-#                  ollama_manager_module, main_exit_app_ref, main_restore_normal_input_ref,
-#                  main_normal_input_accept_handler_ref, is_developer_mode, git_context_manager_instance):
-#         """
-#         Initializes the ShellEngine with all necessary dependencies and callbacks.
+#     def __init__(self, config, ui_manager, category_manager_module, ai_handler_module,
+#                  ollama_manager_module, main_exit_app_ref, main_restore_normal_input_ref,
+#                  main_normal_input_accept_handler_ref, is_developer_mode, git_context_manager_instance):
+#         """
+#         Initializes the ShellEngine with all necessary dependencies and callbacks.
 #
-#         Args:
-#             config (dict): The application configuration.
-#             ui_manager (UIManager): The instance of the UI manager.
-#             category_manager_module (module): A reference to the category_manager module.
-#             ai_handler_module (module): A reference to the ai_handler module.
-#             ollama_manager_module (module): A reference to the ollama_manager module.
-#             main_exit_app_ref (callable): Callback to the main application exit function.
-#             main_restore_normal_input_ref (callable): Callback to restore the UI to normal mode.
-#             main_normal_input_accept_handler_ref (callable): Callback for normal input submission.
-#             is_developer_mode (bool): Flag indicating if developer mode is active.
-#             git_context_manager_instance (GitContextManager): Instance for Git operations.
-#         """
+#         Args:
+#             config (dict): The application configuration.
+#             ui_manager (UIManager): The instance of the UI manager.
+#             category_manager_module (module): A reference to the category_manager module.
+#             ai_handler_module (module): A reference to the ai_handler module.
+#             ollama_manager_module (module): A reference to the ollama_manager module.
+#             main_exit_app_ref (callable): Callback to the main application exit function.
+#             main_restore_normal_input_ref (callable): Callback to restore the UI to normal mode.
+#             main_normal_input_accept_handler_ref (callable): Callback for normal input submission.
+#             is_developer_mode (bool): Flag indicating if developer mode is active.
+#             git_context_manager_instance (GitContextManager): Instance for Git operations.
+#         """
 #
-#     async def handle_built_in_command(self, user_input: str) -> bool:
-#         """
-#         Handles built-in commands like /help, /exit, /update, /utils, /ollama, and /command.
+#     async def handle_built_in_command(self, user_input: str) -> bool:
+#         """
+#         Handles built-in commands like /help, /exit, /update, /utils, /ollama, and /command.
 #
-#         This is the first check for any user input.
+#         This is the first check for any user input.
 #
-#         Returns:
-#             bool: True if the command was a built-in and was handled, False otherwise.
-#         """
+#         Returns:
+#             bool: True if the command was a built-in and was handled, False otherwise.
+#         """
 #
-#     async def submit_user_input(self, user_input: str, from_edit_mode: bool = False):
-#         """
-#         The main entry point for processing all user input that isn't a simple built-in.
+#     async def submit_user_input(self, user_input: str, from_edit_mode: bool = False):
+#         """
+#         The main entry point for processing all user input that isn't a simple built-in.
 #
-#         It orchestrates the flow:
-#         1. Handles `/ai` queries by calling the AI handler.
-#         2. Processes direct command input from the user.
-#         3. For unknown commands, it uses the AI validator and may treat the input
-#            as a natural language query.
-#         4. Ultimately calls `process_command` to execute.
+#         It orchestrates the flow:
+#         1. Handles `/ai` queries by calling the AI handler.
+#         2. Processes direct command input from the user.
+#         3. For unknown commands, it uses the AI validator and may treat the input
+#            as a natural language query.
+#         4. Ultimately calls `process_command` to execute.
 #
-#         Args:
-#             user_input (str): The raw text from the user's input field.
-#             from_edit_mode (bool): True if the input is a resubmission after
-#                                    the user chose to modify an AI suggestion.
-#         """
+#         Args:
+#             user_input (str): The raw text from the user's input field.
+#             from_edit_mode (bool): True if the input is a resubmission after
+#                                    the user chose to modify an AI suggestion.
+#         """
 #
 # **Key Global Constants/Variables:**
-#   (None intended for direct external use)
+#   (None intended for direct external use)
 #
 # --- END API DOCUMENTATION ---
 import asyncio
@@ -279,10 +279,12 @@ class ShellEngine:
                     log_path = temp_log_file.name
                     logger.debug(f"Using platform-agnostic temporary file for tmux log: {log_path}")
                 
-                    replacement_for_single_quote = "'\"'\"'"
-                    escaped_command_str = command_to_execute.replace("'", replacement_for_single_quote)
+                    # Use shlex.quote for robust command escaping
+                    escaped_command_str = shlex.quote(command_to_execute)
                     
-                    wrapped_command = f"bash -c '{escaped_command_str}' |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
+                    # The command for tmux to run in a shell. It executes the user's command,
+                    # tees stdout/stderr to a log, and sleeps briefly to ensure the pane is visible.
+                    wrapped_command = f"bash -c {escaped_command_str} |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
                     
                     tmux_cmd_list_launch = ["tmux", "new-window", "-n", window_name, wrapped_command]
                     logger.info(f"Launching semi_interactive tmux: {' '.join(tmux_cmd_list_launch)} (log: {log_path})")
@@ -340,8 +342,9 @@ class ShellEngine:
                         append_output_func(f"Output from '{original_user_input_display}': (No output captured)", style_class='info')
 
             else: # "interactive_tui"
-                tmux_cmd_list = ["tmux", "new-window", "-n", window_name, command_to_execute]
-                logger.info(f"Launching interactive_tui tmux: {' '.join(tmux_cmd_list)}")
+                # For interactive commands, wrap in 'bash -c' to handle complex commands consistently.
+                tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", command_to_execute]
+                logger.info(f"Launching interactive_tui tmux: {' '.join(shlex.quote(s) for s in tmux_cmd_list)}")
                 append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait for it to complete or be detached.", style_class='info')
                 if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
