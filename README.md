@@ -96,19 +96,19 @@ Detailed manual instructions and prerequisites for each platform are also availa
 If you want to work with or test different branches simultaneously, you can clone the repository into separate directories:
 
 1. **Main Branch (Stable):**  
-   git clone https://github.com/thurtz/micro\_X.git micro\_X-main  
+   git clone [https://github.com/thurtz/micro\_X.git](https://github.com/thurtz/micro_X.git) micro\_X-main  
    cd micro\_X-main  
    git checkout main  
    ./setup.sh
 
 2. **Testing Branch:**  
-   git clone https://github.com/thurtz/micro\_X.git micro\_X-testing  
+   git clone [https://github.com/thurtz/micro\_X.git](https://github.com/thurtz/micro_X.git) micro\_X-testing  
    cd micro\_X-testing  
    git checkout testing  
    ./setup.sh
 
 3. **Development Branch:**  
-   git clone https://github.com/thurtz/micro\_X.git micro\_X-dev  
+   git clone [https://github.com/thurtz/micro\_X.git](https://github.com/thurtz/micro_X.git) micro\_X-dev  
    cd micro\_X-dev  
    git checkout dev  
    ./setup.sh
@@ -118,7 +118,7 @@ Each directory will have its own independent micro\_X installation and virtual e
 **General Setup Steps (for a single clone):**
 
 1. Clone the Repository:  
-   git clone https://github.com/thurtz/micro\_X.git  
+   git clone [https://github.com/thurtz/micro\_X.git](https://github.com/thurtz/micro_X.git)  
    cd micro\_X
 
 2. Make the Unified Setup Script Executable:  
