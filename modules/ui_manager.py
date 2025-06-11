@@ -130,6 +130,10 @@ class UIManager:
         @self.kb.add('c-c')
         @self.kb.add('c-d')
         def _handle_exit_or_cancel(event):
+            # This handler's responsibility is to cancel any active flow by resolving its future.
+            # The responsibility to restore the UI to normal mode lies with the caller of the flow
+            # (e.g., ShellEngine.process_command), which will do so in its 'finally' block
+            # after the flow's future has been resolved. This prevents race conditions.
             if self.categorization_flow_active:
                 self.append_output("\n⚠️ Categorization cancelled by user.", style_class='warning')
                 logger.info("Categorization flow cancelled by Ctrl+C/D.")
@@ -137,7 +141,7 @@ class UIManager:
                    self.categorization_flow_state.get('future') and \
                    not self.categorization_flow_state['future'].done():
                     self.categorization_flow_state['future'].set_result({'action': 'cancel_execution'})
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                # The call to restore normal input is intentionally removed from here.
                 event.app.invalidate()
             elif self.confirmation_flow_active:
                 self.append_output("\n⚠️ Command confirmation cancelled by user.", style_class='warning')
@@ -146,13 +150,17 @@ class UIManager:
                    self.confirmation_flow_state.get('future') and \
                    not self.confirmation_flow_state['future'].done():
                     self.confirmation_flow_state['future'].set_result({'action': 'cancel'})
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                # The call to restore normal input is intentionally removed from here.
                 event.app.invalidate()
             elif self.is_in_edit_mode:
                 self.append_output("\n⌨️ Command editing cancelled.", style_class='info')
                 logger.info("Command edit mode cancelled by Ctrl+C/D.")
                 self.is_in_edit_mode = False
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                # If edit mode was entered from a flow, that flow is already complete.
+                # Restoring the normal input handler is the correct action here, as it's
+                # the end of a self-contained "edit" operation.
+                if self.main_restore_normal_input_ref:
+                    self.main_restore_normal_input_ref()
                 event.app.invalidate()
             else:
                 logger.info("Exit keybinding triggered.")
@@ -473,7 +481,7 @@ class UIManager:
             logger.warning("UIManager: Confirmation flow future was cancelled.")
             if 'future' in self.confirmation_flow_state and \
                self.confirmation_flow_state.get('future') and \
-               not self.confirmation_flow_state.get('future').done():
+               not self.confirmation_flow_state['future'].done():
                     self.confirmation_flow_state.get('future').set_result({'action': 'cancel', 'reason': 'future_cancelled_externally'})
             if 'future' in self.confirmation_flow_state and self.confirmation_flow_state.get('future'):
                 return await self.confirmation_flow_state.get('future')
