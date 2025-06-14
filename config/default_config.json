@@ -4,7 +4,7 @@
       "model": "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
     },
     "direct_translator": {
-      "model": "vitali87/shell-commands-qwen2-1.5b-extended"
+      "model": "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
     },
     "validator": {
       "model": "herawen/lisa"
@@ -47,8 +47,8 @@
       "user_template": "Is the following string likely a Linux command: '{command_text}'"
     },
     "primary_translator": {
-      "system": "Translate the following user request into a single Linux command. Output only the command. Do not include any other text, explanations, or markdown formatting.",
-      "user_template": "Translate to a single Linux command: \"{human_input}\"."
+      "system": "",
+      "user_template": "\"{human_input}\""
     },
     "direct_translator": {
       "system": "Translate the following user request into a single Linux command. Output only the command. Do not include any other text, explanations, or markdown formatting.",
