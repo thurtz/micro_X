@@ -48,7 +48,6 @@ FILES_TO_INCLUDE = [
     "docs/review_of_micro_X_project.md",
     "docs/micro_X_Code_Quality_Review.md",
     "docs/micro_X_Code_Quality_Review_Accomplishments.md",
-    "docs/ai_interaction_rules.md",
     "docs/development_principles.md", # Added the new development principles file
     "micro_X-A_Technical_Whitepaper.md"
 ]
