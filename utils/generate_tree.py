@@ -167,7 +167,8 @@ if __name__ == "__main__":
     custom_ignore_files = [
         '.DS_Store', '*.pyc', '*.pyo', '.coverage', 
         'pytest_results_*.txt', # Corrected pattern for timestamped pytest results
-        output_filename # Ignore the tree file itself if it exists
+        output_filename, # Ignore the tree file itself if it exists
+        '*.old.*' # Exclude user's local backup files (e.g., file.old.py)
     ]
 
     print(f"Attempting to generate file tree and save to: {output_file_full_path}")

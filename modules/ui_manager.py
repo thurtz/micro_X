@@ -1,3 +1,76 @@
+# --- API DOCUMENTATION for modules/ui_manager.py ---
+#
+# **Purpose:** Manages the entire `prompt_toolkit` Text User Interface (TUI),
+# including input/output fields, keybindings, styling, and coordinating complex,
+# multi-step interactive user flows like command categorization and confirmation.
+#
+# **Public Classes:**
+#
+# class UIManager:
+#     """The main class for managing the application's UI."""
+#
+#     def __init__(self, config: dict):
+#         """
+#         Initializes the UIManager with the application configuration.
+#
+#         The Application instance itself is set later via `ui_manager_instance.app = app_instance`.
+#         """
+#
+#     def initialize_ui_elements(self, initial_prompt_text: str, history: FileHistory, output_buffer_main: list) -> Layout:
+#         """
+#         Creates all the prompt_toolkit widgets and constructs the main UI layout.
+#
+#         Args:
+#             initial_prompt_text (str): The text for the very first input prompt.
+#             history (FileHistory): The history object for the input field.
+#             output_buffer_main (list): A list of (style, text) tuples for initial output.
+#
+#         Returns:
+#             Layout: The main prompt_toolkit Layout object for the application.
+#         """
+#
+#     def get_key_bindings(self) -> KeyBindings:
+#         """Returns the configured keybindings for the application."""
+#
+#     def append_output(self, text: str, style_class: str = 'default', internal_call: bool = False):
+#         """The primary method for adding text to the main output field."""
+#
+#     def update_input_prompt(self, current_directory_path: str):
+#         """Updates the text of the input prompt, typically with the current directory."""
+#
+#     async def start_categorization_flow(self, command_initially_proposed: str, ...) -> dict:
+#         """
+#         Initiates the interactive flow for categorizing an unknown command.
+#         This is an async method that awaits user input through the UI.
+#
+#         Returns:
+#             dict: A dictionary containing the result, e.g.,
+#                   {'action': 'categorize_and_execute', 'command': '...', 'category': '...'}.
+#         """
+#
+#     async def prompt_for_command_confirmation(self, command_to_confirm: str, ...) -> dict:
+#         """
+#         Initiates the interactive flow for confirming an AI-generated command.
+#         This is an async method that awaits user input.
+#
+#         Returns:
+#             dict: A dictionary with the user's choice, e.g., {'action': 'execute'}.
+#         """
+#
+#     def set_normal_input_mode(self, accept_handler_func: callable, current_directory_path: str):
+#         """Resets the UI to the default state for normal command input."""
+#
+#     def set_flow_input_mode(self, prompt_text: str, accept_handler_func: callable, ...):
+#         """Sets the UI for a special input flow (categorization or confirmation)."""
+#
+#     def set_edit_mode(self, accept_handler_func: callable, command_to_edit: str):
+#         """Sets the UI to allow editing a command, populating the input field."""
+#
+# **Key Global Constants/Variables:**
+#   (None intended for direct external use)
+#
+# --- END API DOCUMENTATION ---
+
 # modules/ui_manager.py
 import logging
 import os
@@ -57,6 +130,10 @@ class UIManager:
         @self.kb.add('c-c')
         @self.kb.add('c-d')
         def _handle_exit_or_cancel(event):
+            # This handler's responsibility is to cancel any active flow by resolving its future.
+            # The responsibility to restore the UI to normal mode lies with the caller of the flow
+            # (e.g., ShellEngine.process_command), which will do so in its 'finally' block
+            # after the flow's future has been resolved. This prevents race conditions.
             if self.categorization_flow_active:
                 self.append_output("\n⚠️ Categorization cancelled by user.", style_class='warning')
                 logger.info("Categorization flow cancelled by Ctrl+C/D.")
@@ -64,7 +141,7 @@ class UIManager:
                    self.categorization_flow_state.get('future') and \
                    not self.categorization_flow_state['future'].done():
                     self.categorization_flow_state['future'].set_result({'action': 'cancel_execution'})
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                # The call to restore normal input is intentionally removed from here.
                 event.app.invalidate()
             elif self.confirmation_flow_active:
                 self.append_output("\n⚠️ Command confirmation cancelled by user.", style_class='warning')
@@ -73,13 +150,17 @@ class UIManager:
                    self.confirmation_flow_state.get('future') and \
                    not self.confirmation_flow_state['future'].done():
                     self.confirmation_flow_state['future'].set_result({'action': 'cancel'})
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                # The call to restore normal input is intentionally removed from here.
                 event.app.invalidate()
             elif self.is_in_edit_mode:
                 self.append_output("\n⌨️ Command editing cancelled.", style_class='info')
                 logger.info("Command edit mode cancelled by Ctrl+C/D.")
                 self.is_in_edit_mode = False
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                # If edit mode was entered from a flow, that flow is already complete.
+                # Restoring the normal input handler is the correct action here, as it's
+                # the end of a self-contained "edit" operation.
+                if self.main_restore_normal_input_ref:
+                    self.main_restore_normal_input_ref()
                 event.app.invalidate()
             else:
                 logger.info("Exit keybinding triggered.")
@@ -400,7 +481,7 @@ class UIManager:
             logger.warning("UIManager: Confirmation flow future was cancelled.")
             if 'future' in self.confirmation_flow_state and \
                self.confirmation_flow_state.get('future') and \
-               not self.confirmation_flow_state.get('future').done():
+               not self.confirmation_flow_state['future'].done():
                     self.confirmation_flow_state.get('future').set_result({'action': 'cancel', 'reason': 'future_cancelled_externally'})
             if 'future' in self.confirmation_flow_state and self.confirmation_flow_state.get('future'):
                 return await self.confirmation_flow_state.get('future')

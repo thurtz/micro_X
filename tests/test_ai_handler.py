@@ -34,15 +34,14 @@ clean_command_test_cases = [
 
     # Mixed cases
     ("  <bash> '  echo \"Hello World\"  ' </bash>  ", 'echo "Hello World"'),
-    # Current _clean_extracted_command behavior: strips one layer of backticks from ```
-    ("```bash\nls -la\n```", "``bash\nls -la\n``"),
-    ("```\n  git diff --cached \n```", "``\n  git diff --cached \n``"),
+    
+    # Corrected Test: The _clean_extracted_command function receives the content *inside*
+    # the markdown block from the regex, not the block itself. This test now reflects that.
+    ("ls -la", "ls -la"),
+    ("git diff --cached", "git diff --cached"),
 
     # AI refusal phrases
     ("Sorry, I cannot fulfill that request.", ""),
-    # This test WILL FAIL until _clean_extracted_command in ai_handler.py is fixed
-    # to correctly identify "I am unable to..." as a refusal.
-    # The expected output "" is the DESIRED behavior of the function.
     ("I am unable to generate that command.", ""),
     ("Cannot translate safely", ""),
     # _clean_extracted_command does not strip <unsafe> tags as per its current tag list.
@@ -63,7 +62,7 @@ clean_command_test_cases = [
 
     # Edge cases
     ("", ""),
-    ("   ", ""),
+    ("    ", ""),
     ("<bash></bash>", ""),
     ("<code> </code>", ""),
 
@@ -76,7 +75,14 @@ clean_command_test_cases = [
     # Angle brackets not part of a command structure
     ("<ls -l>", "ls -l"),
     ("<echo hello world>", "echo hello world"),
-    ("<cat file.txt | grep error>", "<cat file.txt | grep error>")
+    ("<cat file.txt | grep error>", "<cat file.txt | grep error>"),
+
+    # New Negative Test Cases: Ensure valid shell syntax is NOT altered
+    ("echo '$(pwd)'", "echo '$(pwd)'"),
+    ("echo \"Hello $(whoami)!\"", "echo \"Hello $(whoami)!\""),
+    ("find . -name '*.py' -exec wc -l {} +", "find . -name '*.py' -exec wc -l {} +"),
+    ("awk -F: '{print $1}' /etc/passwd", "awk -F: '{print $1}' /etc/passwd"),
+    ("ps aux | grep '[m]y-process'", "ps aux | grep '[m]y-process'"),
 ]
 
 @pytest.mark.parametrize("input_str, expected_output", clean_command_test_cases)

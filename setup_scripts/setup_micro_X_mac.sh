@@ -107,9 +107,9 @@ echo ""
 echo "--- Installing Ollama Models (Requires Ollama application to be running) ---"
 if command_exists ollama; then
     MODELS=(
-        "llama3.2:3b"
-        "vitali87/shell-commands-qwen2-1.5b"
-        "herawen/lisa:latest"
+        "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
+        "vitali87/shell-commands-qwen2-1.5b-extended"
+        "herawen/lisa"
     )
     echo "Note: Pulling models can take a significant amount of time and storage."
     read -p "Do you want to proceed with pulling these models now? (y/N) " pull_models_choice

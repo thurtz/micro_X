@@ -68,51 +68,72 @@ def merge_configs(base, override):
     return merged
 
 def load_configuration():
-    """
-    Loads configurations from default and user JSON files.
-    The default_config.json file is mandatory for the application to start.
-    """
+    """ Loads configurations from default and user JSON files, merging them. """
     global config
     default_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, DEFAULT_CONFIG_FILENAME)
     user_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, USER_CONFIG_FILENAME)
+    
+    # Define a comprehensive fallback configuration
+    fallback_config = {
+        "ai_models": {"primary_translator": "llama3.2:3b", "direct_translator": "vitali87/shell-commands-qwen2-1.5b", "validator": "herawen/lisa:latest", "explainer": "llama3.2:3b"},
+        "timeouts": {"tmux_poll_seconds": 300, "tmux_semi_interactive_sleep_seconds": 1, "git_fetch_timeout": 10},
+        "behavior": {"input_field_height": 3, "default_category_for_unclassified": "simple", "validator_ai_attempts": 3, "translation_validation_cycles": 3, "ai_retry_delay_seconds": 1, "ollama_api_call_retries": 2, "tui_detection_line_threshold_pct": 30.0, "tui_detection_char_threshold_pct": 3.0},
+        "ui": {
+            "max_prompt_length": 20,
+            "enable_output_separator": True,
+            "output_separator_character": "─",
+            "output_separator_length": 30,
+            "enable_startup_separator": True,
+            "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n",
+            "enable_mouse_support": False # Fallback default for mouse support
+        },
+        "paths": {"tmux_log_base_path": "/tmp"},
+        "prompts": {
+            "validator": {"system": "You are a Linux command validation assistant. Your task is to determine if a given string is likely a valid Linux command. If the string looks like a phrase rather than a linux command then the answer is no. If the string looks like a Linux command rather than a phrase then the answer is yes. Answer only with 'yes' or 'no'.", "user_template": "Is the following string likely a Linux command: '{command_text}'"},
+            "primary_translator": {"system": "You are a helpful assistant that translates human language queries into a single, precise Linux command.\nStrictly enclose the Linux command within <bash></bash> tags.\nDo not add any other explanations, apologies, or text outside these tags.\nIf the request is ambiguous, unsafe, or cannot be translated into a single command, respond with only \"<unsafe>Cannot translate safely</unsafe>\" or a similar message within <unsafe> tags.", "user_template": "Translate to a single Linux command: \"{human_input}\"."},
+            "direct_translator": {"system": "Translate the following user request into a single Linux command. Output only the command. Do not include any other text, explanations, or markdown formatting.", "user_template": "Translate to a single Linux command: \"{human_input}\"."},
+            "explainer": {"system": "You are a helpful assistant that explains Linux commands in simple, clear terms. Describe what the command does, its main arguments/options shown, and any significant side effects or risks. Be concise. If the command is trivial, a very short explanation is fine. If it seems dangerous or complex, highlight that.", "user_template": "Explain the following Linux command: '{command_text}'"}
+        },
+        "ollama_service": {"executable_path": None, "auto_start_serve": True, "startup_wait_seconds": 10, "server_check_retries": 5, "server_check_interval_seconds": 2},
+        "integrity_check": {
+            "protected_branches": ["main", "testing"],
+            "developer_branch": "dev",
+            "halt_on_integrity_failure": True,
+            "allow_run_if_behind_remote": True
+        }
+    }
+    config = fallback_config.copy() # Start with fallback
+    logger.info("Initialized with hardcoded fallback general configurations.")
 
-    # Step 1: Load the mandatory default configuration file. This is the new SSOT.
-    if not os.path.exists(default_config_path):
-        # This is a critical error. The application cannot run without its default config.
-        # Log the error and raise an exception to halt startup.
-        error_msg = f"CRITICAL ERROR: Default configuration file not found at '{default_config_path}'. Application cannot start."
-        logger.critical(error_msg)
-        raise FileNotFoundError(error_msg)
-
-    try:
-        with open(default_config_path, 'r') as f:
-            base_config = json.load(f)
-        logger.info(f"Successfully loaded base configuration from {default_config_path}")
-    except json.JSONDecodeError as e:
-        error_msg = f"CRITICAL ERROR: Failed to parse default configuration file '{default_config_path}'. Invalid JSON: {e}. Application cannot start."
-        logger.critical(error_msg, exc_info=True)
-        raise ValueError(error_msg) # Raise a specific error to distinguish failure types
-    except Exception as e:
-        error_msg = f"CRITICAL ERROR: An unexpected error occurred while loading '{default_config_path}': {e}. Application cannot start."
-        logger.critical(error_msg, exc_info=True)
-        raise IOError(error_msg) # Generic I/O error for other file issues
-
-    config = base_config  # The default config is now the base.
-
-    # Step 2: Load optional user configuration and merge it on top of the default.
+    # Load default config
+    if os.path.exists(default_config_path):
+        try:
+            with open(default_config_path, 'r') as f: default_settings = json.load(f)
+            config = merge_configs(config, default_settings) # Merge fallback with default
+            logger.info(f"Loaded general configurations from {default_config_path}")
+        except Exception as e: logger.error(f"Error loading {default_config_path}: {e}.", exc_info=True)
+    else:
+        logger.warning(f"{default_config_path} not found. Creating it now with fallback values.")
+        try:
+            os.makedirs(os.path.dirname(default_config_path), exist_ok=True)
+            with open(default_config_path, 'w') as f: json.dump(fallback_config, f, indent=2)
+            logger.info(f"Created default general configuration file at {default_config_path} with fallback values.")
+        except Exception as e: logger.error(f"Could not create default config file: {e}", exc_info=True)
+    
+    # Load user config and merge on top
     if os.path.exists(user_config_path):
         try:
-            with open(user_config_path, 'r') as f:
-                user_settings = json.load(f)
-            # Merge user settings onto the base configuration
-            config = merge_configs(config, user_settings)
-            logger.info(f"Loaded and merged user configurations from {user_config_path}")
-        except Exception as e:
-            # A broken user config is not fatal, but should be logged as an error.
-            logger.error(f"Error loading user configuration from '{user_config_path}': {e}. Continuing with default settings.", exc_info=True)
-            # NOTE: A visual warning could be added to the UI here if desired.
-    else:
-        logger.info(f"{user_config_path} not found. No user configuration overrides applied.")
+            with open(user_config_path, 'r') as f: user_settings = json.load(f)
+            config = merge_configs(config, user_settings) # Merge current config with user settings
+            logger.info(f"Loaded and merged general configurations from {user_config_path}")
+        except Exception as e: logger.error(f"Error loading {user_config_path}: {e}.", exc_info=True)
+    else: logger.info(f"{user_config_path} not found. No user general overrides applied.")
+
+    # Ensure critical UI keys exist after merging, especially new ones like enable_mouse_support
+    if "ui" not in config: config["ui"] = {}
+    if "enable_mouse_support" not in config["ui"]:
+        config["ui"]["enable_mouse_support"] = fallback_config["ui"]["enable_mouse_support"]
+        logger.info(f"UI config 'enable_mouse_support' was missing, set to fallback default: {config['ui']['enable_mouse_support']}")
 
 
 load_configuration() # Load config at startup
@@ -428,11 +449,6 @@ def run_shell():
     logger.info("=" * 80) 
     try:
         asyncio.run(main_async_runner())
-    except (FileNotFoundError, ValueError, IOError) as e:
-        # This will catch the critical config loading errors raised from load_configuration()
-        print(f"\nFATAL STARTUP ERROR: {e}")
-        print(f"Please ensure 'config/default_config.json' exists and is a valid JSON file.")
-        logger.critical(f"Application halting due to fatal configuration error: {e}")
     except (EOFError, KeyboardInterrupt):
         print("\nExiting micro_X Shell. 👋"); logger.info("Exiting due to EOF or KeyboardInterrupt at run_shell level.")
     except SystemExit as e:

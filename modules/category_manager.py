@@ -1,3 +1,76 @@
+# --- API DOCUMENTATION for modules/category_manager.py ---
+#
+# **Purpose:** Manages the classification of shell commands into execution categories
+# (simple, semi_interactive, interactive_tui) by merging default and user configurations.
+#
+# **Public Functions:**
+#
+# def init_category_manager(script_dir_path: str, config_dir_name: str, append_output_func_ref: callable):
+#     """
+#     Initializes the manager with necessary paths and the UI callback function.
+#
+#     Must be called once at startup from main.py before any other functions
+#     in this module are used. It loads and merges the initial categories.
+#
+#     Args:
+#         script_dir_path (str): The absolute path to the main script's directory.
+#         config_dir_name (str): The name of the configuration directory (e.g., "config").
+#         append_output_func_ref (callable): A reference to UIManager.append_output
+#                                            to display messages to the user.
+#     """
+#
+# def classify_command(cmd: str) -> str:
+#     """
+#     Classifies a given command string based on the loaded categories.
+#
+#     Returns the category name (e.g., "simple") if found, otherwise returns
+#     the UNKNOWN_CATEGORY_SENTINEL.
+#
+#     Args:
+#         cmd (str): The full command string to classify.
+#
+#     Returns:
+#         str: The name of the category or the UNKNOWN_CATEGORY_SENTINEL constant.
+#     """
+#
+# def add_command_to_category(full_cmd_to_add: str, category_input: str):
+#     """
+#     Adds a command to a specified category in the user's configuration file.
+#
+#     This function handles saving the change to user_command_categories.json and
+#     then re-merging all categories to reflect the change immediately.
+#
+#     Args:
+#         full_cmd_to_add (str): The command string to add or update.
+#         category_input (str): The target category (e.g., "simple", "2").
+#     """
+#
+# def handle_command_subsystem_input(input_str: str) -> dict | None:
+#     """
+#     Parses and handles all '/command' subcommands (add, remove, list, move, run).
+#
+#     This function is the entry point for the `/command` built-in. It prints
+#     help/lists directly to the UI. For the 'run' action, it returns a
+#     dictionary instructing the shell_engine to execute a command.
+#
+#     Args:
+#         input_str (str): The full user input string, starting with "/command".
+#
+#     Returns:
+#         dict | None: Returns a dictionary {'action': 'force_run', ...} if the
+#                      subcommand was 'run'. Returns None for all other cases.
+#     """
+#
+# **Key Global Constants/Variables:**
+# - UNKNOWN_CATEGORY_SENTINEL: A string constant ("##UNKNOWN_CATEGORY##") returned by
+#                            classify_command when a command is not found.
+# - CATEGORY_MAP: A dictionary mapping user-friendly inputs (e.g., "1") to
+#                 category names ("simple"). Used by main.py for UI prompts.
+# - CATEGORY_DESCRIPTIONS: A dictionary with descriptions for each category name.
+#                          Used by main.py for UI prompts.
+#
+# --- END API DOCUMENTATION ---
+
 #!/usr/bin/env python
 
 import os

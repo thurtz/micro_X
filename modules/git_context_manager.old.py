@@ -65,14 +65,6 @@ logger = logging.getLogger(__name__)
 # Default timeout for git fetch operations (in seconds)
 DEFAULT_GIT_FETCH_TIMEOUT = 10
 
-# Enhanced: Use constants for fetch status results for clarity and consistency.
-FETCH_SUCCESS = "success"
-FETCH_TIMEOUT = "timeout"
-FETCH_OFFLINE = "offline_or_unreachable"
-FETCH_ERROR = "other_error"
-FETCH_NOT_A_REPO = "not_a_repo"
-
-
 class GitContextManager:
     """
     Manages interactions with Git for integrity checks and context gathering.
@@ -98,13 +90,18 @@ class GitContextManager:
     async def _run_git_command(self, command_args: List[str], timeout: Optional[int] = None) -> Tuple[bool, str, str]:
         """
         Runs a git command and returns its status, stdout, and stderr.
-        Enhanced with more detailed logging.
+
+        Args:
+            command_args (List[str]): The git command and its arguments.
+            timeout (Optional[int]): Optional timeout for the command.
+
+        Returns:
+            Tuple[bool, str, str]: (success, stdout_str, stderr_str)
+                                   success is True if return code is 0.
         """
         if not await self.is_git_available(): # Check relies on cached value after first call
             return False, "", "Git executable not found."
 
-        full_command_str = f"git {' '.join(command_args)}"
-        logger.debug(f"Executing Git command: '{full_command_str}' in '{self.project_root}' with timeout {timeout}s")
         try:
             process = await asyncio.to_thread(
                 subprocess.run,
@@ -117,20 +114,20 @@ class GitContextManager:
                 errors='replace' 
             )
             if process.returncode == 0:
-                logger.debug(f"Git command '{full_command_str}' succeeded. Stdout: {process.stdout.strip()}")
+                logger.debug(f"Git command '{' '.join(command_args)}' succeeded. Output: {process.stdout.strip()}")
                 return True, process.stdout.strip(), process.stderr.strip()
             else:
-                logger.warning(f"Git command '{full_command_str}' failed with RC {process.returncode}. Stderr: {process.stderr.strip()}, Stdout: {process.stdout.strip()}")
+                logger.warning(f"Git command '{' '.join(command_args)}' failed. RC: {process.returncode}, Stderr: {process.stderr.strip()}, Stdout: {process.stdout.strip()}")
                 return False, process.stdout.strip(), process.stderr.strip()
         except subprocess.TimeoutExpired:
-            logger.error(f"Git command '{full_command_str}' timed out after {timeout} seconds.")
+            logger.error(f"Git command '{' '.join(command_args)}' timed out after {timeout} seconds.")
             return False, "", f"Command timed out after {timeout} seconds."
         except FileNotFoundError:
             logger.error(f"Git executable not found at '{self._git_executable_path}' during command execution.")
             self._is_git_available_cached = False 
             return False, "", "Git executable not found."
         except Exception as e:
-            logger.error(f"Unexpected error running git command '{full_command_str}': {e}", exc_info=True)
+            logger.error(f"Error running git command '{' '.join(command_args)}': {e}", exc_info=True)
             return False, "", str(e)
 
     async def is_git_available(self) -> bool:
@@ -203,10 +200,16 @@ class GitContextManager:
         """
         Fetches updates for a specific branch from the specified remote.
         Uses the configured fetch_timeout.
-        Returns a status string from predefined constants.
+
+        Args:
+            branch_name (str): The name of the branch to fetch (e.g., "main", "dev").
+            remote_name (str): The name of the remote (default: "origin").
+
+        Returns:
+            str: Fetch status: "success", "timeout", "offline_or_unreachable", "other_error".
         """
         if not await self.is_repository():
-            return FETCH_NOT_A_REPO
+            return "not_a_repo" # Should be caught earlier, but good to have a distinct status
         
         logger.info(f"Attempting to fetch '{branch_name}' from remote '{remote_name}' with timeout {self.fetch_timeout}s...")
         success, stdout, stderr = await self._run_git_command(
@@ -216,17 +219,25 @@ class GitContextManager:
 
         if success:
             logger.info(f"Fetch for '{remote_name}/{branch_name}' completed. Stdout: {stdout}, Stderr: {stderr}")
-            return FETCH_SUCCESS
+            return "success"
         else:
+            # Analyze stderr to differentiate timeout/offline from other errors
+            # This is a simplification; real-world git stderr parsing can be complex
             stderr_lower = stderr.lower()
-            if "command timed out" in stderr_lower:
-                return FETCH_TIMEOUT
-            elif any(s in stderr_lower for s in ["could not resolve hostname", "name or service not known", "network is unreachable", "connection refused"]):
+            if "timed out" in stderr_lower or "timeout" in stderr_lower:
+                # Already logged by _run_git_command if it's a subprocess.TimeoutExpired
+                if "Command timed out" not in stderr: # Avoid double logging
+                    logger.warning(f"Fetch for '{remote_name}/{branch_name}' timed out. Stderr: {stderr}")
+                return "timeout"
+            elif "could not resolve hostname" in stderr_lower or \
+                 "name or service not known" in stderr_lower or \
+                 "network is unreachable" in stderr_lower or \
+                 "connection refused" in stderr_lower: # Common for offline/unreachable
                 logger.warning(f"Fetch for '{remote_name}/{branch_name}' failed: Host unreachable or offline. Stderr: {stderr}")
-                return FETCH_OFFLINE
+                return "offline_or_unreachable"
             else:
                 logger.warning(f"Fetch for '{remote_name}/{branch_name}' failed with other error. Stderr: {stderr}")
-                return FETCH_ERROR
+                return "other_error"
 
     async def get_remote_tracking_branch_hash(self, branch_name: str, remote_name: str = "origin") -> Optional[str]:
         """
@@ -256,10 +267,10 @@ class GitContextManager:
             Comparison Status can be: "synced", "ahead", "behind", "diverged",
                                       "synced_local_cache", "ahead_local_cache", "behind_local_cache", "diverged_local_cache",
                                       "no_upstream", "no_upstream_info_locally", "error"
-            Fetch Status can be one of the FETCH_* constants.
+            Fetch Status can be: "success", "timeout", "offline_or_unreachable", "other_error", "not_a_repo"
         """
         if not await self.is_repository():
-            return "error", None, None, FETCH_NOT_A_REPO
+            return "error", None, None, "not_a_repo"
 
         fetch_status = await self.fetch_remote_branch(branch_name, remote_name)
         
@@ -267,24 +278,25 @@ class GitContextManager:
         if not local_hash:
             return "error", None, None, fetch_status # Error getting local hash
 
+        # Try to get remote hash regardless of fetch status, to compare against local cache if fetch failed
         remote_hash = await self.get_remote_tracking_branch_hash(branch_name, remote_name)
 
         comparison_prefix = ""
-        if fetch_status != FETCH_SUCCESS:
-            comparison_prefix = "_local_cache" 
-            if not remote_hash:
+        if fetch_status != "success":
+            comparison_prefix = "_local_cache" # Indicate comparison is against potentially stale data
+            if not remote_hash: # If fetch failed AND no local cache for remote
                  logger.info(f"Branch '{branch_name}' has no remote tracking info locally after fetch issue (status: {fetch_status}).")
                  return "no_upstream_info_locally", local_hash, None, fetch_status
 
 
-        if not remote_hash:
+        if not remote_hash: # Should only happen if fetch succeeded but remote branch disappeared, or no upstream and fetch failed to create it
             success_upstream_ref, _, _ = await self._run_git_command(
                 ["rev-parse", "--symbolic-full-name", f"{branch_name}@{{upstream}}"]
             )
             if not success_upstream_ref:
                  logger.info(f"Branch '{branch_name}' does not have a configured upstream.")
                  return "no_upstream", local_hash, None, fetch_status
-            return "error", local_hash, None, fetch_status
+            return "error", local_hash, None, fetch_status # Upstream exists but couldn't get hash
 
         if local_hash == remote_hash:
             return f"synced{comparison_prefix}", local_hash, remote_hash, fetch_status
@@ -359,3 +371,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error during test: {e}")
         logger.error("Error during direct test", exc_info=True)
+
