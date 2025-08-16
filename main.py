@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# main.py
 
 from prompt_toolkit import Application
 from prompt_toolkit.history import FileHistory
@@ -27,6 +27,7 @@ from modules.category_manager import (
     CATEGORY_MAP as CM_CATEGORY_MAP, CATEGORY_DESCRIPTIONS as CM_CATEGORY_DESCRIPTIONS
 )
 from modules.ui_manager import UIManager
+from modules.curses_ui_manager import CursesUIManager
 
 LOG_DIR = "logs"
 CONFIG_DIR = "config"
@@ -57,6 +58,11 @@ ui_manager_instance = None
 shell_engine_instance = None
 git_context_manager_instance = None
 
+# --- FIX: Define a custom exception for integrity check failures ---
+class StartupIntegrityError(Exception):
+    """Custom exception to signal a fatal integrity check failure during startup."""
+    pass
+
 def merge_configs(base, override):
     """ Helper function to recursively merge dictionaries. """
     merged = base.copy()
@@ -69,8 +75,7 @@ def merge_configs(base, override):
 
 def load_configuration():
     """
-    Loads configurations from default and user JSON files.
-    The default_config.json file is mandatory for the application to start.
+    Loads configurations from default and user JSON files. The default_config.json file is mandatory for the application to start.
     """
     global config
     default_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, DEFAULT_CONFIG_FILENAME)
@@ -119,13 +124,27 @@ load_configuration() # Load config at startup
 
 def normal_input_accept_handler(buff):
     """
-    Handles normal user input submission from the prompt_toolkit input field.
-    This is the default handler for the input field.
+    Handles normal user input submission from the prompt_toolkit input field. This is the default handler for the input field.
     It's also used when submitting an edited command after choosing 'Modify' in AI confirmation.
+
+    This function is a universal handler for both prompt_toolkit's buffer object and the raw
+    string passed from CursesUIManager, ensuring compatibility across both UI backends.
     """
     global shell_engine_instance, ui_manager_instance # These are globals
-    user_input_stripped = buff.text.strip()
+    
+    # Check if the input is a raw string (from the Curses UI) or a buffer (from prompt_toolkit)
+    if isinstance(buff, str):
+        user_input_stripped = buff.strip()
+    else:
+        # Assume it's a prompt_toolkit buffer-like object
+        user_input_stripped = buff.text.strip()
+        
     logger.info(f"normal_input_accept_handler received: '{user_input_stripped}'")
+
+    # FIX: Explicitly clear the CursesUIManager's input buffer to prevent the visual bug
+    # where the text remains on screen while the asynchronous processing runs.
+    if isinstance(ui_manager_instance, CursesUIManager):
+        ui_manager_instance.input_text = ""
 
     was_in_edit_mode = False
     if ui_manager_instance:
@@ -176,20 +195,12 @@ def restore_normal_input_handler():
     elif not shell_engine_instance:
         logger.warning("restore_normal_input_handler: shell_engine_instance is None.")
 
-def _exit_app_main():
-    """ Handles application exit logic. """
-    global app_instance
-    logger.info("Exit requested by _exit_app_main.")
-    if app_instance and app_instance.is_running:
-        app_instance.exit()
-    else:
-        logger.warning("_exit_app_main called but app_instance not running or None. Attempting sys.exit.")
-        sys.exit(0) # Exit gracefully if app not running
+# --- FIX: Removed the _exit_app_main() function.
+# Its logic is now handled by the SystemExit exception raised directly by sys.exit().
 
 async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
     """
-    Performs Git integrity checks at startup.
-    Returns: (is_developer_mode, integrity_ok)
+    Performs Git integrity checks at startup. Returns: (is_developer_mode, integrity_ok)
     """
     global git_context_manager_instance, ui_manager_instance, config, SCRIPT_DIR
     is_developer_mode = False
@@ -316,29 +327,66 @@ async def main_async_runner():
     """ Main asynchronous runner for the application. """
     global app_instance, ui_manager_instance, shell_engine_instance, git_context_manager_instance
 
-    ui_manager_instance = UIManager(config)
-    ui_manager_instance.main_exit_app_ref = _exit_app_main
-    ui_manager_instance.main_restore_normal_input_ref = restore_normal_input_handler
+    # New: Choose UI backend based on configuration
+    ui_backend_choice = config.get("ui", {}).get("ui_backend", "prompt_toolkit")
+    
+    # --- FIX START ---
+    # The original code created ShellEngine with ui_manager=None, which
+    # was inconsistent and could lead to issues. We now create the UI
+    # manager first, then pass it directly to ShellEngine.
 
-    is_developer_mode, integrity_checks_passed = await perform_startup_integrity_checks()
-    integrity_config = config.get("integrity_check", {})
-    halt_on_failure = integrity_config.get("halt_on_integrity_failure", True)
+    # 1. Create the UI manager instance first.
+    if ui_backend_choice == "curses":
+        ui_manager_instance = CursesUIManager(config)
+    else:
+        if ui_backend_choice != "prompt_toolkit":
+            logger.warning(f"Unrecognized UI backend '{ui_backend_choice}' configured. Defaulting to 'prompt_toolkit'.")
+        ui_manager_instance = UIManager(config)
 
-    if not is_developer_mode and not integrity_checks_passed and halt_on_failure:
-        logger.critical("Halting micro_X due to failed integrity checks on a protected branch.")
-        _exit_app_main() 
-        return 
-
+    # 2. Create the ShellEngine instance and pass the UI manager to it.
+    # --- FIX: Pass main_exit_app_ref directly from the runner to ShellEngine ---
     shell_engine_instance = ShellEngine(config, ui_manager_instance,
                                         category_manager_module=sys.modules['modules.category_manager'],
                                         ai_handler_module=sys.modules['modules.ai_handler'],
                                         ollama_manager_module=sys.modules['modules.ollama_manager'],
-                                        main_exit_app_ref=_exit_app_main,
+                                        main_exit_app_ref=lambda: sys.exit(0),
                                         main_restore_normal_input_ref=restore_normal_input_handler,
-                                        main_normal_input_accept_handler_ref=normal_input_accept_handler, 
-                                        is_developer_mode=is_developer_mode,
-                                        git_context_manager_instance=git_context_manager_instance
+                                        main_normal_input_accept_handler_ref=normal_input_accept_handler,
+                                        is_developer_mode=False, # Set after integrity checks
+                                        git_context_manager_instance=None # Set after integrity checks
                                         )
+
+    # 3. For CursesUIManager, the shell_engine_instance is now correctly set after creation.
+    if ui_backend_choice == "curses":
+      ui_manager_instance.shell_engine_instance = shell_engine_instance
+
+    # The line `shell_engine_instance.ui_manager = ui_manager_instance` is no longer needed.
+    # --- FIX END ---
+    
+    # Initialize Git context after the shell engine has its ui_manager
+    git_fetch_timeout_from_config = config.get('timeouts', {}).get('git_fetch_timeout')
+    if git_fetch_timeout_from_config is not None:
+        git_context_manager_instance = GitContextManager(project_root=SCRIPT_DIR, fetch_timeout=git_fetch_timeout_from_config)
+    else:
+        git_context_manager_instance = GitContextManager(project_root=SCRIPT_DIR)
+    shell_engine_instance.git_context_manager_instance = git_context_manager_instance
+    
+    # Perform integrity checks and set developer mode flag on shell engine
+    is_developer_mode, integrity_checks_passed = await perform_startup_integrity_checks()
+    shell_engine_instance.is_developer_mode = is_developer_mode
+    
+    integrity_config = config.get("integrity_check", {})
+    halt_on_failure = integrity_config.get("halt_on_integrity_failure", True)
+
+    # --- FIX: Refactored the exit logic to be more robust. ---
+    if not is_developer_mode and not integrity_checks_passed and halt_on_failure:
+        logger.critical("Halting micro_X due to failed integrity checks on a protected branch.")
+        # Raise the custom exception to be caught in run_shell
+        raise StartupIntegrityError("Failed integrity checks on a protected branch.")
+    # The code now continues if the 'if' block is not entered.
+
+    ui_manager_instance.main_exit_app_ref = lambda: sys.exit(0) # FIX: Pass the sys.exit callable directly
+    ui_manager_instance.main_restore_normal_input_ref = restore_normal_input_handler
     
     ollama_service_ready = await shell_engine_instance.ollama_manager_module.ensure_ollama_service(config, ui_manager_instance.append_output)
     if not ollama_service_ready:
@@ -382,41 +430,55 @@ async def main_async_runner():
     elif not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
         initial_buffer_for_ui.append(('class:welcome', initial_welcome_message))
 
+    # *** FIX BEGINS HERE ***
+    # This block now constructs the arguments for initialize_ui_elements
+    # conditionally, preventing the TypeError.
+    kwargs_for_ui_init = {
+        "initial_prompt_text": f"({initial_prompt_dir}) > ",
+        "history": history,
+        "output_buffer_main": initial_buffer_for_ui
+    }
+    if ui_backend_choice == "curses":
+        kwargs_for_ui_init["shell_engine_instance"] = shell_engine_instance
+    
+    layout_from_ui_manager = ui_manager_instance.initialize_ui_elements(**kwargs_for_ui_init)
+    # *** FIX ENDS HERE ***
 
-    layout_from_ui_manager = ui_manager_instance.initialize_ui_elements(
-        initial_prompt_text=f"({initial_prompt_dir}) > ",
-        history=history,
-        output_buffer_main=initial_buffer_for_ui 
-    )
-
-    if ui_manager_instance and ui_manager_instance.input_field:
-        ui_manager_instance.input_field.buffer.accept_handler = normal_input_accept_handler
+    if ui_backend_choice == "curses":
+        # New: CursesUIManager doesn't need an Application instance.
+        # Run it directly.
+        await ui_manager_instance.run_async()
     else:
-        logger.critical("UIManager did not create input_field. Cannot set accept_handler.")
-        _exit_app_main()
-        return
+        # Existing prompt_toolkit path
+        if ui_manager_instance and ui_manager_instance.input_field:
+            ui_manager_instance.input_field.buffer.accept_handler = normal_input_accept_handler
+        else:
+            logger.critical("UIManager did not create input_field. Cannot set accept_handler.")
+            sys.exit(0)
+            return
 
-    if ui_manager_instance:
-        ui_manager_instance.initial_prompt_settled = True 
-        ui_manager_instance.last_output_was_separator = False 
-        ui_manager_instance.add_startup_separator()
+        if ui_manager_instance:
+            ui_manager_instance.initial_prompt_settled = True 
+            ui_manager_instance.last_output_was_separator = False 
+            ui_manager_instance.add_startup_separator()
 
-    # Read mouse support configuration
-    enable_mouse = config.get("ui", {}).get("enable_mouse_support", False)
-    logger.info(f"Prompt Toolkit Application mouse_support will be set to: {enable_mouse}")
+        # Read mouse support configuration
+        enable_mouse = config.get("ui", {}).get("enable_mouse_support", False)
+        logger.info(f"Prompt Toolkit Application mouse_support will be set to: {enable_mouse}")
 
-    app_instance = Application(
-        layout=layout_from_ui_manager,
-        key_bindings=ui_manager_instance.get_key_bindings(),
-        style=ui_manager_instance.style,
-        full_screen=True,
-        mouse_support=enable_mouse # Use configured value
-    )
-    if ui_manager_instance:
-        ui_manager_instance.app = app_instance 
+        app_instance = Application(
+            layout=layout_from_ui_manager,
+            key_bindings=ui_manager_instance.get_key_bindings(),
+            style=ui_manager_instance.style,
+            full_screen=True,
+            mouse_support=enable_mouse # Use configured value
+        )
+        if ui_manager_instance:
+            ui_manager_instance.app = app_instance 
 
-    logger.info("micro_X Shell application starting.")
-    await app_instance.run_async()
+        logger.info("micro_X Shell application starting.")
+        await app_instance.run_async()
+
     logger.info("micro_X Shell application run_async completed.")
 
 
@@ -428,6 +490,12 @@ def run_shell():
     logger.info("=" * 80) 
     try:
         asyncio.run(main_async_runner())
+    # --- FIX: Catch the new custom exception for a clean, specific exit ---
+    except StartupIntegrityError as e:
+        print(f"\nFATAL STARTUP ERROR: {e}")
+        print("Please resolve the Git integrity issues before running on this protected branch.")
+        logger.critical(f"Application halting due to fatal integrity error: {e}")
+    # --- END FIX ---
     except (FileNotFoundError, ValueError, IOError) as e:
         # This will catch the critical config loading errors raised from load_configuration()
         print(f"\nFATAL STARTUP ERROR: {e}")

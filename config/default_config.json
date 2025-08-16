@@ -36,7 +36,8 @@
     "output_separator_length": 30,
     "enable_startup_separator": true,
     "startup_separator_string": "\ud83d\ude80 micro_X Initialized & Ready \ud83d\ude80\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n",
-    "enable_mouse_support": false
+    "enable_mouse_support": false,
+    "ui_backend": "prompt_toolkit"
   },
   "paths": {
     "tmux_log_base_path": "/tmp"

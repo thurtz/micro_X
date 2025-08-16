@@ -114,6 +114,12 @@ def run_tests_main_logic():
     results_abs_dir = os.path.join(project_root, RESULTS_DIR_NAME)
     os.makedirs(results_abs_dir, exist_ok=True)
 
+    # --- CHANGE START: Make the test path explicit ---
+    # This ensures pytest only looks in the correct 'tests' directory
+    # at the root of the current project context (main, dev, or testing).
+    tests_dir_abs = os.path.join(project_root, "tests")
+    # --- CHANGE END ---
+
     fixed_results_file_path_abs = os.path.join(results_abs_dir, FIXED_RESULTS_FILENAME)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     timestamped_results_file_path_abs = os.path.join(results_abs_dir, f"pytest_results_{timestamp}.txt")
@@ -129,6 +135,15 @@ def run_tests_main_logic():
         print("Please ensure pytest is installed in the virtual environment '.venv' (e.g., via setup.sh or by running 'pip install pytest pytest-mock pytest-asyncio' in the activated venv).")
         return 2 # Pytest's exit code for internal error / setup issue
 
+    # --- CHANGE START: Check for tests directory ---
+    if not os.path.isdir(tests_dir_abs):
+        logger.error(f"Tests directory not found at actual path: '{tests_dir_abs}'.")
+        dp_tests_dir = display_path(tests_dir_abs, project_root, home_dir)
+        print(f"Error: Tests directory not found at '{dp_tests_dir}'.")
+        print("Please ensure a 'tests' directory exists in the project root.")
+        return 2 # Pytest's exit code for setup issue
+    # --- CHANGE END ---
+
     logger.info(f"Running tests from project root (shown as {dp_project_root})")
     logger.info(f"Pytest executable (shown as {dp_pytest_path})")
     logger.info(f"Saving fixed results to (shown as {dp_fixed_results_file})")
@@ -137,8 +152,10 @@ def run_tests_main_logic():
     print(f"\nRunning tests from: {dp_project_root}")
     print(f"Using Pytest: {dp_pytest_path}")
 
-    # Pytest command: run pytest on the project_root, use short traceback
-    pytest_command = [pytest_path_abs, project_root, "--tb=short"]
+    # --- CHANGE START: Use explicit tests directory ---
+    # Pytest command: run pytest on the specific tests_dir_abs, use short traceback
+    pytest_command = [pytest_path_abs, tests_dir_abs, "--tb=short"]
+    # --- CHANGE END ---
     
     try:
         process = subprocess.run(
@@ -168,7 +185,12 @@ def run_tests_main_logic():
     output_for_file_lines.append(f"pytest execution from micro_X utility ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})\n")
     
     anonymized_pytest_executable_for_display = display_path(pytest_path_abs, project_root, home_dir)
-    output_for_file_lines.append(f"Command: {anonymized_pytest_executable_for_display} {PROJECT_ROOT_PLACEHOLDER} --tb=short\n")
+    
+    # --- CHANGE START: Update command in log file ---
+    anonymized_tests_dir_for_display = display_path(tests_dir_abs, project_root, home_dir)
+    output_for_file_lines.append(f"Command: {anonymized_pytest_executable_for_display} {anonymized_tests_dir_for_display} --tb=short\n")
+    # --- CHANGE END ---
+
     output_for_file_lines.append(f"Return Code: {process.returncode}\n")
     output_for_file_lines.append(f"Note: Actual project root path has been replaced with: {PROJECT_ROOT_PLACEHOLDER}\n")
     if home_dir != "/" and home_dir != project_root : 

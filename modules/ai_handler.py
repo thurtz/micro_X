@@ -62,7 +62,7 @@
 #
 # --- END API DOCUMENTATION ---
 
-#!/usr/bin/env python
+# modules/ai_handler.py
 
 import asyncio
 import re
