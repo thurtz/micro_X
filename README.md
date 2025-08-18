@@ -1,7 +1,7 @@
 # **micro\_X: The AI-Enhanced Shell**
 
-**micro\_X** is an intelligent, interactive shell environment designed to bridge the gap between natural language and executable Linux commands. It leverages local large language models (LLMs) via Ollama to translate your queries, validate commands, explain their functionality, and streamline your command-line workflow. It also features branch-aware integrity checks to ensure code reliability when running on stable or testing branches.  
-GitHub Repository: [https://github.com/thurtz/micro\_X.git](https://github.com/thurtz/micro_X.git)  
+micro\_X is an intelligent, interactive shell environment designed to bridge the gap between natural language and executable Linux commands. It leverages local large language models (LLMs) via Ollama to translate your queries, validate commands, explain their functionality, and streamline your command-line workflow. It also features branch-aware integrity checks to ensure code reliability when running on stable or testing branches.  
+GitHub Repository: https://github.com/thurtz/micro\_X.git  
 Detailed User Guide: docs/user\_guide/index.md
 
 ## **Overview**
@@ -18,7 +18,7 @@ micro\_X provides a text-based user interface (TUI) where you can:
 * Manage command history and categorizations.  
 * Control the underlying Ollama service directly from within the shell.  
 * **Branch-Aware Integrity & Developer Mode:** Automatically enables a permissive 'Developer Mode' when running off the dev branch. Performs startup integrity checks on main and testing branches.  
-* **Web-Based Configuration Manager:** An integrated tool to easily view and edit user configurations and command categorizations via a web interface (launched with /utils config\_manager).
+* **Web-Based Configuration Manager:** An integrated tool to easily view and edit user configurations and command categorizations via a web interface (launched with the **/config** command).
 
 ## **Key Features**
 
@@ -26,7 +26,7 @@ micro\_X provides a text-based user interface (TUI) where you can:
 * **Secondary Direct Translator:** Leverages a configurable "direct\_translator" model specialized in direct command output (default example: vitali87/shell-commands-qwen2-1.5b-extended) as a fallback.  
 * **AI-Powered Command Validation:** Employs a configurable "validator" Ollama model (default example: herawen/lisa) to assess command validity.  
 * **AI-Powered Command Explanation:** Before executing an AI-generated command, you can request an explanation from a configurable "explainer" Ollama model (default example: herawen/lisa) to understand its purpose and potential impact.  
-* Interactive Command Confirmation: For AI-generated commands, micro\_X prompts for user action:  
+* **Interactive Command Confirmation:** For AI-generated commands, micro\_X prompts for user action:  
   * \[Y\]es: Execute the command (will prompt for categorization if the command is new).  
   * \[Ys\] Simple & Run: Execute and categorize the command as 'simple'.  
   * \[Ym\] Semi-Interactive & Run: Execute and categorize the command as 'semi\_interactive'.  
@@ -34,29 +34,30 @@ micro\_X provides a text-based user interface (TUI) where you can:
   * \[E\]xplain: Ask the AI to explain the command before deciding.  
   * \[M\]odify: Load the command into the input field for editing.  
   * \[C\]ancel: Do not execute the command.  
-* Command Categorization & Execution: \* simple: Direct execution, output captured in micro\_X.  
+* **Command Categorization & Execution:** \* simple: Direct execution, output captured in micro\_X.  
   * semi\_interactive: Runs in a new tmux window. Output is typically captured after completion.  
     * Smart Output Handling: If a semi\_interactive command produces output resembling a full-screen TUI application, micro\_X avoids displaying garbled output and suggests re-categorizing to interactive\_tui.  
   * interactive\_tui: Runs fully interactively in a new tmux window.  
-  * Users manage categories via /command subcommands.  
-* Ollama Service Management (/ollama command): \* Control the Ollama service directly from micro\_X.  
+  * Users manage categories via the **/command** alias.  
+* **Ollama Service Management (/ollama command):** \* Control the Ollama service directly from micro\_X.  
   * Subcommands: start, stop, restart, status, help.  
-* Runtime AI Configuration (/config command): \* View and modify AI model settings (e.g., model name, temperature) at runtime.  
+* **Runtime AI Configuration (/config command):** \* View and modify AI model settings (e.g., model name, temperature) at runtime.  
   * Save runtime changes to your user configuration file.  
-* Branch-Aware Integrity & Developer Mode: \* Developer Mode: Automatically activated when running from the dev branch or if integrity checks cannot be performed (e.g., not a git repository). In this mode, integrity checks are informational or bypassed, allowing development and local modifications without interruption.  
+* **Branch-Aware Integrity & Developer Mode:** \* Developer Mode: Automatically activated when running from the dev branch or if integrity checks cannot be performed (e.g., not a git repository). In this mode, integrity checks are informational or bypassed, allowing development and local modifications without interruption.  
   * Protected Mode: Active when running from main or testing branches. Performs startup integrity checks:  
     * Clean Working Directory: Ensures no uncommitted changes to tracked files.  
     * Sync with Remote: Verifies the local branch is synchronized with its remote counterpart (origin/main or origin/testing).  
     * If critical integrity checks fail (e.g., uncommitted local changes on a protected branch), micro\_X will halt execution. If the local branch is merely behind the remote, it will issue a warning and suggest using /update (if allow\_run\_if\_behind\_remote is enabled in config, which is default). Error messages are logged to logs/micro\_x.log.  
-* Modular Architecture: \* modules/ai\_handler.py: Manages all interactions with Ollama LLMs.  
+* **Modular Architecture:** \* modules/ai\_handler.py: Manages all interactions with Ollama LLMs.  
   * modules/category\_manager.py: Handles command categories.  
   * modules/output\_analyzer.py: Detects TUI-like output.  
   * modules/ollama\_manager.py: Manages the Ollama service lifecycle.  
   * modules/shell\_engine.py: Orchestrates command processing and execution.  
   * modules/git\_context\_manager.py: Handles Git interactions for integrity checks.  
 * **Shell-like Functionality:** Supports cd, history, and shell variable expansion.  
-* **Security:** Basic sanitization for potentially dangerous commands. The command confirmation flow with the "Explain" option and startup integrity checks are key safety features. **Always review and understand commands, especially AI-generated ones, before execution.** \* **Logging & Configuration:** Detailed logging and persistent configuration.  
-* **Web-Based Configuration Manager:** Launch with /utils config\_manager \--start to easily manage user\_config.json and user\_command\_categories.json via a web UI.
+* **Multi-Layered Security**: micro\_X employs a multi-layered security approach. It uses a configurable **deny-list** in config/default\_config.json to automatically block known dangerous command patterns. Additionally, a separate **warn-list** triggers an extra confirmation prompt for sensitive commands (like fdisk or dd) that aren't blocked outright. The primary defense for all AI-generated commands remains the interactive **user confirmation flow** (\[E\]xplain, \[M\]odify, \[C\]ancel), ensuring you always have the final say before execution.  
+* **Logging & Configuration:** Detailed logging and persistent configuration.  
+* **Web-Based Configuration Manager:** Launch with the **/config** command to easily manage user\_config.json and user\_command\_categories.json via a web UI.
 
 ## **Setup Guide**
 
@@ -102,11 +103,12 @@ micro\_X's behavior at startup is influenced by the current Git branch:
 
 * **Direct Commands:** Type any Linux command and press Enter (e.g., ls \-l).  
 * **AI Translation (/ai):** Prefix your query with /ai to translate it into a command.  
-  * (\\\~) \> /ai list text files  
+  * (\~) \> /ai list text files  
 * **User Scripts (/run):** Execute your own scripts from the user\_scripts/ directory.  
-  * (\\\~) \> /run my\_script \--with-args  
-* **Aliases (/alias):** Create and manage shortcuts for longer commands.  
-  * (\\\~) \> /alias \--add /snapshot /utils generate\_snapshot  
+  * (\~) \> /run my\_script \--with-args  
+* **Aliases (/alias, /command, /config, etc.):** Use aliases for common utilities.  
+  * (\~) \> /alias \--add /snap /snapshot  
+  * (\~) \> /config \--start  
 * **Help (/help):** Displays the main help message.  
 * **Exit (/exit or exit):** Exits the micro\_X shell.
 
@@ -121,15 +123,12 @@ micro\_X's behavior at startup is influenced by the current Git branch:
 * Plugin system for extending functionality.  
 * GPG signature verification for commits/tags on the main branch as part of integrity checks.
 
-## **Minor Areas for Potential Refinement** 
+## **Minor Areas for Potential Refinement**
 
 The project is in an excellent state, and the following points are minor suggestions for future evolution rather than immediate flaws:
 
-* Security Hardening: The sanitize\_and\_validate function in shell\_engine.py uses a deny list of dangerous patterns. While effective as a basic safeguard, this can never be exhaustive. The primary defense remains the user confirmation flow, which is the correct focus.
+* **Configuration File Format**: The configuration files \(e.g., default\_config.json\) now support comments \(like JSONC\) for better self\-documentation, even while retaining the .json extension. A future migration to a more structured format like TOML is still being considered for long\-term maintainability.
+* **Dependency Injection**: In main.py, module references are passed to the ShellEngine. A slightly cleaner pattern could be to pass fully initialized instances of the managers. This is a minor stylistic point with no impact on current functionality.
 
-* Configuration File Format: default_config.json is well-structured but, being JSON, cannot contain comments. For better self-documentation, migrating to a format like JSONC or TOML could be considered in the future.
-
-* Dependency Injection: In main.py, module references are passed to the ShellEngine. A slightly cleaner pattern could be to pass fully initialized instances of the managers. This is a minor stylistic point with no impact on current functionality.
-
-Contributions, bug reports, and feature requests are welcome\! Please open an issue or pull request on the [GitHub repository](https://github.com/thurtz/micro_X.git).  
-*This README was drafted with the assistance of an AI and subsequently updated based on project evolution.*
+Contributions, bug reports, and feature requests are welcome\! Please open an issue or pull request on the GitHub repository.  
+This README was drafted with the assistance of an AI and subsequently updated based on project evolution.

@@ -17,6 +17,7 @@ This document establishes a set of guiding principles and rules for the ongoing 
 1. **No Feature Removal Without Verification:** Existing features, commands, or significant functionalities will not be removed or fundamentally altered without explicit user confirmation and a clear justification based on the Quality Review or a direct request.  
 2. **Preservation of Core UX:** Key user-facing behaviors will be preserved. For example, semi\_interactive commands will continue to launch in a foreground tmux window as per the established design. Any deviation must be a conscious, agreed-upon decision to improve usability.  
 3. **Configuration Compatibility:** Changes should, whenever possible, avoid breaking compatibility with existing user configuration files (user\_config.json, user\_command\_categories.json). If a breaking change is necessary, it must be clearly documented.
+4. **Preservation of alias usage:** Aliases in end user documentation should be prefered and preserved. For example, \/utils generate\_snapshot commands will continue to be launched via \/snapshot per the established README.md documentation. Any deviation must be a conscious, agreed-upon decision to improve usability.
 
 ### **B. Code Quality and Maintenance**
 

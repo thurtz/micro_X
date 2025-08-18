@@ -250,6 +250,54 @@ class UIManager:
     def get_key_bindings(self) -> KeyBindings:
         return self.kb
 
+    # --- NEW: Caution Confirmation Flow ---
+    async def prompt_for_caution_confirmation(self, command_to_confirm: str) -> dict:
+        """Initiates a simple Yes/No confirmation for potentially sensitive commands."""
+        logger.info(f"UIManager: Starting caution confirmation for '{command_to_confirm}'.")
+        # Use existing flow flags to manage UI state, but with a unique state dict
+        self.confirmation_flow_active = True # Re-use this flag to lock scrolling etc.
+        self.confirmation_flow_state = {
+            'command_to_confirm': command_to_confirm,
+            'future': asyncio.Future()
+        }
+
+        self.append_output(f"\n⚠️ CAUTION: The command '{command_to_confirm.split()[0]}' can have significant effects.", style_class='security-warning')
+        self.append_output(f"   Full command: '{command_to_confirm}'", style_class='security-warning')
+        self.append_output("   Are you sure you want to proceed?", style_class='security-warning')
+
+        self.set_flow_input_mode(
+            prompt_text="[Confirm Execution] (yes/no): ",
+            accept_handler_func=self._handle_caution_confirmation_response,
+            is_confirmation=True
+        )
+
+        try:
+            result = await self.confirmation_flow_state['future']
+            logger.info(f"UIManager: Caution flow future resolved with: {result}")
+            return result
+        finally:
+            self.confirmation_flow_active = False
+            logger.info("UIManager: Caution flow ended.")
+
+    def _handle_caution_confirmation_response(self, buff):
+        response = buff.text.strip().lower()
+        future_to_set = self.confirmation_flow_state.get('future')
+        if not future_to_set or future_to_set.done():
+            return
+
+        if response in ['y', 'yes']:
+            future_to_set.set_result({'proceed': True})
+        elif response in ['n', 'no']:
+            future_to_set.set_result({'proceed': False})
+        else:
+            self.append_output("Invalid choice. Please enter 'yes' or 'no'.", style_class='error')
+            # Re-ask the question
+            self.set_flow_input_mode(
+                prompt_text="[Confirm Execution] (yes/no): ",
+                accept_handler_func=self._handle_caution_confirmation_response,
+                is_confirmation=True
+            )
+
     # --- Categorization Flow Methods ---
     async def start_categorization_flow(self, command_initially_proposed: str,
                                         ai_raw_candidate: str | None,

@@ -7,11 +7,16 @@ import argparse
 import logging
 import shutil
 import glob
+import json # Added for loading configuration
 
 # --- Configuration ---
 TESTING_BRANCH_DIR_NAME = "micro_X-testing"
 DEV_BRANCH_DIR_NAME = "micro_X-dev"
 GIT_REPO_URL = "https://github.com/thurtz/micro_X.git"
+DEFAULT_CONFIG_FILENAME = "default_config.json"
+USER_CONFIG_FILENAME = "user_config.json"
+CONFIG_DIR_NAME = "config"
+
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -25,6 +30,48 @@ def get_project_root():
     script_path = os.path.abspath(__file__)
     # Assumes this script is in project_root/utils/
     return os.path.dirname(os.path.dirname(script_path))
+
+# --- START: Added configuration loading functions ---
+def merge_configs(base, override):
+    """ Helper function to recursively merge dictionaries. """
+    merged = base.copy()
+    for key, value in override.items():
+        if isinstance(value, dict) and key in merged and isinstance(merged[key], dict):
+            merged[key] = merge_configs(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+def load_configuration(project_root):
+    """
+    Loads configurations from default and user JSON files for this utility.
+    """
+    default_config_path = os.path.join(project_root, CONFIG_DIR_NAME, DEFAULT_CONFIG_FILENAME)
+    user_config_path = os.path.join(project_root, CONFIG_DIR_NAME, USER_CONFIG_FILENAME)
+
+    base_config = {}
+    if os.path.exists(default_config_path):
+        try:
+            with open(default_config_path, 'r') as f:
+                base_config = json.load(f)
+        except Exception as e:
+            print(f"❌ Error loading default configuration: {e}")
+            return None # Cannot proceed without a base config
+    else:
+        print("❌ Error: Default configuration file not found. Cannot determine activation rules.")
+        return None
+
+    if os.path.exists(user_config_path):
+        try:
+            with open(user_config_path, 'r') as f:
+                user_settings = json.load(f)
+            return merge_configs(base_config, user_settings)
+        except Exception as e:
+            print(f"⚠️ Warning: Could not load or parse user config. Using defaults only. Error: {e}")
+    
+    return base_config
+# --- END: Added configuration loading functions ---
+
 
 def run_command(command, cwd, step_name, capture=False):
     """
@@ -69,8 +116,14 @@ def activate_dev_environment(project_root):
     print("🚀 Activating micro_X development environment...")
     print("This process will be interactive as it runs the setup scripts.")
 
-    # 1. Prerequisite Check: Verify we are on the main branch
+    # --- START: Updated branch check logic ---
     print("\n[Step 1/5] Verifying current branch...")
+    config = load_configuration(project_root)
+    if not config:
+        return # Stop if config loading failed
+
+    allowed_branches = config.get("integrity_check", {}).get("dev_activation_allowed_branches", ["main"])
+
     if not shutil.which("git"):
         print("❌ Error: 'git' command not found. Please install Git and ensure it's in your PATH.")
         return
@@ -81,13 +134,17 @@ def activate_dev_environment(project_root):
             cwd=project_root, capture_output=True, text=True, check=True
         )
         current_branch = result.stdout.strip()
-        if current_branch != 'main':
-            print(f"❌ Error: This utility must be run from the 'main' branch, but you are on '{current_branch}'.")
+        if current_branch not in allowed_branches:
+            print(f"❌ Error: For safety, this utility can only be run from specific branches.")
+            print(f"   You are currently on: '{current_branch}'")
+            print(f"   Allowed branches are configured as: {', '.join(allowed_branches)}")
+            print(f"   You can change this in your 'user_config.json' file if needed.")
             return
-        print(f"--> Success: Currently on '{current_branch}' branch.")
+        print(f"--> Success: Currently on '{current_branch}' branch (which is allowed).")
     except Exception as e:
         print(f"❌ Error checking current branch: {e}")
         return
+    # --- END: Updated branch check logic ---
 
     # 2. Clone Branches
     branches_to_clone = [

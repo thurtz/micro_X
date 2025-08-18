@@ -6,6 +6,9 @@ import json
 import argparse
 import logging
 
+# --- New Import ---
+from modules import config_handler
+
 # --- Configuration ---
 DEFAULT_ALIASES_FILENAME = "default_aliases.json"
 USER_ALIASES_FILENAME = "user_aliases.json"
@@ -26,40 +29,18 @@ def get_project_root():
     return os.path.dirname(os.path.dirname(script_path))
 
 def load_aliases(aliases_path):
-    """Loads a single alias file from the JSON file."""
-    if not os.path.exists(aliases_path):
+    """Loads an alias file using the centralized config handler."""
+    aliases = config_handler.load_jsonc_file(aliases_path)
+    if aliases is None:
+        return {}  # Return an empty dict if file doesn't exist or is invalid
+    if not isinstance(aliases, dict):
+        logger.warning(f"Alias file at {aliases_path} is not a valid dictionary. Ignoring.")
         return {}
-    try:
-        with open(aliases_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError) as e:
-        logger.error(f"Error loading aliases from {aliases_path}: {e}")
-        print(f"❌ Error: Could not read or parse the aliases file at {aliases_path}.", file=sys.stderr)
-        return None
+    return aliases
 
-def load_and_merge_aliases(default_path, user_path):
-    """Loads default and user aliases and merges them."""
-    default_aliases = load_aliases(default_path)
-    if default_aliases is None: default_aliases = {} # Recover from bad default file
-    
-    user_aliases = load_aliases(user_path)
-    if user_aliases is None: user_aliases = {} # Recover from bad user file
-
-    # User aliases override default aliases
-    merged = {**default_aliases, **user_aliases}
-    return merged
-
-def save_aliases(aliases_path, aliases_data):
-    """Saves aliases to the JSON file."""
-    try:
-        os.makedirs(os.path.dirname(aliases_path), exist_ok=True)
-        with open(aliases_path, 'w', encoding='utf-8') as f:
-            json.dump(aliases_data, f, indent=2, sort_keys=True)
-        return True
-    except IOError as e:
-        logger.error(f"Error saving aliases to {aliases_path}: {e}")
-        print(f"❌ Error: Could not write to the aliases file at {aliases_path}.", file=sys.stderr)
-        return False
+def save_user_aliases(aliases_path, aliases_data):
+    """Saves user aliases using the centralized config handler."""
+    return config_handler.save_json_file(aliases_path, aliases_data)
 
 def handle_add_alias(args, user_aliases_path):
     """Handles the --add alias command, modifying only the user aliases."""
@@ -79,10 +60,9 @@ def handle_add_alias(args, user_aliases_path):
         return
 
     user_aliases = load_aliases(user_aliases_path)
-    if user_aliases is None: return
-
+    
     user_aliases[alias_name] = command
-    if save_aliases(user_aliases_path, user_aliases):
+    if save_user_aliases(user_aliases_path, user_aliases):
         print(f"✅ User alias '{alias_name}' successfully mapped to '{command}'.")
 
 def handle_remove_alias(args, user_aliases_path):
@@ -94,11 +74,10 @@ def handle_remove_alias(args, user_aliases_path):
         return
 
     user_aliases = load_aliases(user_aliases_path)
-    if user_aliases is None: return
 
     if alias_name in user_aliases:
         del user_aliases[alias_name]
-        if save_aliases(user_aliases_path, user_aliases):
+        if save_user_aliases(user_aliases_path, user_aliases):
             print(f"🗑️ User alias '{alias_name}' successfully removed.")
             print("   (If a default alias with the same name exists, it will now be active).")
     else:
@@ -106,8 +85,8 @@ def handle_remove_alias(args, user_aliases_path):
 
 def handle_list_aliases(default_path, user_path):
     """Handles the --list alias command, showing merged results."""
-    default_aliases = load_aliases(default_path) or {}
-    user_aliases = load_aliases(user_path) or {}
+    default_aliases = load_aliases(default_path)
+    user_aliases = load_aliases(user_path)
     merged_aliases = {**default_aliases, **user_aliases}
 
     if not merged_aliases:

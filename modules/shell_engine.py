@@ -198,22 +198,16 @@ class ShellEngine:
         Performs basic sanitization and validation of commands.
         Returns the command if safe, None if blocked.
         """
-        dangerous_patterns = [
-            r'\brm\s+(?:-[a-zA-Z0-9]*f[a-zA-Z0-9]*|-f[a-zA-Z0-9]*)\s+/(?!(?:tmp|var/tmp)\b)\S*',
-            r'\brm\s+(?:-[a-zA-Z0-9]*f[a-zA-Z0-9]*|-f[a-zA-Z0-9]*)\s+/\s*(?:$|\.\.?\s*$|\*(?:\s.*|$))',
-            r'\bmkfs\b',
-            r'\bdd\b\s+if=/dev/random',
-            r'\bdd\b\s+if=/dev/zero',
-            r'\b(shutdown|reboot|halt|poweroff)\b',
-            r'>\s*/dev/sd[a-z]+',
-            r':\(\)\{:\|:&};:',
-            r'\b(wget|curl)\s+.*\s*\|\s*(sh|bash|python|perl)\b'
-        ]
+        dangerous_patterns = self.config.get("security", {}).get("dangerous_patterns", [])
         for pattern in dangerous_patterns:
-            if re.search(pattern, command):
-                logger.warning(f"DANGEROUS command blocked (matched pattern '{pattern}'): '{command}' (original input: '{original_input_for_log}')")
-                self.ui_manager.append_output(f"🛡️ Command blocked for security: {command}", style_class='security-critical')
-                return None
+            try:
+                if re.search(pattern, command):
+                    logger.warning(f"DANGEROUS command blocked (matched pattern '{pattern}'): '{command}' (original input: '{original_input_for_log}')")
+                    self.ui_manager.append_output(f"🛡️ Command blocked by security pattern: {command}", style_class='security-critical')
+                    return None
+            except re.error as e:
+                logger.error(f"Invalid regex pattern in security config: '{pattern}'. Error: {e}")
+                self.ui_manager.append_output(f"⚠️ Invalid security regex pattern in config: '{pattern}'.", style_class='warning')
         return command
 
     async def handle_cd_command(self, full_cd_command: str):
@@ -585,6 +579,16 @@ class ShellEngine:
             command_to_execute_expanded = self.expand_shell_variables(command_str_original)
             command_to_execute_sanitized = self.sanitize_and_validate(command_to_execute_expanded, original_user_input_for_display)
             if not command_to_execute_sanitized: return
+
+            # --- NEW: Caution Confirmation Step ---
+            warn_on_commands = self.config.get("security", {}).get("warn_on_commands", [])
+            command_base = command_to_execute_sanitized.split()[0]
+            if command_base in warn_on_commands:
+                caution_result = await self.ui_manager.prompt_for_caution_confirmation(command_to_execute_sanitized)
+                if not caution_result.get('proceed', False):
+                    self.ui_manager.append_output(f"🛡️ Execution of '{command_to_execute_sanitized}' cancelled by user.", style_class='info')
+                    return
+            # --- END: Caution Confirmation Step ---
 
             exec_message_prefix = "Executing"
             if forced_category:

@@ -61,6 +61,7 @@ FILES_TO_INCLUDE = [
     # --- Core Application Modules ---
     "modules/ai_handler.py",
     "modules/category_manager.py",
+    "modules/config_handler.py",
     "modules/curses_ui_manager.py",
     "modules/git_context_manager.py",
     "modules/ollama_manager.py",
@@ -78,6 +79,7 @@ FILES_TO_INCLUDE = [
     "tests/conftest.py",
     "tests/test_ai_handler.py",
     "tests/test_category_manager.py",
+    "tests/test_config_handler.py",
     "tests/test_git_context_manager.py",
     "tests/test_main_startup.py",
     "tests/test_shell_engine.py",

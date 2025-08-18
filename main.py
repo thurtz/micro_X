@@ -17,6 +17,9 @@ import sys
 import datetime # Added for log timestamps
 from typing import Tuple, Optional
 
+# --- New Import ---
+import modules.config_handler
+
 from modules.git_context_manager import GitContextManager
 from modules.shell_engine import ShellEngine
 import modules.category_manager
@@ -75,49 +78,31 @@ def merge_configs(base, override):
 
 def load_configuration():
     """
-    Loads configurations from default and user JSON files. The default_config.json file is mandatory for the application to start.
+    Loads configurations from default and user JSONC files.
+    The default_config.json file is mandatory for the application to start.
+    It now uses the config_handler module to support comments.
     """
     global config
     default_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, DEFAULT_CONFIG_FILENAME)
     user_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, USER_CONFIG_FILENAME)
 
-    # Step 1: Load the mandatory default configuration file. This is the new SSOT.
-    if not os.path.exists(default_config_path):
-        # This is a critical error. The application cannot run without its default config.
-        # Log the error and raise an exception to halt startup.
-        error_msg = f"CRITICAL ERROR: Default configuration file not found at '{default_config_path}'. Application cannot start."
+    # Step 1: Load the mandatory default configuration file.
+    base_config = modules.config_handler.load_jsonc_file(default_config_path)
+    if base_config is None:
+        error_msg = f"CRITICAL ERROR: Default configuration file not found or failed to parse at '{default_config_path}'. Application cannot start."
         logger.critical(error_msg)
         raise FileNotFoundError(error_msg)
 
-    try:
-        with open(default_config_path, 'r') as f:
-            base_config = json.load(f)
-        logger.info(f"Successfully loaded base configuration from {default_config_path}")
-    except json.JSONDecodeError as e:
-        error_msg = f"CRITICAL ERROR: Failed to parse default configuration file '{default_config_path}'. Invalid JSON: {e}. Application cannot start."
-        logger.critical(error_msg, exc_info=True)
-        raise ValueError(error_msg) # Raise a specific error to distinguish failure types
-    except Exception as e:
-        error_msg = f"CRITICAL ERROR: An unexpected error occurred while loading '{default_config_path}': {e}. Application cannot start."
-        logger.critical(error_msg, exc_info=True)
-        raise IOError(error_msg) # Generic I/O error for other file issues
+    logger.info(f"Successfully loaded base configuration from {default_config_path}")
+    config = base_config
 
-    config = base_config  # The default config is now the base.
-
-    # Step 2: Load optional user configuration and merge it on top of the default.
-    if os.path.exists(user_config_path):
-        try:
-            with open(user_config_path, 'r') as f:
-                user_settings = json.load(f)
-            # Merge user settings onto the base configuration
-            config = merge_configs(config, user_settings)
-            logger.info(f"Loaded and merged user configurations from {user_config_path}")
-        except Exception as e:
-            # A broken user config is not fatal, but should be logged as an error.
-            logger.error(f"Error loading user configuration from '{user_config_path}': {e}. Continuing with default settings.", exc_info=True)
-            # NOTE: A visual warning could be added to the UI here if desired.
+    # Step 2: Load optional user configuration and merge it.
+    user_settings = modules.config_handler.load_jsonc_file(user_config_path)
+    if user_settings:
+        config = merge_configs(config, user_settings)
+        logger.info(f"Loaded and merged user configurations from {user_config_path}")
     else:
-        logger.info(f"{user_config_path} not found. No user configuration overrides applied.")
+        logger.info(f"{user_config_path} not found or is invalid. No user configuration overrides applied.")
 
 
 load_configuration() # Load config at startup
