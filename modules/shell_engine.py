@@ -309,7 +309,8 @@ class ShellEngine:
                     # The command for tmux to run in a shell. It executes the user's command,
                     # tees stdout/stderr to a log, and sleeps briefly to ensure the pane is visible.
                     wrapped_command = f"bash -c {escaped_command_str} |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
-                    
+                    #wrapped_command = f"bash -c 'source ~/.bashrc && {command_to_execute}' |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
+
                     tmux_cmd_list_launch = ["tmux", "new-window", "-n", window_name, wrapped_command]
                     logger.info(f"Launching semi_interactive tmux: {' '.join(tmux_cmd_list_launch)} (log: {log_path})")
 
@@ -368,6 +369,7 @@ class ShellEngine:
             else: # "interactive_tui"
                 # For interactive commands, wrap in 'bash -c' to handle complex commands consistently.
                 tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", command_to_execute]
+                #tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", f"source ~/.bashrc && {command_to_execute}"]
                 logger.info(f"Launching interactive_tui tmux: {' '.join(shlex.quote(s) for s in tmux_cmd_list)}")
                 append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait for it to complete or be detached.", style_class='info')
                 if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()

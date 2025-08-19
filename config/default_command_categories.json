@@ -78,8 +78,7 @@
     "lsof -i :80",
     "lsof -p 1234",
     "dpkg -l packagename",
-    "rpm -q packagename",
-    "which brew"
+    "rpm -q packagename"
   ],
   "semi_interactive": [
     "less",
