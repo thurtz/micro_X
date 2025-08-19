@@ -5,6 +5,8 @@ import sys
 import subprocess
 import logging
 import argparse
+import shutil
+import platform
 
 # --- Path Setup ---
 try:
@@ -12,7 +14,7 @@ try:
     project_root = os.path.dirname(os.path.dirname(script_path))
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
-    from utils.alias import handle_add_alias 
+    from utils.alias import handle_add_alias
 except ImportError as e:
     print(f"❌ Error: Could not import necessary modules. Ensure this script is run from within the micro_X project structure.", file=sys.stderr)
     print(f"   Details: {e}", file=sys.stderr)
@@ -24,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 # --- Helper Functions ---
 def command_exists(command):
-    """Checks if a command exists on the system by checking its path."""
-    return any(os.access(os.path.join(path, command), os.X_OK) for path in os.environ["PATH"].split(os.pathsep))
+    """Checks if a command exists on the system."""
+    return shutil.which(command) is not None
 
 def is_wsl():
     """Checks if the environment is Windows Subsystem for Linux (WSL)."""
@@ -38,6 +40,33 @@ def is_wsl():
     except FileNotFoundError:
         pass
     return False
+
+def get_brew_executable_path():
+    """
+    Determines the path to the Homebrew executable by checking standard locations first,
+    then falling back to shutil.which.
+    """
+    # Define standard installation paths
+    standard_paths = []
+    if sys.platform == "darwin": # macOS
+        # Apple Silicon
+        if platform.machine() == "arm64":
+            standard_paths.append("/opt/homebrew/bin/brew")
+        # Intel
+        standard_paths.append("/usr/local/bin/brew")
+    elif sys.platform.startswith("linux"): # Linux / WSL
+        standard_paths.append("/home/linuxbrew/.linuxbrew/bin/brew")
+
+    # Check standard paths first
+    for path in standard_paths:
+        if os.path.exists(path):
+            logger.info(f"Found brew executable at standard path: {path}")
+            return path
+
+    # Fallback to checking the system PATH
+    logger.info("Brew not found in standard locations, checking system PATH with shutil.which.")
+    return shutil.which('brew')
+
 
 def install_linux_prerequisites():
     """Installs prerequisites for Homebrew on Debian-based Linux."""
@@ -74,7 +103,6 @@ def install_homebrew():
         print("✅ Homebrew is already installed.")
         return True
 
-    # Install prerequisites if on Linux/WSL
     if sys.platform.startswith("linux"):
         if not install_linux_prerequisites():
             return False
@@ -82,8 +110,6 @@ def install_homebrew():
     print("🍺 Homebrew not found. Attempting to install...")
     print("   Please follow any on-screen prompts from the Homebrew installer.")
     try:
-        # The official installer script works for macOS, Linux, and WSL
-        # We run it without capturing output so the user can interact with it (e.g., enter password)
         process = subprocess.run(
             '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
             shell=True,
@@ -91,10 +117,6 @@ def install_homebrew():
         )
         if process.returncode == 0:
             print("✅ Homebrew installed successfully.")
-            print("\nIMPORTANT: Please follow the 'Next steps' instructions printed by the")
-            print("Homebrew installer to add Homebrew to your PATH.")
-            if is_wsl():
-                print("   For WSL, this typically involves adding a line to your ~/.profile or ~/.bashrc file.")
             return True
     except subprocess.CalledProcessError as e:
         print(f"❌ Error installing Homebrew: {e}", file=sys.stderr)
@@ -103,11 +125,70 @@ def install_homebrew():
         print(f"❌ An unexpected error occurred during Homebrew installation: {e}", file=sys.stderr)
         return False
 
+def setup_brew_path():
+    """
+    Detects the user's shell and adds the Homebrew path to the correct
+    shell configuration file if it's not already present.
+    """
+    print("\n🔧 Checking shell environment for Homebrew path...")
+    
+    brew_executable_path = get_brew_executable_path()
+    if not brew_executable_path:
+        print("❌ Error: 'brew' command not found after installation. Cannot configure shell path.", file=sys.stderr)
+        print("   Please follow the 'Next steps' from the Homebrew installer manually.", file=sys.stderr)
+        return
+
+    shell_path = os.environ.get("SHELL", "")
+    shell_name = os.path.basename(shell_path)
+    
+    if shell_name in ["bash", "zsh"]:
+        config_file = os.path.expanduser(f"~/.{shell_name}rc")
+        if shell_name == "bash" and not os.path.exists(config_file):
+            config_file = os.path.expanduser("~/.bash_profile")
+            if not os.path.exists(config_file):
+                 config_file = os.path.expanduser("~/.profile")
+    else:
+        config_file = os.path.expanduser("~/.profile")
+
+    print(f"   Detected Shell: {shell_name}")
+    print(f"   Configuration file to check/modify: {config_file}")
+
+    brew_eval_command = f'eval "$({brew_executable_path} shellenv)"'
+    
+    try:
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as f:
+                if any(brew_eval_command in line for line in f):
+                    print("✅ Homebrew path is already configured in your shell profile.")
+                    return
+    except Exception as e:
+        print(f"⚠️ Warning: Could not read {config_file} to check for existing config: {e}", file=sys.stderr)
+
+    print(f"\nHomebrew path is not configured in {config_file}.")
+    response = input(f"Do you want to automatically add the setup command to this file? (y/N): ").lower()
+    
+    if response == 'y':
+        try:
+            with open(config_file, 'a') as f:
+                f.write('\n# Homebrew Setup for micro_X\n')
+                f.write(f'{brew_eval_command}\n')
+            print(f"✅ Successfully added Homebrew setup to {config_file}.")
+            print("\nIMPORTANT: To apply the changes, please run the following command or restart your terminal:")
+            print(f"  source {config_file}")
+        except Exception as e:
+            print(f"❌ Error: Could not write to {config_file}: {e}", file=sys.stderr)
+            print("   Please add the following line to your shell configuration file manually:")
+            print(f"   {brew_eval_command}")
+    else:
+        print("🚫 Shell configuration not modified.")
+        print("   To use Homebrew, you must add the following line to your shell configuration file manually:")
+        print(f"   {brew_eval_command}")
+
 def main():
     """Main function to install Homebrew and create an alias."""
     parser = argparse.ArgumentParser(
         description="Install Homebrew on macOS, Debian-based Linux, or WSL and create an alias for it in micro_X.",
-        epilog="This utility helps set up the Homebrew package manager."
+        epilog="This utility helps set up the Homebrew package manager and configures your shell environment."
     )
     parser.parse_args()
 
@@ -116,15 +197,15 @@ def main():
         sys.exit(1)
 
     if install_homebrew():
-        # After successful installation, create the alias
+        setup_brew_path()
+        
         print("\n🔗 Creating alias '/brew'...")
         
-        # We need to simulate the argparse Namespace object for handle_add_alias
         class Args:
             pass
         
         args = Args()
-        args.add = ['/brew', 'brew'] # alias_name and command
+        args.add = ['/brew', 'brew']
         
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         user_aliases_path = os.path.join(project_root, 'config', 'user_aliases.json')
