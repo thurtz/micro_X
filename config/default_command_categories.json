@@ -78,8 +78,7 @@
     "lsof -i :80",
     "lsof -p 1234",
     "dpkg -l packagename",
-    "rpm -q packagename",
-    "/config"
+    "rpm -q packagename"
   ],
   "semi_interactive": [
     "less",
@@ -229,8 +228,7 @@
     "python --help",
     "pip --help",
     "npm --help",
-    "node --help",
-    "/setup_brew"
+    "node --help"
   ],
   "interactive_tui": [
     "nano",
