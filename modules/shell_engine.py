@@ -435,75 +435,48 @@ class ShellEngine:
         self.ui_manager.append_output(help_output_string, style_class='help-base')
         logger.info("Displayed general help.")
 
-    async def _handle_script_command_async(self, full_command_str: str, script_dir_path: str, script_dir_name: str, command_name: str):
-        """Generic handler for executing scripts from a specified directory (e.g., utils or user_scripts)."""
-        if not self.ui_manager:
-            logger.error(f"Cannot handle /{command_name}: UIManager not initialized.")
-            return
+    def _translate_script_command(self, command_str: str) -> Optional[str]:
+        """
+        If the command is a /utils or /run command, translate it to the
+        actual python execution string. Otherwise, return None.
+        """
+        try:
+            parts = shlex.split(command_str)
+            if not parts:
+                return None
+        except ValueError:
+            return None
 
-        logger.info(f"Handling /{command_name} command: {full_command_str}")
+        command_prefix = parts[0]
+        script_dir_path = None
         
-        try:
-            parts = shlex.split(full_command_str)
-        except ValueError as e:
-            self.ui_manager.append_output(f"❌ Error parsing /{command_name} command: {e}", style_class='error')
-            logger.warning(f"shlex error for /{command_name} '{full_command_str}': {e}")
-            return
+        if command_prefix == "/utils":
+            script_dir_path = self.UTILS_DIR_PATH
+        elif command_prefix == "/run":
+            script_dir_path = self.USER_SCRIPTS_DIR_PATH
+        else:
+            return None
 
-        help_message = f"ℹ️ Usage: /{command_name} <script_name> [args... | help | -h | --help] | list"
         if len(parts) < 2:
-            self.ui_manager.append_output(help_message, style_class='info')
-            return
+            self.ui_manager.append_output(f"ℹ️ Usage: {command_prefix} <script_name> [args...]", style_class='info')
+            return "" 
 
-        subcommand = parts[1]
+        script_name = parts[1]
+        script_args = parts[2:]
+        
+        script_path = os.path.join(script_dir_path, f"{script_name}.py")
 
-        # --- UNIFIED LISTING LOGIC ---
-        if subcommand.lower() == "list":
-            # Always run the list_scripts.py utility from the utils directory
-            list_script_path = os.path.join(self.UTILS_DIR_PATH, "list_scripts.py")
-            if not os.path.isfile(list_script_path):
-                self.ui_manager.append_output("❌ Error: The 'list_scripts.py' utility is missing.", style_class='error')
-                return
-            
-            # Formulate the command to run the unified lister
-            list_command_str = f"/utils list_scripts"
-            # Re-enter the command handling logic with the new command
-            await self._handle_utils_command_async(list_command_str)
-            return
-        # --- END UNIFIED LISTING LOGIC ---
-
-        script_path = os.path.join(script_dir_path, f"{subcommand}.py")
         if not os.path.isfile(script_path):
-            self.ui_manager.append_output(f"❌ Script not found: {subcommand}.py in '{script_dir_name}'.", style_class='error')
-            return
+            self.ui_manager.append_output(f"❌ Script not found: {script_name}.py in '{os.path.basename(script_dir_path)}'.", style_class='error')
+            return ""
 
-        args_for_script = parts[2:]
-        command_to_execute = [sys.executable, script_path] + args_for_script
-
-        self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute)}", style_class='info')
-        try:
-            process = await asyncio.to_thread(
-                subprocess.run, command_to_execute, capture_output=True, text=True, cwd=self.PROJECT_ROOT, check=False
-            )
-            if process.stdout:
-                self.ui_manager.append_output(f"Output from '{subcommand}.py':\n{process.stdout.strip()}")
-            if process.stderr:
-                self.ui_manager.append_output(f"Stderr from '{subcommand}.py':\n{process.stderr.strip()}", style_class='warning')
-            if process.returncode != 0:
-                self.ui_manager.append_output(f"⚠️ Script '{subcommand}.py' exited with code {process.returncode}.", style_class='warning')
-            else:
-                self.ui_manager.append_output(f"✅ Script '{subcommand}.py' completed.", style_class='success')
-
-            if subcommand == 'alias':
-                self._reload_aliases()
-        except Exception as e:
-            self.ui_manager.append_output(f"❌ Failed to execute script: {e}", style_class='error')
-
-    async def _handle_utils_command_async(self, full_command_str: str):
-        await self._handle_script_command_async(full_command_str, self.UTILS_DIR_PATH, self.UTILS_DIR_NAME, "utils")
-
-    async def _handle_user_script_command_async(self, full_command_str: str):
-        await self._handle_script_command_async(full_command_str, self.USER_SCRIPTS_DIR_PATH, self.USER_SCRIPTS_DIR_NAME, "run")
+        python_executable = shlex.quote(sys.executable)
+        script_path_quoted = shlex.quote(script_path)
+        args_quoted = [shlex.quote(arg) for arg in script_args]
+        
+        final_command = f"{python_executable} {script_path_quoted} {' '.join(args_quoted)}"
+        logger.info(f"Translated script command '{command_str}' to '{final_command}'")
+        return final_command
 
     async def handle_built_in_command(self, user_input: str) -> Tuple[bool, str]:
         """
@@ -531,12 +504,9 @@ class ShellEngine:
 
         logger.info(f"ShellEngine.handle_built_in_command received: '{user_input_stripped}'")
 
-        # --- FIX START ---
-        # Prioritize checking if the *entire* command is a known, categorized command.
-        if self.category_manager_module.classify_command(user_input_stripped) != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
-            logger.debug(f"Command '{user_input_stripped}' is categorized, bypassing built-in prefix handlers.")
-            return False, user_input_stripped
-        # --- FIX END ---
+        # This function now only handles "meta" commands that don't go through
+        # the standard execution pipeline (like help and exit).
+        # Script commands like /utils and /run are translated and handled by process_command.
         
         if user_input_stripped.lower() in {"/help", "help"}:
             self._display_general_help()
@@ -549,13 +519,8 @@ class ShellEngine:
                 app_instance = self.ui_manager.get_app_instance()
                 if app_instance and app_instance.is_running: app_instance.exit()
             return True, user_input_stripped
-        elif user_input_stripped.startswith("/utils"):
-            await self._handle_utils_command_async(user_input_stripped)
-            return True, user_input_stripped
-        elif user_input_stripped.startswith("/run"):
-            await self._handle_user_script_command_async(user_input_stripped)
-            return True, user_input_stripped
         
+        # It's not a meta-command, so pass it on for full processing.
         return False, user_input_stripped
         
     async def process_command(self, command_str_original: str, original_user_input_for_display: str,
@@ -591,7 +556,19 @@ class ShellEngine:
                     self.category_manager_module.add_command_to_category(command_str_original, category)
                 else: category = self.config['behavior']['default_category_for_unclassified']
 
-            command_to_execute_expanded = self.expand_shell_variables(command_str_original)
+            # --- NEW TRANSLATION STEP ---
+            # Translate internal commands like /utils to their real executable form.
+            command_to_execute = self._translate_script_command(command_str_original)
+            if command_to_execute is None:
+                # It wasn't a script command, so it's a regular shell command.
+                command_to_execute = command_str_original
+            elif command_to_execute == "":
+                # It was a malformed script command (e.g., missing script name)
+                # An error message was already printed. We stop processing here.
+                return
+            # --- END TRANSLATION STEP ---
+
+            command_to_execute_expanded = self.expand_shell_variables(command_to_execute)
             command_to_execute_sanitized = self.sanitize_and_validate(command_to_execute_expanded, original_user_input_for_display)
             if not command_to_execute_sanitized: return
 
