@@ -30,7 +30,9 @@ FILES_TO_INCLUDE = [
 
     # --- Config Files ---
     "config/default_config.json",
+    "config/user_config.json",
     "config/default_command_categories.json",
+    "config/user_command_categories.json",
     "config/.tmux.conf",
     "config/user_aliases.json",
     "config/default_aliases.json",
