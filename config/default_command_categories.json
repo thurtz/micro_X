@@ -228,7 +228,8 @@
     "python --help",
     "pip --help",
     "npm --help",
-    "node --help"
+    "node --help",
+    "python utils/setup_brew.py"
   ],
   "interactive_tui": [
     "nano",
