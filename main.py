@@ -1,3 +1,6 @@
+# ==============================================================================
+# --- START OF FILE: main.py ---
+# ==============================================================================
 # main.py
 
 from prompt_toolkit import Application
@@ -139,8 +142,15 @@ def normal_input_accept_handler(buff):
 
     async def _handle_input():
         try:
-            if not await shell_engine_instance.handle_built_in_command(user_input_stripped):
-                await shell_engine_instance.submit_user_input(user_input_stripped, from_edit_mode=was_in_edit_mode)
+            # --- FIX START ---
+            # The handle_built_in_command function now returns a tuple:
+            # (was_handled: bool, final_command: str)
+            # This allows it to pass back the alias-expanded command string.
+            was_handled, final_command = await shell_engine_instance.handle_built_in_command(user_input_stripped)
+            if not was_handled:
+                # Use the potentially modified 'final_command' for further processing.
+                await shell_engine_instance.submit_user_input(final_command, from_edit_mode=was_in_edit_mode)
+            # --- FIX END ---
         finally:
             if was_in_edit_mode:
                 logger.debug("Input was from edit mode; explicitly calling restore_normal_input_handler.")
@@ -524,3 +534,6 @@ def run_shell():
 if __name__ == "__main__":
     run_shell()
 # This is the main entry point for the micro_X shell application.
+# ==============================================================================
+# --- END OF FILE: main.py ---
+# ==============================================================================

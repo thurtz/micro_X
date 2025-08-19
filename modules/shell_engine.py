@@ -74,7 +74,7 @@ import shutil
 import sys
 import hashlib
 import json
-from typing import Optional
+from typing import Optional, Tuple
 
 from modules.output_analyzer import is_tui_like_output
 
@@ -505,7 +505,13 @@ class ShellEngine:
     async def _handle_user_script_command_async(self, full_command_str: str):
         await self._handle_script_command_async(full_command_str, self.USER_SCRIPTS_DIR_PATH, self.USER_SCRIPTS_DIR_NAME, "run")
 
-    async def handle_built_in_command(self, user_input: str) -> bool:
+    async def handle_built_in_command(self, user_input: str) -> Tuple[bool, str]:
+        """
+        Handles built-in commands.
+        Returns a tuple: (was_handled, final_command_string)
+        'was_handled' is True if the command was fully processed here.
+        'final_command_string' is the original or alias-expanded command.
+        """
         user_input_stripped = user_input.strip()
         
         # --- ALIAS EXPANSION ---
@@ -515,19 +521,26 @@ class ShellEngine:
             if alias_name in self.aliases:
                 expanded_command = self.aliases[alias_name]
                 remaining_args = input_parts[1:]
-                # Simple append, for more complex logic (e.g., placeholders) this would need enhancement
                 final_command = f"{expanded_command} {' '.join(shlex.quote(arg) for arg in remaining_args)}".strip()
                 
                 self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
                 user_input_stripped = final_command
         except ValueError:
-            # shlex failed, proceed with original input
             pass
         # --- END ALIAS EXPANSION ---
 
         logger.info(f"ShellEngine.handle_built_in_command received: '{user_input_stripped}'")
+
+        # --- FIX START ---
+        # Prioritize checking if the *entire* command is a known, categorized command.
+        if self.category_manager_module.classify_command(user_input_stripped) != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
+            logger.debug(f"Command '{user_input_stripped}' is categorized, bypassing built-in prefix handlers.")
+            return False, user_input_stripped
+        # --- FIX END ---
+        
         if user_input_stripped.lower() in {"/help", "help"}:
-            self._display_general_help(); return True
+            self._display_general_help()
+            return True, user_input_stripped
         elif user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
             self.ui_manager.append_output("Exiting micro_X Shell 🚪", style_class='info')
             logger.info("Exit command received from built-in handler.")
@@ -535,13 +548,15 @@ class ShellEngine:
             else:
                 app_instance = self.ui_manager.get_app_instance()
                 if app_instance and app_instance.is_running: app_instance.exit()
-            return True
+            return True, user_input_stripped
         elif user_input_stripped.startswith("/utils"):
-            await self._handle_utils_command_async(user_input_stripped); return True
+            await self._handle_utils_command_async(user_input_stripped)
+            return True, user_input_stripped
         elif user_input_stripped.startswith("/run"):
-            await self._handle_user_script_command_async(user_input_stripped); return True
-        # --- REMOVED /update and /ollama direct handling ---
-        return False
+            await self._handle_user_script_command_async(user_input_stripped)
+            return True, user_input_stripped
+        
+        return False, user_input_stripped
         
     async def process_command(self, command_str_original: str, original_user_input_for_display: str,
                               ai_raw_candidate: Optional[str] = None,
@@ -648,3 +663,6 @@ class ShellEngine:
                 else:
                     self.ui_manager.append_output("🤔 AI failed. Trying original as direct command.", style_class='warning')
                     await self.process_command(user_input_stripped, user_input_stripped, ai_raw_candidate)
+# ==============================================================================
+# --- END OF FILE: modules/shell_engine.py ---
+# ==============================================================================
