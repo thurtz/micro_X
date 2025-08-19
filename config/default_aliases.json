@@ -8,6 +8,5 @@
   "/snapshot": "/utils generate_snapshot",
   "/tree": "/utils generate_tree",
   "/update": "/utils update",
-  "/setup_brew": "python utils/setup_brew.py",
-  "/brew": "brew"
+  "/setup_brew": "python utils/setup_brew.py"
 }
