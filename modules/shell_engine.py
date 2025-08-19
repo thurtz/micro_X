@@ -517,6 +517,18 @@ class ShellEngine:
                 
                 self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
                 user_input_stripped = final_command
+
+                # --- FIX START: Immediate execution for categorized aliases ---
+                # After expanding an alias, immediately check if the result is a known, categorized command.
+                # If it is, we can execute it directly and bypass the "unknown command" logic (AI validation).
+                category = self.category_manager_module.classify_command(final_command)
+                if category != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
+                    logger.info(f"Alias '{alias_name}' expanded to categorized command '{final_command}'. Executing directly.")
+                    # We use the original user input (the alias itself) for display purposes.
+                    await self.process_command(final_command, user_input.strip())
+                    return True # IMPORTANT: Return True to signify the command was fully handled.
+                # --- FIX END ---
+
         except ValueError:
             # shlex failed, proceed with original input
             pass
