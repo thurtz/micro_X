@@ -6,8 +6,19 @@ import json
 import argparse
 import logging
 
-# --- New Import ---
-from modules import config_handler
+# --- Path Setup ---
+# Add the project root to the Python path to allow importing from 'modules'
+try:
+    script_path = os.path.abspath(__file__)
+    project_root = os.path.dirname(os.path.dirname(script_path))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    # Now we can safely import from modules
+    from modules import config_handler
+except ImportError as e:
+    print(f"❌ Error: Could not import the config_handler module. Ensure this script is run from within the micro_X project structure.", file=sys.stderr)
+    print(f"   Details: {e}", file=sys.stderr)
+    sys.exit(1)
 
 # --- Configuration ---
 DEFAULT_ALIASES_FILENAME = "default_aliases.json"
