@@ -7,5 +7,6 @@
   "/ollama": "/utils ollama_cli",
   "/snapshot": "/utils generate_snapshot",
   "/tree": "/utils generate_tree",
-  "/update": "/utils update"
+  "/update": "/utils update",
+  "/setup_brew": "/utils setup_brew"
 }

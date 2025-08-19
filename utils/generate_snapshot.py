@@ -100,6 +100,7 @@ FILES_TO_INCLUDE = [
     "utils/list_scripts.py",
     "utils/ollama_cli.py",
     "utils/run_tests.py",
+    "utils/setup_brew",
     "utils/setup_dev_env.py",
     "utils/update.py",
 ]
