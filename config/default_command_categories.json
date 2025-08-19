@@ -263,6 +263,7 @@
     "sudo parted /dev/sda",
     "sudo ufw enable",
     "sudo ufw default deny incoming",
-    "sudo systemctl edit servicename"
+    "sudo systemctl edit servicename",
+    "bash"
   ]
 }
