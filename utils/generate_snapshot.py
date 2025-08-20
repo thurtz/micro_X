@@ -33,9 +33,9 @@ FILES_TO_INCLUDE = [
     "config/user_config.json",
     "config/default_command_categories.json",
     "config/user_command_categories.json",
-    "config/.tmux.conf",
-    "config/user_aliases.json",
     "config/default_aliases.json",
+    "config/user_aliases.json",
+    "config/.tmux.conf"
 
     # --- Documentation ---
     "docs/developer/development_principles.md",
@@ -45,10 +45,6 @@ FILES_TO_INCLUDE = [
     "docs/developer/micro_X_Code_Quality_Review_Accomplishments.md",
     "docs/developer/micro_X_testing_guide.md",
     "docs/developer/review_of_micro_X_project.md",
-    "docs/developer/setup_micro_X_mac.md",
-    "docs/developer/setup_micro_X_mint.md",
-    "docs/developer/setup_micro_X_termux.md",
-    "docs/developer/setup_micro_X_wsl.md",
 
     "docs/user_guide/01_installation.md",
     "docs/user_guide/02_basic_usage.md",
