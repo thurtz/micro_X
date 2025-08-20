@@ -96,7 +96,7 @@ def _set_nested_config(config_dict, key_path, new_value):
         if key in d and not isinstance(d[key], dict):
             return False, f"Path conflict: '{key}' is not a dictionary."
         d = d.setdefault(key, {})
-    
+
     d[keys[-1]] = new_value
     return True, None # Success
 
@@ -127,7 +127,7 @@ class ShellEngine:
         self.git_context_manager_instance = git_context_manager_instance
 
         self.current_directory = os.getcwd()
-        
+
         module_file_path = os.path.abspath(__file__)
         modules_dir_path = os.path.dirname(module_file_path)
         self.PROJECT_ROOT = os.path.dirname(modules_dir_path)
@@ -216,9 +216,9 @@ class ShellEngine:
         try:
             parts = full_cd_command.split(" ", 1)
             target_dir_str = parts[1].strip() if len(parts) > 1 else "~"
-            
+
             expanded_dir_arg = os.path.expanduser(os.path.expandvars(target_dir_str))
-            
+
             if os.path.isabs(expanded_dir_arg):
                 new_dir_abs = expanded_dir_arg
             else:
@@ -259,13 +259,30 @@ class ShellEngine:
                 cwd=self.current_directory
             )
             stdout, stderr = await process.communicate()
-            output_prefix = f"Output from '{original_user_input_display}':\n"
+
+            show_verbose_prefix = command_to_execute.strip() != original_user_input_display.strip()
+
+            # --- START OF CHANGE ---
+            if not show_verbose_prefix:
+                # For direct simple commands, always print the prompt line first.
+                append_output_func(f"$ {original_user_input_display}", style_class='executing')
+
             if stdout:
-                append_output_func(f"{output_prefix}{stdout.decode(errors='replace').strip()}")
+                if show_verbose_prefix:
+                    # For AI/aliased commands, use the descriptive prefix
+                    append_output_func(f"Output from '{original_user_input_display}':\n{stdout.decode(errors='replace').strip()}")
+                else:
+                    # For direct commands, the prompt is already printed, so just print the output.
+                    append_output_func(stdout.decode(errors='replace').strip())
+            # --- END OF CHANGE ---
+
             if stderr:
                 append_output_func(f"Stderr from '{original_user_input_display}':\n{stderr.decode(errors='replace').strip()}", style_class='warning')
+            
             if not stdout and not stderr and process.returncode == 0:
-                append_output_func(f"{output_prefix}(No output)", style_class='info')
+                if show_verbose_prefix:
+                    append_output_func(f"Output from '{original_user_input_display}': (No output)", style_class='info')
+                # If not show_verbose_prefix, the prompt was already printed, and we do nothing else, which is correct.
             
             if process.returncode != 0:
                 logger.warning(f"Command '{command_to_execute}' exited with code {process.returncode}")
@@ -302,10 +319,10 @@ class ShellEngine:
                 with tempfile.NamedTemporaryFile(mode='w+', delete=True, encoding='utf-8', errors='ignore') as temp_log_file:
                     log_path = temp_log_file.name
                     logger.debug(f"Using platform-agnostic temporary file for tmux log: {log_path}")
-                
+
                     # Use shlex.quote for robust command escaping
                     escaped_command_str = shlex.quote(command_to_execute)
-                    
+
                     # The command for tmux to run in a shell. It executes the user's command,
                     # tees stdout/stderr to a log, and sleeps briefly to ensure the pane is visible.
                     wrapped_command = f"bash -c {escaped_command_str} |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
@@ -328,7 +345,7 @@ class ShellEngine:
 
                     append_output_func(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output (max {tmux_poll_timeout}s)...", style_class='info')
                     if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
-                    
+
                     start_time = asyncio.get_event_loop().time()
                     window_closed_or_cmd_done = False
 
@@ -346,14 +363,14 @@ class ShellEngine:
                         except Exception as tmux_err:
                             logger.warning(f"Error checking tmux windows: {tmux_err}")
                             window_closed_or_cmd_done = True; break
-                    
+
                     if not window_closed_or_cmd_done:
                         append_output_func(f"⚠️ Tmux window '{window_name}' poll timed out. Output might be incomplete or window still running.", style_class='warning')
                         logger.warning(f"Tmux poll for '{window_name}' timed out.")
-                    
+
                     temp_log_file.seek(0)
                     output_content = temp_log_file.read().strip()
-                    
+
                     tui_line_threshold = self.config.get('behavior', {}).get('tui_detection_line_threshold_pct', 30.0)
                     tui_char_threshold = self.config.get('behavior', {}).get('tui_detection_char_threshold_pct', 3.0)
 
@@ -401,7 +418,7 @@ class ShellEngine:
             return
 
         logger.info(f"Handling /{command_name} command: {full_command_str}")
-        
+
         try:
             parts = shlex.split(full_command_str)
         except ValueError as e:
@@ -423,7 +440,7 @@ class ShellEngine:
             if not os.path.isfile(list_script_path):
                 self.ui_manager.append_output("❌ Error: The 'list_scripts.py' utility is missing.", style_class='error')
                 return
-            
+
             # Formulate the command to run the unified lister
             list_command_str = f"/utils list_scripts"
             # Re-enter the command handling logic with the new command
@@ -466,7 +483,7 @@ class ShellEngine:
 
     async def handle_built_in_command(self, user_input: str) -> bool:
         user_input_stripped = user_input.strip()
-        
+
         # --- ALIAS EXPANSION ---
         try:
             input_parts = shlex.split(user_input_stripped)
@@ -476,7 +493,7 @@ class ShellEngine:
                 remaining_args = input_parts[1:]
                 # Simple append, for more complex logic (e.g., placeholders) this would need enhancement
                 final_command = f"{expanded_command} {' '.join(shlex.quote(arg) for arg in remaining_args)}".strip()
-                
+
                 self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
                 user_input_stripped = final_command
 
@@ -511,7 +528,7 @@ class ShellEngine:
             await self._handle_user_script_command_async(user_input_stripped); return True
         # --- REMOVED /update and /ollama direct handling ---
         return False
-        
+
     async def process_command(self, command_str_original: str, original_user_input_for_display: str,
                               ai_raw_candidate: Optional[str] = None,
                               original_direct_input_if_different: Optional[str] = None,
@@ -559,13 +576,20 @@ class ShellEngine:
                     return
             # --- END: Caution Confirmation Step ---
 
+            self.ui_manager.add_interaction_separator()
+
             exec_message_prefix = "Executing"
             if forced_category:
                 if confirmation_result and confirmation_result.get('action') == 'execute_and_categorize':
                     exec_message_prefix = f"Executing (user categorized as {category})"
                 else: exec_message_prefix = "Forced execution"
-            
-            append_output_func(f"▶️ {exec_message_prefix} ({category} - {self.category_manager_module.CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style_class='executing')
+
+            # Conditionally display the "Executing" message to create a cleaner, shell-like output for simple, direct commands.
+            is_direct_simple_command = (category == "simple" and not is_ai_generated and not forced_category)
+
+            if not is_direct_simple_command:
+                append_output_func(f"▶️ {exec_message_prefix} ({category} - {self.category_manager_module.CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style_class='executing')
+
             if category == "simple": await self.execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
             else: await self.execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category)
         finally:
