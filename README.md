@@ -66,7 +66,7 @@ micro\_X provides a text-based user interface (TUI) where you can:
 It is recommended that all users start by cloning and setting up the main branch for the most stable experience.
 
 1. Clone the Repository:  
-   git clone https://github.com/thurtz/micro\_X.git  
+   git clone https://github.com/thurtz/micro_X.git  
    cd micro\_X  
 2. Make the Setup Script Executable:  
    chmod \+x setup.sh  
