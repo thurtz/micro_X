@@ -35,7 +35,7 @@ FILES_TO_INCLUDE = [
     "config/user_command_categories.json",
     "config/default_aliases.json",
     "config/user_aliases.json",
-    "config/.tmux.conf"
+    "config/.tmux.conf",
 
     # --- Documentation ---
     "docs/developer/development_principles.md",

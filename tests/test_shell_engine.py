@@ -3,7 +3,7 @@ import pytest
 import os
 import uuid
 import asyncio
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch, AsyncMock, call
 import re
 from unittest.mock import mock_open
 
@@ -15,11 +15,6 @@ from modules.output_analyzer import is_tui_like_output
 @pytest.fixture
 def mock_config_for_engine():
     """Provides a mock configuration for ShellEngine tests, including security patterns."""
-    # --- FIX START ---
-    # The original fixture was missing the 'security' section.
-    # This caused the sanitize_and_validate function to have no patterns to test against,
-    # leading to incorrect test failures. By adding this section from the default config,
-    # the tests can now correctly validate the security function.
     return {
         "security": {
             "dangerous_patterns": [
@@ -37,7 +32,6 @@ def mock_config_for_engine():
                 "dd", "fdisk", "visudo"
             ]
         },
-        # --- END FIX ---
         "ai_models": {},
         "timeouts": {
             "tmux_poll_seconds": 1, # Shorten for tests
@@ -127,7 +121,6 @@ def test_expand_shell_variables_no_change(shell_engine):
     assert shell_engine.expand_shell_variables("echo no_vars_here") == "echo no_vars_here"
 
 # --- Tests for sanitize_and_validate ---
-# These test cases should now pass with the corrected fixture.
 sanitize_test_cases = [
     # Safe commands
     ("ls -l /some/path", "ls -l /some/path"),
@@ -157,18 +150,15 @@ sanitize_test_cases = [
 def test_sanitize_and_validate(shell_engine, command, expected_output):
     original_input = f"Original input for: {command}"
     
-    # The shell_engine fixture now has the correct config
     result = shell_engine.sanitize_and_validate(command, original_input)
     assert result == expected_output
 
-    # Verify that a UI message is shown ONLY when a command is blocked
     if expected_output is None:
         shell_engine.ui_manager.append_output.assert_called_with(
             f"🛡️ Command blocked by security pattern: {command}",
             style_class='security-critical'
         )
     else:
-        # Ensure no security block message was called for safe commands
         for call in shell_engine.ui_manager.append_output.call_args_list:
             args, kwargs = call
             assert not (args[0].startswith("🛡️ Command blocked by security pattern:") and \
@@ -231,11 +221,16 @@ async def test_handle_cd_command_home_dir(shell_engine):
 
 @pytest.mark.asyncio
 async def test_execute_shell_command_success_with_output(shell_engine):
+    """
+    FIXED TEST: This test now correctly asserts the two-call behavior of append_output
+    for simple, direct commands.
+    """
     mock_process = AsyncMock()
     mock_process.communicate.return_value = (b"Hello from stdout\n", b"")
     mock_process.returncode = 0
 
     with patch('asyncio.create_subprocess_shell', return_value=mock_process) as mock_sub_shell:
+        # We simulate a direct command where original_user_input_display is the same as the command.
         await shell_engine.execute_shell_command("echo hello", "echo hello")
         
         mock_sub_shell.assert_called_once_with(
@@ -244,9 +239,18 @@ async def test_execute_shell_command_success_with_output(shell_engine):
             stderr=asyncio.subprocess.PIPE,
             cwd=shell_engine.current_directory
         )
-        shell_engine.ui_manager.append_output.assert_called_once_with(
-            "Output from 'echo hello':\nHello from stdout"
-        )
+        
+        # Define the expected calls
+        expected_calls = [
+            call("$ echo hello", style_class='executing'), # First call: prints the command
+            call("Hello from stdout")                     # Second call: prints the output
+        ]
+        
+        # Assert that the mock was called with this sequence
+        shell_engine.ui_manager.append_output.assert_has_calls(expected_calls)
+        # Verify exactly two calls were made
+        assert shell_engine.ui_manager.append_output.call_count == 2
+
 
 @pytest.mark.asyncio
 async def test_execute_shell_command_failure_with_stderr(shell_engine):
@@ -257,11 +261,17 @@ async def test_execute_shell_command_failure_with_stderr(shell_engine):
     with patch('asyncio.create_subprocess_shell', return_value=mock_process):
         await shell_engine.execute_shell_command("nonexistent_cmd", "nonexistent_cmd")
         
+        # Check for the initial command echo
+        shell_engine.ui_manager.append_output.assert_any_call(
+            "$ nonexistent_cmd", style_class='executing'
+        )
+        # Check for the stderr output
         shell_engine.ui_manager.append_output.assert_any_call(
             "Stderr from 'nonexistent_cmd':\nError: command not found", style_class='warning'
         )
         # Check that the specific "exited with code" message is NOT present when stderr exists
         assert not any("exited with code" in call.args[0] for call in shell_engine.ui_manager.append_output.call_args_list if 'warning' in call.kwargs.get('style_class', ''))
+
 
 @pytest.mark.asyncio
 async def test_execute_shell_command_empty_command(shell_engine):
