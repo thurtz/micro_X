@@ -3,6 +3,8 @@
   "/command": "/utils command",
   "/config": "/utils config_manager",
   "/dev": "/utils dev",
+  "/help": "/utils help",
+  "help": "/utils help",
   "/list": "/utils list_scripts",
   "/ollama": "/utils ollama_cli",
   "/snapshot": "/utils generate_snapshot",

@@ -394,46 +394,6 @@ class ShellEngine:
             append_output_func(f"❌ Unexpected error interacting with tmux: {e}", style_class='error')
             logger.exception(f"Unexpected error during tmux interaction: {e}")
 
-    def _display_general_help(self):
-        """Displays the general help message in the UI."""
-        if not self.ui_manager: logger.error("display_general_help: UIManager not initialized."); return
-        help_text_styled = [
-            ('class:help-title', "micro_X AI-Enhanced Shell - Help\n\n"),
-            ('class:help-text', "Welcome to micro_X! An intelligent shell that blends traditional command execution with AI capabilities.\n"),
-            ('class:help-header', "\nAvailable Commands:\n"),
-            ('class:help-command', "  /ai <query>              "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
-            ('class:help-example', "                           Example: /ai list all text files in current folder\n"),
-            ('class:help-command', "  /run <script> [args]     "), ('class:help-description', "- Run a custom script from the 'user_scripts' directory.\n"),
-            ('class:help-example', "                           Type '/run list' or '/run <script_name> help' for details.\n"),
-            ('class:help-command', "  /command <subcommand>    "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
-            ('class:help-example', "                           Type '/command help' for detailed options.\n"),
-            ('class:help-command', "  /config <subcommand>     "), ('class:help-description', "- Manage runtime AI configuration (e.g., temperature).\n"),
-            ('class:help-example', "                           Type '/config help' for detailed options.\n"),
-            ('class:help-command', "  /ollama <subcommand>     "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"),
-            ('class:help-example', "                           Type '/ollama help' for detailed options.\n"),
-            ('class:help-command', "  /utils <script> [args]   "), ('class:help-description', "- Run a built-in utility script from the 'utils' directory.\n"),
-            ('class:help-example', "                           Type '/utils list' or '/utils <script_name> help' for details.\n"),
-            ('class:help-command', "  /update                  "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
-            ('class:help-command', "  /help                    "), ('class:help-description', "- Display this help message.\n"),
-            ('class:help-command', "  exit | quit              "), ('class:help-description', "- Exit the micro_X shell.\n"),
-            ('class:help-header', "\nDirect Commands:\n"),
-            ('class:help-text', "  You can type standard Linux commands directly (e.g., 'ls -l', 'cd my_folder').\n"),
-            ('class:help-text', "  Unknown commands will trigger an interactive categorization flow.\n"),
-            ('class:help-text', "  AI-generated commands will prompt for confirmation (with categorization options) before execution.\n"),
-            ('class:help-header', "\nKeybindings:\n"),
-            ('class:help-text', "  Common keybindings are displayed at the bottom of the screen.\n"),
-            ('class:help-text', "  Ctrl+C / Ctrl+D: Exit micro_X or cancel current categorization/confirmation/edit.\n"),
-            ('class:help-text', "  Ctrl+N: Insert a newline in the input field.\n"),
-            ('class:help-header', "\nConfiguration:\n"),
-            ('class:help-text', "  AI models and some behaviors can be customized in 'config/user_config.json'.\n"),
-            ('class:help-text', "  Command categorizations are saved in 'config/user_command_categories.json'.\n"),
-            ('class:help-text', "  Command history: '.micro_x_history'.\n"),
-            ('class:help-text', "\nHappy shelling!\n")
-        ]
-        help_output_string = "".join([text for _, text in help_text_styled])
-        self.ui_manager.append_output(help_output_string, style_class='help-base')
-        logger.info("Displayed general help.")
-
     async def _handle_script_command_async(self, full_command_str: str, script_dir_path: str, script_dir_name: str, command_name: str):
         """Generic handler for executing scripts from a specified directory (e.g., utils or user_scripts)."""
         if not self.ui_manager:
@@ -537,9 +497,7 @@ class ShellEngine:
         # --- END ALIAS EXPANSION ---
 
         logger.info(f"ShellEngine.handle_built_in_command received: '{user_input_stripped}'")
-        if user_input_stripped.lower() in {"/help", "help"}:
-            self._display_general_help(); return True
-        elif user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
+        if user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
             self.ui_manager.append_output("Exiting micro_X Shell 🚪", style_class='info')
             logger.info("Exit command received from built-in handler.")
             if self.main_exit_app_ref: self.main_exit_app_ref()

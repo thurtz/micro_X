@@ -94,6 +94,7 @@ FILES_TO_INCLUDE = [
     "utils/dev.py",
     "utils/generate_snapshot.py", # Include self
     "utils/generate_tree.py",
+    "utils/help.py",
     "utils/install_requirements.py",
     "utils/list_scripts.py",
     "utils/ollama_cli.py",
