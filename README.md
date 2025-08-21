@@ -66,7 +66,7 @@ micro\_X provides a text-based user interface (TUI) where you can:
 It is recommended that all users start by cloning and setting up the main branch for the most stable experience.
 
 1. Clone the Repository:  
-   git clone https://github.com/thurtz/micro\_X.git  
+   git clone https://github.com/thurtz/micro_X.git  
    cd micro\_X  
 2. Make the Setup Script Executable:  
    chmod \+x setup.sh  
@@ -129,6 +129,7 @@ The project is in an excellent state, and the following points are minor suggest
 
 * **Configuration File Format**: The configuration files \(e.g., default\_config.json\) now support comments \(like JSONC\) for better self\-documentation, even while retaining the .json extension. A future migration to a more structured format like TOML is still being considered for long\-term maintainability.
 * **Dependency Injection**: In main.py, module references are passed to the ShellEngine. A slightly cleaner pattern could be to pass fully initialized instances of the managers. This is a minor stylistic point with no impact on current functionality.
+* **TUI Rendering Robustness**: Users may occasionally observe visual artifacts \(such as excessive whitespace or leftover characters\) when output occurs to the output field in the micro\_X terminal window or scrolling is performed. This is a common challenge in TUI development. Future work could focus on hardening the UI redraw and screen clearing logic in the ui\_manager to ensure a smoother rendering experience across all terminal emulators and conditions. Resizing the terminal window appears to refresh the screen resulting in an acceptable visual state without visual artifacts.
 
 Contributions, bug reports, and feature requests are welcome\! Please open an issue or pull request on the GitHub repository.  
 This README was drafted with the assistance of an AI and subsequently updated based on project evolution.
