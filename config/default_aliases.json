@@ -1,0 +1,14 @@
+{
+  "/alias": "/utils alias",
+  "/command": "/utils command",
+  "/config": "/utils config_manager",
+  "/dev": "/utils dev",
+  "/help": "/utils help",
+  "help": "/utils help",
+  "/list": "/utils list_scripts",
+  "/ollama": "/utils ollama_cli",
+  "/snapshot": "/utils generate_snapshot",
+  "/tree": "/utils generate_tree",
+  "/update": "/utils update",
+  "/setup_brew": "python utils/setup_brew.py"
+}
