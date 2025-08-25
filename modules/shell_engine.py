@@ -96,7 +96,7 @@ def _set_nested_config(config_dict, key_path, new_value):
         if key in d and not isinstance(d[key], dict):
             return False, f"Path conflict: '{key}' is not a dictionary."
         d = d.setdefault(key, {})
-    
+
     d[keys[-1]] = new_value
     return True, None # Success
 
@@ -127,19 +127,25 @@ class ShellEngine:
         self.git_context_manager_instance = git_context_manager_instance
 
         self.current_directory = os.getcwd()
-        
+
         module_file_path = os.path.abspath(__file__)
         modules_dir_path = os.path.dirname(module_file_path)
         self.PROJECT_ROOT = os.path.dirname(modules_dir_path)
         if not (os.path.exists(os.path.join(self.PROJECT_ROOT, "main.py")) or \
                 os.path.exists(os.path.join(self.PROJECT_ROOT, ".git"))):
-            logger.warning(f"ShellEngine inferred PROJECT_ROOT as {self.PROJECT_ROOT}. If incorrect, pass explicitly or improve detection.")
+            logger.warning(f"ShellEngine inferred PROJECT_ROOT as {self.PROJECT_ROOT}.\nIf incorrect, pass explicitly or improve detection.")
 
         self.REQUIREMENTS_FILENAME = "requirements.txt"
         self.REQUIREMENTS_FILE_PATH = os.path.join(self.PROJECT_ROOT, self.REQUIREMENTS_FILENAME)
         self.UTILS_DIR_NAME = "utils"
         self.UTILS_DIR_PATH = os.path.join(self.PROJECT_ROOT, self.UTILS_DIR_NAME)
+        self.USER_SCRIPTS_DIR_NAME = "user_scripts"
+        self.USER_SCRIPTS_DIR_PATH = os.path.join(self.PROJECT_ROOT, self.USER_SCRIPTS_DIR_NAME)
         self.USER_CONFIG_FILE_PATH = os.path.join(self.PROJECT_ROOT, "config", "user_config.json")
+        self.DEFAULT_ALIASES_FILE_PATH = os.path.join(self.PROJECT_ROOT, "config", "default_aliases.json")
+        self.USER_ALIASES_FILE_PATH = os.path.join(self.PROJECT_ROOT, "config", "user_aliases.json")
+        self.aliases = self._load_and_merge_aliases()
+
 
         logger.info(f"ShellEngine initialized. Developer Mode: {self.is_developer_mode}")
         if self.git_context_manager_instance:
@@ -148,6 +154,30 @@ class ShellEngine:
             logger.info("ShellEngine received main_normal_input_accept_handler_ref.")
         else:
             logger.warning("ShellEngine did NOT receive main_normal_input_accept_handler_ref. Edit mode might not work correctly.")
+
+    def _load_single_alias_file(self, file_path):
+        """Loads a single alias file."""
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                logger.error(f"Error loading alias file {os.path.basename(file_path)}: {e}")
+                self.ui_manager.append_output(f"⚠️ Could not load {os.path.basename(file_path)}: {e}", style_class='warning')
+        return {}
+
+    def _load_and_merge_aliases(self):
+        """Loads default and user aliases, with user aliases taking precedence."""
+        default_aliases = self._load_single_alias_file(self.DEFAULT_ALIASES_FILE_PATH)
+        user_aliases = self._load_single_alias_file(self.USER_ALIASES_FILE_PATH)
+        merged_aliases = {**default_aliases, **user_aliases}
+        logger.info(f"Loaded {len(default_aliases)} default and {len(user_aliases)} user aliases, resulting in {len(merged_aliases)} total active aliases.")
+        return merged_aliases
+
+    def _reload_aliases(self):
+        """Reloads aliases from the file, typically after the alias utility is run."""
+        self.aliases = self._load_and_merge_aliases()
+        logger.info("Aliases reloaded.")
 
 
     def expand_shell_variables(self, command_string: str) -> str:
@@ -165,22 +195,16 @@ class ShellEngine:
         Performs basic sanitization and validation of commands.
         Returns the command if safe, None if blocked.
         """
-        dangerous_patterns = [
-            r'\brm\s+(?:-[a-zA-Z0-9]*f[a-zA-Z0-9]*|-f[a-zA-Z0-9]*)\s+/(?!(?:tmp|var/tmp)\b)\S*',
-            r'\brm\s+(?:-[a-zA-Z0-9]*f[a-zA-Z0-9]*|-f[a-zA-Z0-9]*)\s+/\s*(?:$|\.\.?\s*$|\*(?:\s.*|$))',
-            r'\bmkfs\b',
-            r'\bdd\b\s+if=/dev/random',
-            r'\bdd\b\s+if=/dev/zero',
-            r'\b(shutdown|reboot|halt|poweroff)\b',
-            r'>\s*/dev/sd[a-z]+',
-            r':\(\)\{:\|:&};:',
-            r'\b(wget|curl)\s+.*\s*\|\s*(sh|bash|python|perl)\b'
-        ]
+        dangerous_patterns = self.config.get("security", {}).get("dangerous_patterns", [])
         for pattern in dangerous_patterns:
-            if re.search(pattern, command):
-                logger.warning(f"DANGEROUS command blocked (matched pattern '{pattern}'): '{command}' (original input: '{original_input_for_log}')")
-                self.ui_manager.append_output(f"🛡️ Command blocked for security: {command}", style_class='security-critical')
-                return None
+            try:
+                if re.search(pattern, command):
+                    logger.warning(f"DANGEROUS command blocked (matched pattern '{pattern}'): '{command}' (original input: '{original_input_for_log}')")
+                    self.ui_manager.append_output(f"🛡️ Command blocked by security pattern: {command}", style_class='security-critical')
+                    return None
+            except re.error as e:
+                logger.error(f"Invalid regex pattern in security config: '{pattern}'. Error: {e}")
+                self.ui_manager.append_output(f"⚠️ Invalid security regex pattern in config: '{pattern}'.", style_class='warning')
         return command
 
     async def handle_cd_command(self, full_cd_command: str):
@@ -192,9 +216,9 @@ class ShellEngine:
         try:
             parts = full_cd_command.split(" ", 1)
             target_dir_str = parts[1].strip() if len(parts) > 1 else "~"
-            
+
             expanded_dir_arg = os.path.expanduser(os.path.expandvars(target_dir_str))
-            
+
             if os.path.isabs(expanded_dir_arg):
                 new_dir_abs = expanded_dir_arg
             else:
@@ -235,13 +259,30 @@ class ShellEngine:
                 cwd=self.current_directory
             )
             stdout, stderr = await process.communicate()
-            output_prefix = f"Output from '{original_user_input_display}':\n"
+
+            show_verbose_prefix = command_to_execute.strip() != original_user_input_display.strip()
+
+            # --- START OF CHANGE ---
+            if not show_verbose_prefix:
+                # For direct simple commands, always print the prompt line first.
+                append_output_func(f"$ {original_user_input_display}", style_class='executing')
+
             if stdout:
-                append_output_func(f"{output_prefix}{stdout.decode(errors='replace').strip()}")
+                if show_verbose_prefix:
+                    # For AI/aliased commands, use the descriptive prefix
+                    append_output_func(f"Output from '{original_user_input_display}':\n{stdout.decode(errors='replace').strip()}")
+                else:
+                    # For direct commands, the prompt is already printed, so just print the output.
+                    append_output_func(stdout.decode(errors='replace').strip())
+            # --- END OF CHANGE ---
+
             if stderr:
                 append_output_func(f"Stderr from '{original_user_input_display}':\n{stderr.decode(errors='replace').strip()}", style_class='warning')
+            
             if not stdout and not stderr and process.returncode == 0:
-                append_output_func(f"{output_prefix}(No output)", style_class='info')
+                if show_verbose_prefix:
+                    append_output_func(f"Output from '{original_user_input_display}': (No output)", style_class='info')
+                # If not show_verbose_prefix, the prompt was already printed, and we do nothing else, which is correct.
             
             if process.returncode != 0:
                 logger.warning(f"Command '{command_to_execute}' exited with code {process.returncode}")
@@ -278,14 +319,15 @@ class ShellEngine:
                 with tempfile.NamedTemporaryFile(mode='w+', delete=True, encoding='utf-8', errors='ignore') as temp_log_file:
                     log_path = temp_log_file.name
                     logger.debug(f"Using platform-agnostic temporary file for tmux log: {log_path}")
-                
+
                     # Use shlex.quote for robust command escaping
                     escaped_command_str = shlex.quote(command_to_execute)
-                    
+
                     # The command for tmux to run in a shell. It executes the user's command,
                     # tees stdout/stderr to a log, and sleeps briefly to ensure the pane is visible.
                     wrapped_command = f"bash -c {escaped_command_str} |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
-                    
+                    #wrapped_command = f"bash -c 'source ~/.bashrc && {command_to_execute}' |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
+
                     tmux_cmd_list_launch = ["tmux", "new-window", "-n", window_name, wrapped_command]
                     logger.info(f"Launching semi_interactive tmux: {' '.join(tmux_cmd_list_launch)} (log: {log_path})")
 
@@ -303,7 +345,7 @@ class ShellEngine:
 
                     append_output_func(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output (max {tmux_poll_timeout}s)...", style_class='info')
                     if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
-                    
+
                     start_time = asyncio.get_event_loop().time()
                     window_closed_or_cmd_done = False
 
@@ -321,14 +363,14 @@ class ShellEngine:
                         except Exception as tmux_err:
                             logger.warning(f"Error checking tmux windows: {tmux_err}")
                             window_closed_or_cmd_done = True; break
-                    
+
                     if not window_closed_or_cmd_done:
                         append_output_func(f"⚠️ Tmux window '{window_name}' poll timed out. Output might be incomplete or window still running.", style_class='warning')
                         logger.warning(f"Tmux poll for '{window_name}' timed out.")
-                    
+
                     temp_log_file.seek(0)
                     output_content = temp_log_file.read().strip()
-                    
+
                     tui_line_threshold = self.config.get('behavior', {}).get('tui_detection_line_threshold_pct', 30.0)
                     tui_char_threshold = self.config.get('behavior', {}).get('tui_detection_char_threshold_pct', 3.0)
 
@@ -344,6 +386,7 @@ class ShellEngine:
             else: # "interactive_tui"
                 # For interactive commands, wrap in 'bash -c' to handle complex commands consistently.
                 tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", command_to_execute]
+                #tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", f"source ~/.bashrc && {command_to_execute}"]
                 logger.info(f"Launching interactive_tui tmux: {' '.join(shlex.quote(s) for s in tmux_cmd_list)}")
                 append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait for it to complete or be detached.", style_class='info')
                 if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
@@ -368,351 +411,110 @@ class ShellEngine:
             append_output_func(f"❌ Unexpected error interacting with tmux: {e}", style_class='error')
             logger.exception(f"Unexpected error during tmux interaction: {e}")
 
-    def _get_file_hash(self, filepath):
-        """Calculates SHA256 hash of a file."""
-        if not os.path.exists(filepath): return None
-        hasher = hashlib.sha256()
-        try:
-            with open(filepath, 'rb') as f:
-                while chunk := f.read(8192):
-                    hasher.update(chunk)
-            return hasher.hexdigest()
-        except Exception as e:
-            logger.error(f"Error hashing file {filepath}: {e}", exc_info=True)
-            return None
-
-    async def _handle_update_command(self):
-        """Handles the /update command to pull changes from git."""
-        if not self.ui_manager: logger.error("handle_update_command: UIManager not initialized."); return
-        self.ui_manager.append_output("🔄 Checking for updates...", style_class='info')
-        logger.info("Update command received.")
-        current_app_inst = self.ui_manager.get_app_instance()
-        if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
-
-        if not shutil.which("git"):
-            self.ui_manager.append_output("❌ Update failed: 'git' not found in PATH.", style_class='error')
-            logger.error("Update failed: git not found."); return
-
-        original_req_hash = self._get_file_hash(self.REQUIREMENTS_FILE_PATH)
-        requirements_changed = False
-        try:
-            branch_process_result = await asyncio.to_thread(subprocess.run,
-                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
-                cwd=self.PROJECT_ROOT, capture_output=True, text=True, check=True, errors='replace'
-            )
-            current_branch = branch_process_result.stdout.strip()
-            self.ui_manager.append_output(f"ℹ️ On branch: '{current_branch}'. Fetching updates from 'origin/{current_branch}'...", style_class='info')
-            logger.info(f"Current git branch: {current_branch}")
-            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
-
-            pull_process_result = await asyncio.to_thread(subprocess.run,
-                ['git', 'pull', 'origin', current_branch],
-                cwd=self.PROJECT_ROOT, capture_output=True, text=True, errors='replace'
-            )
-            if pull_process_result.returncode == 0:
-                self.ui_manager.append_output(f"✅ Git pull successful.\nOutput:\n{pull_process_result.stdout.strip()}", style_class='success')
-                logger.info(f"Git pull output: {pull_process_result.stdout.strip()}")
-                if "Already up to date." in pull_process_result.stdout:
-                    self.ui_manager.append_output("✅ micro_X is up to date.", style_class='success')
-                else:
-                    self.ui_manager.append_output("✅ Updates downloaded.", style_class='success')
-                    new_req_hash = self._get_file_hash(self.REQUIREMENTS_FILE_PATH)
-                    if original_req_hash != new_req_hash:
-                        requirements_changed = True
-                        self.ui_manager.append_output("⚠️ requirements.txt changed.", style_class='warning')
-                        logger.info("requirements.txt changed.")
-                    self.ui_manager.append_output("💡 Restart micro_X for changes to take effect.", style_class='info')
-                    if requirements_changed:
-                        self.ui_manager.append_output(f"💡 After restart, consider updating dependencies if not handled automatically:\n  cd \"{self.PROJECT_ROOT}\"\n  source .venv/bin/activate\n  pip install -r {self.REQUIREMENTS_FILENAME}", style_class='info')
-            else:
-                self.ui_manager.append_output(f"❌ Git pull failed.\nError:\n{pull_process_result.stderr.strip()}", style_class='error')
-                logger.error(f"Git pull failed. Stderr: {pull_process_result.stderr.strip()}")
-        except subprocess.CalledProcessError as e:
-            self.ui_manager.append_output(f"❌ Update failed: git error during branch detection.\n{e.stderr}", style_class='error')
-            logger.error(f"Update git error (branch detection): {e}", exc_info=True)
-        except FileNotFoundError:
-            self.ui_manager.append_output("❌ Update failed: 'git' command not found.", style_class='error')
-            logger.error("Update failed: git not found (unexpected).")
-        except Exception as e:
-            self.ui_manager.append_output(f"❌ Unexpected error during update: {e}", style_class='error')
-            logger.error(f"Unexpected update error: {e}", exc_info=True)
-        finally:
-            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
-
-    async def _handle_config_command(self, user_input_parts: list):
-        """Handles the /config command for runtime configuration management."""
-        append_output_func = self.ui_manager.append_output
-        cmd_help = (
-            "ℹ️ /config usage:\n"
-            "  list                         - Show current models and their specific AI options.\n"
-            "  get <key.path>               - Get a config value (e.g., ai_models.primary_translator.options.temperature).\n"
-            "  set <key.path> <value>       - Set a config value (e.g., set ai_models.validator.options.temperature 0.1).\n"
-            "  save                         - Save current AI model configurations to user_config.json.\n"
-            "  help                         - Show this help message."
-        )
-
-        if len(user_input_parts) < 2 or user_input_parts[1].lower() == 'help':
-            append_output_func(cmd_help, style_class='help-base')
+    async def _handle_script_command_async(self, full_command_str: str, script_dir_path: str, script_dir_name: str, command_name: str):
+        """Generic handler for executing scripts from a specified directory (e.g., utils or user_scripts)."""
+        if not self.ui_manager:
+            logger.error(f"Cannot handle /{command_name}: UIManager not initialized.")
             return
 
-        subcommand = user_input_parts[1].lower()
+        logger.info(f"Handling /{command_name} command: {full_command_str}")
 
-        if subcommand == 'list':
-            ai_models_config = self.config.get("ai_models", {})
-            append_output_func("Current AI Model Configurations:", style_class='info-header')
-            if ai_models_config:
-                for role, settings in ai_models_config.items():
-                    append_output_func(f"\n🔹 {role}:", style_class='info-subheader')
-                    # *** FIX: Handle both old string format and new dict format ***
-                    if isinstance(settings, dict):
-                        model_name = settings.get('model', 'N/A')
-                        options = settings.get('options')
-                        append_output_func(f"  - model: {model_name}", style_class='info-item')
-                        if options:
-                            append_output_func(f"  - options:", style_class='info-item')
-                            for key, val in options.items():
-                                append_output_func(f"    - {key}: {json.dumps(val)}", style_class='info-item')
-                        else:
-                            append_output_func(f"  - options: (Using Ollama model defaults)", style_class='info-item-empty')
-                    elif isinstance(settings, str):
-                        model_name = settings
-                        append_output_func(f"  - model: {model_name}", style_class='info-item')
-                        append_output_func(f"  - options: (Using Ollama model defaults)", style_class='info-item-empty')
-                    else:
-                        append_output_func(f"  (Invalid configuration for this role)", style_class='error')
+        try:
+            parts = shlex.split(full_command_str)
+        except ValueError as e:
+            self.ui_manager.append_output(f"❌ Error parsing /{command_name} command: {e}", style_class='error')
+            logger.warning(f"shlex error for /{command_name} '{full_command_str}': {e}")
+            return
+
+        help_message = f"ℹ️ Usage: /{command_name} <script_name> [args... | help | -h | --help] | list"
+        if len(parts) < 2:
+            self.ui_manager.append_output(help_message, style_class='info')
+            return
+
+        subcommand = parts[1]
+
+        # --- UNIFIED LISTING LOGIC ---
+        if subcommand.lower() == "list":
+            # Always run the list_scripts.py utility from the utils directory
+            list_script_path = os.path.join(self.UTILS_DIR_PATH, "list_scripts.py")
+            if not os.path.isfile(list_script_path):
+                self.ui_manager.append_output("❌ Error: The 'list_scripts.py' utility is missing.", style_class='error')
+                return
+
+            # Formulate the command to run the unified lister
+            list_command_str = f"/utils list_scripts"
+            # Re-enter the command handling logic with the new command
+            await self._handle_utils_command_async(list_command_str)
+            return
+        # --- END UNIFIED LISTING LOGIC ---
+
+        script_path = os.path.join(script_dir_path, f"{subcommand}.py")
+        if not os.path.isfile(script_path):
+            self.ui_manager.append_output(f"❌ Script not found: {subcommand}.py in '{script_dir_name}'.", style_class='error')
+            return
+
+        args_for_script = parts[2:]
+        command_to_execute = [sys.executable, script_path] + args_for_script
+
+        self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute)}", style_class='info')
+        try:
+            process = await asyncio.to_thread(
+                subprocess.run, command_to_execute, capture_output=True, text=True, cwd=self.PROJECT_ROOT, check=False
+            )
+            if process.stdout:
+                self.ui_manager.append_output(f"Output from '{subcommand}.py':\n{process.stdout.strip()}")
+            if process.stderr:
+                self.ui_manager.append_output(f"Stderr from '{subcommand}.py':\n{process.stderr.strip()}", style_class='warning')
+            if process.returncode != 0:
+                self.ui_manager.append_output(f"⚠️ Script '{subcommand}.py' exited with code {process.returncode}.", style_class='warning')
             else:
-                append_output_func("  (No AI models configured)", style_class='warning')
+                self.ui_manager.append_output(f"✅ Script '{subcommand}.py' completed.", style_class='success')
 
-        elif subcommand == 'get':
-            if len(user_input_parts) != 3:
-                append_output_func("❌ Usage: /config get <key.path>", style_class='error'); return
-            key_path = user_input_parts[2]
-            value = _get_nested_config(self.config, key_path)
-            if value is not None:
-                append_output_func(f"{key_path}: {json.dumps(value, indent=2)}", style_class='info')
-            else:
-                append_output_func(f"❌ Key '{key_path}' not found.", style_class='error')
-
-        elif subcommand == 'set':
-            if len(user_input_parts) < 4:
-                append_output_func("❌ Usage: /config set <key.path> <value>", style_class='error'); return
-            key_path, new_value_str = user_input_parts[2], ' '.join(user_input_parts[3:])
-            if not (key_path.startswith("ai_models.") and (".model" in key_path or ".options." in key_path)):
-                 append_output_func("❌ For safety, only model names and options can be set at runtime.", style_class='error'); return
-            try: typed_value = int(new_value_str)
-            except ValueError:
-                try: typed_value = float(new_value_str)
-                except ValueError:
-                    if new_value_str.lower() == 'true': typed_value = True
-                    elif new_value_str.lower() == 'false': typed_value = False
-                    else: typed_value = new_value_str
-            success, error_msg = _set_nested_config(self.config, key_path, typed_value)
-            if success: append_output_func(f"✅ Set '{key_path}' to {json.dumps(typed_value)}. (Not saved yet)", style_class='success')
-            else: append_output_func(f"❌ {error_msg}", style_class='error')
-
-        elif subcommand == 'save':
-            user_config = {}
-            try:
-                if os.path.exists(self.USER_CONFIG_FILE_PATH):
-                    with open(self.USER_CONFIG_FILE_PATH, 'r') as f: user_config = json.load(f)
-            except Exception as e:
-                append_output_func(f"❌ Could not read user_config.json: {e}", style_class='error'); return
-            user_config["ai_models"] = self.config.get("ai_models", {})
-            try:
-                with open(self.USER_CONFIG_FILE_PATH, 'w') as f: json.dump(user_config, f, indent=2)
-                append_output_func(f"✅ AI model configurations saved to {self.USER_CONFIG_FILE_PATH}", style_class='success')
-            except Exception as e:
-                append_output_func(f"❌ Failed to write to user_config.json: {e}", style_class='error')
-        else:
-            append_output_func(f"❌ Unknown /config subcommand: '{subcommand}'\n{cmd_help}", style_class='error')
-
-    def _display_general_help(self):
-        """Displays the general help message in the UI."""
-        if not self.ui_manager: logger.error("display_general_help: UIManager not initialized."); return
-        help_text_styled = [
-            ('class:help-title', "micro_X AI-Enhanced Shell - Help\n\n"),
-            ('class:help-text', "Welcome to micro_X! An intelligent shell that blends traditional command execution with AI capabilities.\n"),
-            ('class:help-header', "\nAvailable Commands:\n"),
-            ('class:help-command', "  /ai <query>              "), ('class:help-description', "- Translate natural language <query> into a Linux command.\n"),
-            ('class:help-example', "                           Example: /ai list all text files in current folder\n"),
-            ('class:help-command', "  /command <subcommand>    "), ('class:help-description', "- Manage command categorizations (simple, semi_interactive, interactive_tui).\n"),
-            ('class:help-example', "                           Type '/command help' for detailed options.\n"),
-            ('class:help-command', "  /config <subcommand>     "), ('class:help-description', "- Manage runtime AI configuration (e.g., temperature).\n"),
-            ('class:help-example', "                           Type '/config help' for detailed options.\n"),
-            ('class:help-command', "  /ollama <subcommand>     "), ('class:help-description', "- Manage the Ollama service (start, stop, restart, status).\n"),
-            ('class:help-example', "                           Type '/ollama help' for detailed options.\n"),
-            ('class:help-command', "  /utils <script> [args]   "), ('class:help-description', "- Run a utility script from the 'utils' directory.\n"),
-            ('class:help-example', "                           Type '/utils list' or '/utils <script_name> help' for details.\n"),
-            ('class:help-command', "  /update                  "), ('class:help-description', "- Check for and download updates for micro_X from its repository.\n"),
-            ('class:help-command', "  /help                    "), ('class:help-description', "- Display this help message.\n"),
-            ('class:help-command', "  exit | quit              "), ('class:help-description', "- Exit the micro_X shell.\n"),
-            ('class:help-header', "\nDirect Commands:\n"),
-            ('class:help-text', "  You can type standard Linux commands directly (e.g., 'ls -l', 'cd my_folder').\n"),
-            ('class:help-text', "  Unknown commands will trigger an interactive categorization flow.\n"),
-            ('class:help-text', "  AI-generated commands will prompt for confirmation (with categorization options) before execution.\n"),
-            ('class:help-header', "\nKeybindings:\n"),
-            ('class:help-text', "  Common keybindings are displayed at the bottom of the screen.\n"),
-            ('class:help-text', "  Ctrl+C / Ctrl+D: Exit micro_X or cancel current categorization/confirmation/edit.\n"),
-            ('class:help-text', "  Ctrl+N: Insert a newline in the input field.\n"),
-            ('class:help-header', "\nConfiguration:\n"),
-            ('class:help-text', "  AI models and some behaviors can be customized in 'config/user_config.json'.\n"),
-            ('class:help-text', "  Command categorizations are saved in 'config/user_command_categories.json'.\n"),
-            ('class:help-text', "  Command history: '.micro_x_history'.\n"),
-            ('class:help-text', "\nHappy shelling!\n")
-        ]
-        help_output_string = "".join([text for _, text in help_text_styled])
-        self.ui_manager.append_output(help_output_string, style_class='help-base')
-        logger.info("Displayed general help.")
-
-    def _display_ollama_help(self):
-        """Displays help for the /ollama command."""
-        if not self.ui_manager: logger.error("display_ollama_help: UIManager not initialized."); return
-        help_text = [
-            ("class:help-title", "Ollama Service Management - Help\n"),
-            ("class:help-text", "Use these commands to manage the Ollama service used by micro_X.\n"),
-            ("class:help-header", "\nAvailable /ollama Subcommands:\n"),
-            ("class:help-command", "  /ollama start      "), ("class:help-description", "- Attempts to start the managed Ollama service if not already running.\n"),
-            ("class:help-command", "  /ollama stop       "), ("class:help-description", "- Attempts to stop the managed Ollama service.\n"),
-            ("class:help-command", "  /ollama restart    "), ("class:help-description", "- Attempts to restart the managed Ollama service.\n"),
-            ("class:help-command", "  /ollama status     "), ("class:help-description", "- Shows the current status of the Ollama service and managed session.\n"),
-            ("class:help-command", "  /ollama help       "), ("class:help-description", "- Displays this help message.\n"),
-            ("class:help-text", "\nNote: These commands primarily interact with an Ollama instance managed by micro_X in a tmux session. ")
-        ]
-        help_output_string = "".join([text for _, text in help_text])
-        self.ui_manager.append_output(help_output_string, style_class='help-base')
-        logger.info("Displayed Ollama command help.")
+            if subcommand == 'alias':
+                self._reload_aliases()
+        except Exception as e:
+            self.ui_manager.append_output(f"❌ Failed to execute script: {e}", style_class='error')
 
     async def _handle_utils_command_async(self, full_command_str: str):
-        if not self.ui_manager: logger.error("handle_utils_command_async: UIManager not initialized."); return
-        logger.info(f"Handling /utils command: {full_command_str}")
-        self.ui_manager.append_output("🛠️ Processing /utils command...", style_class='info')
-        current_app_inst = self.ui_manager.get_app_instance()
-        if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
-        try: parts = shlex.split(full_command_str)
-        except ValueError as e:
-            self.ui_manager.append_output(f"❌ Error parsing /utils command: {e}", style_class='error')
-            logger.warning(f"shlex error for /utils '{full_command_str}': {e}")
-            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate(); return
-        
-        utils_help_message = "ℹ️ Usage: /utils <script_name> [args... | help | -h | --help] | list"
-        if len(parts) < 2:
-            self.ui_manager.append_output(utils_help_message, style_class='info')
-            logger.debug("Insufficient arguments for /utils command.")
-            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate(); return
-        
-        subcommand_or_script_name = parts[1]
-        
-        if subcommand_or_script_name.lower() == "list":
-            try:
-                if not os.path.exists(self.UTILS_DIR_PATH) or not os.path.isdir(self.UTILS_DIR_PATH):
-                    self.ui_manager.append_output(f"❌ Utility directory '{self.UTILS_DIR_NAME}' not found at '{self.UTILS_DIR_PATH}'.", style_class='error'); logger.error(f"Utility directory not found: {self.UTILS_DIR_PATH}")
-                    if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate(); return
-                available_scripts = [f[:-3] for f in os.listdir(self.UTILS_DIR_PATH) if os.path.isfile(os.path.join(self.UTILS_DIR_PATH, f)) and f.endswith(".py") and f != "__init__.py"]
-                if available_scripts:
-                    self.ui_manager.append_output("Available utility scripts (run with /utils <script_name> [args... | help]):", style_class='info')
-                    for script_name_no_ext in sorted(available_scripts): self.ui_manager.append_output(f"  - {script_name_no_ext}", style_class='info')
-                else: self.ui_manager.append_output(f"No executable Python utility scripts found in '{self.UTILS_DIR_NAME}'.", style_class='info')
-                logger.info(f"Listed utils scripts: {available_scripts}")
-            except Exception as e: self.ui_manager.append_output(f"❌ Error listing utility scripts: {e}", style_class='error'); logger.error(f"Error listing utility scripts: {e}", exc_info=True)
-            finally:
-                if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate(); return
-        
-        script_name_no_ext = subcommand_or_script_name
-        script_filename = f"{script_name_no_ext}.py"
-        script_path = os.path.join(self.UTILS_DIR_PATH, script_filename)
+        await self._handle_script_command_async(full_command_str, self.UTILS_DIR_PATH, self.UTILS_DIR_NAME, "utils")
 
-        if not os.path.isfile(script_path):
-            self.ui_manager.append_output(f"❌ Utility script not found: {script_filename} in '{self.UTILS_DIR_NAME}' directory.", style_class='error'); logger.warning(f"Utility script not found: {script_path}")
-            self.ui_manager.append_output(utils_help_message, style_class='info')
-            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate(); return
-        
-        args_for_script = parts[2:]
-        command_to_execute_list = [sys.executable, script_path]
-        
-        if script_name_no_ext == "config_manager" and self.git_context_manager_instance:
-            current_branch = await self.git_context_manager_instance.get_current_branch()
-            if current_branch:
-                command_to_execute_list.extend(["--branch", current_branch])
-            else:
-                logger.warning("Could not determine current branch for config_manager utility.")
-                command_to_execute_list.extend(["--branch", "unknown"])
-        
-        is_help_request = False
-        if args_for_script and args_for_script[0].lower() in ["help", "-h", "--help"]:
-            is_help_request = True
-            command_to_execute_list.append("--help")
-        else:
-            command_to_execute_list.extend(args_for_script)
-
-        command_str_for_display = f"{sys.executable} {script_path} {' '.join(args_for_script if not is_help_request else ['--help'])}"
-        
-        if is_help_request:
-            self.ui_manager.append_output(f"📜 Requesting help for utility: {script_name_no_ext}", style_class='info')
-        else:
-            self.ui_manager.append_output(f"🚀 Executing utility: {command_str_for_display}\n    (Working directory: {self.PROJECT_ROOT})", style_class='info')
-        
-        logger.info(f"Executing utility script: {command_to_execute_list} with cwd={self.PROJECT_ROOT}")
-        if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
-        
-        try:
-            process = await asyncio.to_thread(subprocess.run, command_to_execute_list, capture_output=True, text=True, cwd=self.PROJECT_ROOT, check=False, errors='replace')
-            output_prefix = f"Output from '{script_filename}':\n"; has_output = False
-            if process.stdout: self.ui_manager.append_output(f"{output_prefix}{process.stdout.strip()}"); has_output = True
-            if process.stderr: self.ui_manager.append_output(f"Stderr from '{script_filename}':\n{process.stderr.strip()}", style_class='warning'); has_output = True
-            
-            if not has_output and process.returncode == 0 and not is_help_request:
-                self.ui_manager.append_output(f"{output_prefix}(No output)", style_class='info')
-            
-            if process.returncode != 0 and not is_help_request:
-                self.ui_manager.append_output(f"⚠️ Utility '{script_filename}' exited with code {process.returncode}.", style_class='warning')
-                logger.warning(f"Utility script '{script_path}' exited with code {process.returncode}. Args: {args_for_script}")
-            elif not is_help_request and not process.stderr :
-                self.ui_manager.append_output(f"✅ Utility '{script_filename}' completed.", style_class='success')
-            
-            if not is_help_request:
-                logger.info(f"Utility script '{script_path}' completed with code {process.returncode}. Args: {args_for_script}")
-
-        except FileNotFoundError: self.ui_manager.append_output(f"❌ Error: Python interpreter ('{sys.executable}') or script ('{script_filename}') not found.", style_class='error'); logger.error(f"FileNotFoundError executing utility: {command_to_execute_list}", exc_info=True)
-        except Exception as e: self.ui_manager.append_output(f"❌ Unexpected error executing utility '{script_filename}': {e}", style_class='error'); logger.error(f"Error executing utility script '{script_path}': {e}", exc_info=True)
-        finally:
-            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
-
-    async def _handle_ollama_command_async(self, user_input_parts: list):
-        if not self.ui_manager: logger.error("handle_ollama_command_async: UIManager not initialized."); return
-        append_output_func = self.ui_manager.append_output
-        logger.info(f"Handling /ollama command: {user_input_parts}")
-        if len(user_input_parts) < 2: self._display_ollama_help(); return
-        
-        subcommand = user_input_parts[1].lower()
-        if subcommand == "start":
-            append_output_func("⚙️ Attempting to start Ollama service...", style_class='info')
-            success = await self.ollama_manager_module.explicit_start_ollama_service(self.config, append_output_func)
-            if success:
-                append_output_func("✅ Ollama service start process initiated. Check status shortly.", style_class='success')
-                await self.ollama_manager_module.ensure_ollama_service(self.config, append_output_func)
-            else: append_output_func("❌ Ollama service start process failed.", style_class='error')
-        elif subcommand == "stop":
-            append_output_func("⚙️ Attempting to stop Ollama service...", style_class='info')
-            success = await self.ollama_manager_module.explicit_stop_ollama_service(self.config, append_output_func)
-            if success: append_output_func("✅ Ollama service stop process initiated.", style_class='success')
-            else: append_output_func("❌ Ollama service stop process failed.", style_class='error')
-        elif subcommand == "restart":
-            append_output_func("⚙️ Attempting to restart Ollama service...", style_class='info')
-            success = await self.ollama_manager_module.explicit_restart_ollama_service(self.config, append_output_func)
-            if success:
-                append_output_func("✅ Ollama service restart process initiated. Check status shortly.", style_class='success')
-                await self.ollama_manager_module.ensure_ollama_service(self.config, append_output_func)
-            else: append_output_func("❌ Ollama service restart process failed.", style_class='error')
-        elif subcommand == "status": await self.ollama_manager_module.get_ollama_status_info(self.config, append_output_func)
-        elif subcommand == "help": self._display_ollama_help()
-        else: append_output_func(f"❌ Unknown /ollama subcommand: '{subcommand}'.", style_class='error'); logger.warning(f"Unknown /ollama subcommand: {subcommand}")
+    async def _handle_user_script_command_async(self, full_command_str: str):
+        await self._handle_script_command_async(full_command_str, self.USER_SCRIPTS_DIR_PATH, self.USER_SCRIPTS_DIR_NAME, "run")
 
     async def handle_built_in_command(self, user_input: str) -> bool:
         user_input_stripped = user_input.strip()
+
+        # --- ALIAS EXPANSION ---
+        try:
+            input_parts = shlex.split(user_input_stripped)
+            alias_name = input_parts[0] if input_parts else ""
+            if alias_name in self.aliases:
+                expanded_command = self.aliases[alias_name]
+                remaining_args = input_parts[1:]
+                # Simple append, for more complex logic (e.g., placeholders) this would need enhancement
+                final_command = f"{expanded_command} {' '.join(shlex.quote(arg) for arg in remaining_args)}".strip()
+
+                self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
+                user_input_stripped = final_command
+
+                # --- FIX START: Immediate execution for categorized aliases ---
+                # After expanding an alias, immediately check if the result is a known, categorized command.
+                # If it is, we can execute it directly and bypass the "unknown command" logic (AI validation).
+                category = self.category_manager_module.classify_command(final_command)
+                if category != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
+                    logger.info(f"Alias '{alias_name}' expanded to categorized command '{final_command}'. Executing directly.")
+                    # We use the original user input (the alias itself) for display purposes.
+                    await self.process_command(final_command, user_input.strip())
+                    return True # IMPORTANT: Return True to signify the command was fully handled.
+                # --- FIX END ---
+
+        except ValueError:
+            # shlex failed, proceed with original input
+            pass
+        # --- END ALIAS EXPANSION ---
+
         logger.info(f"ShellEngine.handle_built_in_command received: '{user_input_stripped}'")
-        if user_input_stripped.lower() in {"/help", "help"}:
-            self._display_general_help(); return True
-        elif user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
+        if user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
             self.ui_manager.append_output("Exiting micro_X Shell 🚪", style_class='info')
             logger.info("Exit command received from built-in handler.")
             if self.main_exit_app_ref: self.main_exit_app_ref()
@@ -720,32 +522,13 @@ class ShellEngine:
                 app_instance = self.ui_manager.get_app_instance()
                 if app_instance and app_instance.is_running: app_instance.exit()
             return True
-        elif user_input_stripped.lower() == "/update":
-            await self._handle_update_command(); return True
         elif user_input_stripped.startswith("/utils"):
             await self._handle_utils_command_async(user_input_stripped); return True
-        elif user_input_stripped.startswith("/ollama"):
-            try:
-                parts = user_input_stripped.split()
-                await self._handle_ollama_command_async(parts)
-            except Exception as e:
-                self.ui_manager.append_output(f"❌ Error processing /ollama command: {e}", style_class='error')
-                logger.error(f"Error in /ollama command '{user_input_stripped}': {e}", exc_info=True)
-            return True
-        elif user_input_stripped.startswith("/command"):
-            logger.info(f"Handling /command subsystem input: {user_input_stripped}")
-            if not self.category_manager_module:
-                logger.error("Category Manager module not available.")
-                self.ui_manager.append_output("❌ Internal Error: Command subsystem not available.", style_class='error')
-                return True
-            action_result = self.category_manager_module.handle_command_subsystem_input(user_input_stripped)
-            if isinstance(action_result, dict) and action_result.get('action') == 'force_run':
-                await self.process_command(action_result['command'], user_input_stripped, forced_category=action_result['category'])
-            return True
-        elif user_input_stripped.startswith("/config"):
-            await self._handle_config_command(user_input_stripped.split()); return True
+        elif user_input_stripped.startswith("/run"):
+            await self._handle_user_script_command_async(user_input_stripped); return True
+        # --- REMOVED /update and /ollama direct handling ---
         return False
-        
+
     async def process_command(self, command_str_original: str, original_user_input_for_display: str,
                               ai_raw_candidate: Optional[str] = None,
                               original_direct_input_if_different: Optional[str] = None,
@@ -783,13 +566,30 @@ class ShellEngine:
             command_to_execute_sanitized = self.sanitize_and_validate(command_to_execute_expanded, original_user_input_for_display)
             if not command_to_execute_sanitized: return
 
+            # --- NEW: Caution Confirmation Step ---
+            warn_on_commands = self.config.get("security", {}).get("warn_on_commands", [])
+            command_base = command_to_execute_sanitized.split()[0]
+            if command_base in warn_on_commands:
+                caution_result = await self.ui_manager.prompt_for_caution_confirmation(command_to_execute_sanitized)
+                if not caution_result.get('proceed', False):
+                    self.ui_manager.append_output(f"🛡️ Execution of '{command_to_execute_sanitized}' cancelled by user.", style_class='info')
+                    return
+            # --- END: Caution Confirmation Step ---
+
+            self.ui_manager.add_interaction_separator()
+
             exec_message_prefix = "Executing"
             if forced_category:
                 if confirmation_result and confirmation_result.get('action') == 'execute_and_categorize':
                     exec_message_prefix = f"Executing (user categorized as {category})"
                 else: exec_message_prefix = "Forced execution"
-            
-            append_output_func(f"▶️ {exec_message_prefix} ({category} - {self.category_manager_module.CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style_class='executing')
+
+            # Conditionally display the "Executing" message to create a cleaner, shell-like output for simple, direct commands.
+            is_direct_simple_command = (category == "simple" and not is_ai_generated and not forced_category)
+
+            if not is_direct_simple_command:
+                append_output_func(f"▶️ {exec_message_prefix} ({category} - {self.category_manager_module.CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style_class='executing')
+
             if category == "simple": await self.execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
             else: await self.execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category)
         finally:

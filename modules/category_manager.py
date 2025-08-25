@@ -71,12 +71,16 @@
 #
 # --- END API DOCUMENTATION ---
 
-#!/usr/bin/env python
+# modules/category_manager.py
 
 import os
+import sys
 import json
 import shlex
 import logging
+
+# --- New Import ---
+from modules import config_handler
 
 # --- Module-specific logger ---
 logger = logging.getLogger(__name__)
@@ -131,34 +135,27 @@ def init_category_manager(script_dir_path: str, config_dir_name: str, append_out
 
 
 def _load_single_category_file(file_path: str) -> dict:
-    """Loads a single category JSON file, ensuring structure."""
-    categories = {}
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "r", encoding='utf-8') as f: # Specify encoding
-                loaded_data = json.load(f)
-            
-            # Ensure all defined categories in CATEGORY_MAP.values() exist as keys
-            for cat_name_key in set(CATEGORY_MAP.values()): 
-                if cat_name_key not in loaded_data:
-                    categories[cat_name_key] = [] # Initialize if missing
-                elif not isinstance(loaded_data[cat_name_key], list): 
-                    logger.warning(f"Category '{cat_name_key}' in {file_path} is not a list. Resetting to empty list.")
-                    categories[cat_name_key] = []
-                else: 
-                    # Ensure all commands are strings
-                    categories[cat_name_key] = [str(cmd) for cmd in loaded_data[cat_name_key] if isinstance(cmd, str)]
-            logger.info(f"Successfully loaded and validated categories from {file_path}")
-            return categories
-        except json.JSONDecodeError as e:
-            logger.error(f"Error decoding JSON from {file_path}: {e}. Returning empty categories.", exc_info=True)
-        except Exception as e: # Catch other potential errors during file processing
-            logger.error(f"Error loading categories from {file_path}: {e}. Returning empty categories.", exc_info=True)
-    else:
-        logger.info(f"Category file {file_path} not found. Returning empty structure.")
+    """Loads a single category JSON file using the config_handler, ensuring structure."""
+    loaded_data = config_handler.load_jsonc_file(file_path)
     
-    # Return a default empty structure if file not found or error
-    return {cat_name: [] for cat_name in set(CATEGORY_MAP.values())}
+    if loaded_data is None:
+        # If file doesn't exist or is invalid, return a default empty structure
+        return {cat_name: [] for cat_name in set(CATEGORY_MAP.values())}
+
+    categories = {}
+    # Ensure all defined categories in CATEGORY_MAP.values() exist as keys
+    for cat_name_key in set(CATEGORY_MAP.values()):
+        if cat_name_key not in loaded_data:
+            categories[cat_name_key] = [] # Initialize if missing
+        elif not isinstance(loaded_data[cat_name_key], list):
+            logger.warning(f"Category '{cat_name_key}' in {file_path} is not a list. Resetting to empty list.")
+            categories[cat_name_key] = []
+        else:
+            # Ensure all commands are strings
+            categories[cat_name_key] = [str(cmd) for cmd in loaded_data[cat_name_key] if isinstance(cmd, str)]
+            
+    logger.info(f"Successfully loaded and validated categories from {file_path}")
+    return categories
 
 
 def load_and_merge_command_categories():
@@ -173,14 +170,11 @@ def load_and_merge_command_categories():
     # If default category file doesn't exist, try to create an empty one
     if not os.path.exists(DEFAULT_CATEGORY_FILE_PATH): 
         logger.info(f"{DEFAULT_CATEGORY_FILENAME} not found at {DEFAULT_CATEGORY_FILE_PATH}. Attempting to create an empty one.")
-        try:
-            # Ensure the config directory exists
-            os.makedirs(os.path.dirname(DEFAULT_CATEGORY_FILE_PATH), exist_ok=True)
-            with open(DEFAULT_CATEGORY_FILE_PATH, "w", encoding='utf-8') as f: # Specify encoding
-                json.dump({cat_name: [] for cat_name in set(CATEGORY_MAP.values())}, f, indent=2)
+        empty_data = {cat_name: [] for cat_name in set(CATEGORY_MAP.values())}
+        if config_handler.save_json_file(DEFAULT_CATEGORY_FILE_PATH, empty_data):
             logger.info(f"Created empty default category file: {DEFAULT_CATEGORY_FILE_PATH}")
-        except Exception as e_create:
-            logger.error(f"Could not create empty {DEFAULT_CATEGORY_FILENAME} at {DEFAULT_CATEGORY_FILE_PATH}: {e_create}", exc_info=True)
+        else:
+            logger.error(f"Could not create empty {DEFAULT_CATEGORY_FILENAME} at {DEFAULT_CATEGORY_FILE_PATH}")
 
     user_categories = _load_single_category_file(USER_CATEGORY_FILE_PATH)
     
@@ -189,16 +183,16 @@ def load_and_merge_command_categories():
     
     # Merge user categories, ensuring user's choice overrides default and removes duplicates
     for category_name, user_cmds_in_category in user_categories.items():
-        if category_name not in merged_categories: # Should not happen if _load_single ensures all keys
+        if category_name not in merged_categories:
             merged_categories[category_name] = [] 
         
         for user_cmd in user_cmds_in_category:
-            # Remove command from any other category in merged_categories to ensure it's only in the user-specified one
+            # Remove command from any other category in merged_categories
             for cat_list_to_check in merged_categories.values(): 
                 if user_cmd in cat_list_to_check:
                     cat_list_to_check.remove(user_cmd)
             
-            # Add to the target category if not already present (it shouldn't be due to removal above)
+            # Add to the target category
             if user_cmd not in merged_categories[category_name]: 
                 merged_categories[category_name].append(user_cmd)
                 
@@ -210,92 +204,77 @@ def classify_command(cmd: str) -> str:
     """Checks the loaded & merged categories to find the classification for a command."""
     if not _CURRENTLY_LOADED_CATEGORIES:
         logger.warning("Categories not loaded. Attempting to load now.")
-        load_and_merge_command_categories() # Attempt to load if not already
-        if not _CURRENTLY_LOADED_CATEGORIES: # Still not loaded (e.g. paths not set)
+        load_and_merge_command_categories()
+        if not _CURRENTLY_LOADED_CATEGORIES:
             logger.error("Cannot classify command: categories are not loaded and path might be uninitialized.")
             return UNKNOWN_CATEGORY_SENTINEL
             
-    if not cmd: # Empty command string
+    if not cmd:
         return UNKNOWN_CATEGORY_SENTINEL
         
-    # Iterate through the merged categories to find the command
     for category_name, full_commands_in_category in _CURRENTLY_LOADED_CATEGORIES.items():
         if cmd in full_commands_in_category:
             return category_name
             
-    return UNKNOWN_CATEGORY_SENTINEL # Command not found in any category
+    return UNKNOWN_CATEGORY_SENTINEL
 
 
 def _save_user_command_categories(user_data: dict):
-    """Saves data to the user command categories JSON file."""
+    """Saves data to the user command categories JSON file using config_handler."""
     if USER_CATEGORY_FILE_PATH is None:
         logger.error("User category path not initialized. Cannot save.")
         if _append_output_func_ref:
             _append_output_func_ref("❌ Error: User category path not configured.", style_class='error')
         return
 
-    try:
-        # Ensure the config directory exists
-        os.makedirs(os.path.dirname(USER_CATEGORY_FILE_PATH), exist_ok=True)
-        with open(USER_CATEGORY_FILE_PATH, "w", encoding='utf-8') as f: # Specify encoding
-            json.dump(user_data, f, indent=2)
-        logger.info(f"User command categories saved to {USER_CATEGORY_FILE_PATH}")
-    except Exception as e:
-        logger.error(f"Failed to save user categories to {USER_CATEGORY_FILE_PATH}: {e}", exc_info=True)
+    if not config_handler.save_json_file(USER_CATEGORY_FILE_PATH, user_data):
+        logger.error(f"Failed to save user categories to {USER_CATEGORY_FILE_PATH} via config_handler.")
         if _append_output_func_ref:
-            _append_output_func_ref(f"❌ Error saving user categories: {e}", style_class='error')
+            _append_output_func_ref("❌ Error saving user categories.", style_class='error')
+    else:
+        logger.info(f"User command categories saved to {USER_CATEGORY_FILE_PATH}")
 
 
 def add_command_to_category(full_cmd_to_add: str, category_input: str):
     """Adds or updates a command's category in the USER FILE and reloads categories."""
     if not _append_output_func_ref:
         logger.warning("append_output function not available for add_command_to_category status messages.")
-        # Decide if to proceed or return early if UI feedback is critical
     
     if not full_cmd_to_add:
         if _append_output_func_ref: _append_output_func_ref("⚠️ Cannot add empty command.", style_class='warning')
         logger.warning("Attempted to add an empty command to categories.")
         return 
 
-    # Validate target category
-    target_category_name = CATEGORY_MAP.get(category_input.lower(), None)
-    if not target_category_name: # If not found by key (e.g. "1"), check if it's a valid category name (e.g. "simple")
-        if category_input in CATEGORY_MAP.values():
-            target_category_name = category_input
-        else:
-            if _append_output_func_ref: _append_output_func_ref(f"❌ Invalid category: '{category_input}'. Valid: simple, semi_interactive, interactive_tui (or 1, 2, 3).", style_class='error')
-            logger.warning(f"Invalid category specified for adding command: {category_input}")
-            return 
+    target_category_name = CATEGORY_MAP.get(category_input.lower())
+    if not target_category_name:
+        if _append_output_func_ref: _append_output_func_ref(f"❌ Invalid category: '{category_input}'.", style_class='error')
+        logger.warning(f"Invalid category specified for adding command: {category_input}")
+        return 
 
-    user_categories = _load_single_category_file(USER_CATEGORY_FILE_PATH) # Load current user settings
+    user_categories = _load_single_category_file(USER_CATEGORY_FILE_PATH)
     cmd_found_in_user_file_old_cat = None
 
-    # Remove command from any existing category in user's file
     for cat_name, cmds_list in user_categories.items(): 
         if full_cmd_to_add in cmds_list:
-            if cat_name != target_category_name: # If it's in a different category, remove it
+            if cat_name != target_category_name:
                 cmds_list.remove(full_cmd_to_add)
-                cmd_found_in_user_file_old_cat = cat_name # Note its old category
-            else: # Command is already in the target category in user's file
-                if _append_output_func_ref: _append_output_func_ref(f"ℹ️ Command '{full_cmd_to_add}' is already set as '{target_category_name}' in your user settings.", style_class='info')
+                cmd_found_in_user_file_old_cat = cat_name
+            else:
+                if _append_output_func_ref: _append_output_func_ref(f"ℹ️ Command '{full_cmd_to_add}' is already set as '{target_category_name}'.", style_class='info')
                 logger.info(f"Command '{full_cmd_to_add}' already in user category '{target_category_name}'. No change needed.")
-                # No need to save or reload if no change
                 return 
                 
-    # Add command to the target category in user_categories
-    if target_category_name not in user_categories: # Should be present due to _load_single_category_file
-        user_categories[target_category_name] = [] 
     if full_cmd_to_add not in user_categories[target_category_name]:
         user_categories[target_category_name].append(full_cmd_to_add)
     
-    _save_user_command_categories(user_categories) # Save updated user categories
-    load_and_merge_command_categories() # Reload all categories to reflect changes immediately
+    _save_user_command_categories(user_categories)
+    load_and_merge_command_categories()
     
     if _append_output_func_ref:
         if cmd_found_in_user_file_old_cat:
-            _append_output_func_ref(f"✅ Command '{full_cmd_to_add}' moved from '{cmd_found_in_user_file_old_cat}' to '{target_category_name}' in your settings.", style_class='success') 
+            _append_output_func_ref(f"✅ Command '{full_cmd_to_add}' moved from '{cmd_found_in_user_file_old_cat}' to '{target_category_name}'.", style_class='success') 
         else:
-            _append_output_func_ref(f"✅ Command '{full_cmd_to_add}' now set as '{target_category_name}' in your settings.", style_class='success') 
+            _append_output_func_ref(f"✅ Command '{full_cmd_to_add}' now set as '{target_category_name}'.", style_class='success') 
     logger.info(f"Command '{full_cmd_to_add}' added/updated to category '{target_category_name}' in user settings.")
 
 
@@ -312,19 +291,18 @@ def remove_command_from_category(full_cmd_to_remove: str):
     user_categories = _load_single_category_file(USER_CATEGORY_FILE_PATH)
     found_and_removed_from_user = False
     
-    for commands_in_category in user_categories.values(): # Iterate through lists of commands
+    for commands_in_category in user_categories.values():
         if full_cmd_to_remove in commands_in_category:
             commands_in_category.remove(full_cmd_to_remove)
             found_and_removed_from_user = True
-            # Don't break, command might (erroneously) be in multiple lists in user file before cleanup
             
     if found_and_removed_from_user:
         _save_user_command_categories(user_categories)
-        load_and_merge_command_categories() # Reload to reflect change
-        if _append_output_func_ref: _append_output_func_ref(f"🗑️ Command '{full_cmd_to_remove}' removed from your explicit user settings. It may now revert to a default category or become unknown.", style_class='info') 
+        load_and_merge_command_categories()
+        if _append_output_func_ref: _append_output_func_ref(f"🗑️ Command '{full_cmd_to_remove}' removed from your user settings.", style_class='info') 
         logger.info(f"Command '{full_cmd_to_remove}' removed from user categories.")
     else:
-        if _append_output_func_ref: _append_output_func_ref(f"⚠️ Command '{full_cmd_to_remove}' not found in your explicit user settings.", style_class='warning')
+        if _append_output_func_ref: _append_output_func_ref(f"⚠️ Command '{full_cmd_to_remove}' not found in your user settings.", style_class='warning')
         logger.info(f"Command '{full_cmd_to_remove}' not found in user categories for removal.")
 
 
@@ -343,7 +321,6 @@ def list_categorized_commands():
 
     _append_output_func_ref("📄 Current command categories (defaults + user overrides):", style_class='info-header') 
     
-    # Ensure consistent order of categories
     sorted_category_names = sorted(list(set(CATEGORY_MAP.values())))
 
     for cat_name in sorted_category_names:
@@ -356,25 +333,23 @@ def list_categorized_commands():
                 _append_output_func_ref(f"  - {cmd}", style_class='info-item') 
         else:
             _append_output_func_ref("  (No commands in this category)", style_class='info-item-empty') 
-    _append_output_func_ref("") # Add a blank line at the end for spacing
+    _append_output_func_ref("")
 
 
 def move_command_category(full_cmd_to_move: str, new_category_input: str):
     """Moves a command to a new category in the user's settings. Essentially an alias for add."""
-    # The add_command_to_category function already handles removing from old category
-    # if the command is found elsewhere in the user's settings.
     logger.info(f"Moving command '{full_cmd_to_move}' to category '{new_category_input}'.")
     add_command_to_category(full_cmd_to_move, new_category_input)
 
 
-def handle_command_subsystem_input(input_str: str): # Modified to return action for 'run'
+def handle_command_subsystem_input(input_str: str):
     """
     Parses and handles '/command' subcommands.
     Returns a dictionary for 'run' action, None otherwise.
     """
     if not _append_output_func_ref:
         logger.error("append_output function not available for /command subsystem.")
-        return None # Indicate no action for main.py
+        return None
         
     try:
         parts = shlex.split(input_str.strip())
@@ -388,12 +363,9 @@ def handle_command_subsystem_input(input_str: str): # Modified to return action 
                 f"  remove \"<cmd>\"             - Remove command from your settings.\n"
                 f"  list                       - List all categorized commands.\n"
                 f"  move \"<cmd>\" <new_cat>     - Move command to a new category.\n"
-                f"  run <cat_num|cat_name> \"<cmd>\" - Force run command with category.\n" # New help line
+                f"  run <cat_num|cat_name> \"<cmd>\" - Force run command with category.\n"
                 f"  help                       - Show this help message.\n"
-                f"Categories: 1/simple, 2/semi_interactive, 3/interactive_tui\n"
-                f"  simple: {CATEGORY_DESCRIPTIONS['simple']}\n"
-                f"  semi_interactive: {CATEGORY_DESCRIPTIONS['semi_interactive']}\n"
-                f"  interactive_tui: {CATEGORY_DESCRIPTIONS['interactive_tui']}")
+                f"Categories: 1/simple, 2/semi_interactive, 3/interactive_tui")
 
     if len(parts) < 2 or parts[0] != "/command":
         _append_output_func_ref(f"❌ Invalid /command structure.\n{cmd_help}", style_class='error')
@@ -405,39 +377,39 @@ def handle_command_subsystem_input(input_str: str): # Modified to return action 
         if len(parts) == 4:
             add_command_to_category(parts[2], parts[3])
         else:
-            _append_output_func_ref(f"❌ Usage: /command add \"<full_command_string>\" <category_name_or_number>\n{cmd_help}", style_class='error') 
+            _append_output_func_ref(f"❌ Usage: /command add \"<full_command_string>\" <category>", style_class='error') 
     elif subcmd == "remove":
         if len(parts) == 3:
             remove_command_from_category(parts[2])
         else:
-            _append_output_func_ref(f"❌ Usage: /command remove \"<full_command_string>\"\n{cmd_help}", style_class='error') 
+            _append_output_func_ref(f"❌ Usage: /command remove \"<full_command_string>\"", style_class='error') 
     elif subcmd == "list":
         if len(parts) == 2:
             list_categorized_commands()
         else:
-            _append_output_func_ref(f"❌ Usage: /command list\n{cmd_help}", style_class='error') 
+            _append_output_func_ref(f"❌ Usage: /command list", style_class='error') 
     elif subcmd == "move":
         if len(parts) == 4:
             move_command_category(parts[2], parts[3])
         else:
-            _append_output_func_ref(f"❌ Usage: /command move \"<full_command_string>\" <new_category_name_or_number>\n{cmd_help}", style_class='error') 
-    elif subcmd == "run": # New subcommand
+            _append_output_func_ref(f"❌ Usage: /command move \"<full_command_string>\" <new_category>", style_class='error') 
+    elif subcmd == "run":
         if len(parts) == 4:
             category_input = parts[2]
             command_to_run = parts[3]
             
             resolved_category = CATEGORY_MAP.get(category_input.lower())
             if not resolved_category:
-                 _append_output_func_ref(f"❌ Invalid category for 'run': '{category_input}'. Use number (1-3) or name.\n{cmd_help}", style_class='error')
+                 _append_output_func_ref(f"❌ Invalid category for 'run': '{category_input}'.", style_class='error')
                  return None
             
             logger.info(f"/command run: category '{resolved_category}', command '{command_to_run}'")
             return {'action': 'force_run', 'command': command_to_run, 'category': resolved_category}
         else:
-            _append_output_func_ref(f"❌ Usage: /command run <category_name_or_number> \"<full_command_string>\"\n{cmd_help}", style_class='error')
+            _append_output_func_ref(f"❌ Usage: /command run <category> \"<full_command_string>\"", style_class='error')
     elif subcmd == "help":
         _append_output_func_ref(cmd_help, style_class='help-base') 
     else:
         _append_output_func_ref(f"❌ Unknown /command subcommand '{subcmd}'.\n{cmd_help}", style_class='error')
     
-    return None # Default return if not 'run' or error handled by printing help
+    return None

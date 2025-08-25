@@ -103,6 +103,7 @@ class UIManager:
         self.style = None
         self.auto_scroll = True
         self.output_buffer = []
+        self.max_output_buffer_lines = config.get('ui', {}).get('max_output_buffer_lines', 500) # Default to 500 lines
 
         self.categorization_flow_active = False
         self.categorization_flow_state = {}
@@ -248,6 +249,54 @@ class UIManager:
 
     def get_key_bindings(self) -> KeyBindings:
         return self.kb
+
+    # --- NEW: Caution Confirmation Flow ---
+    async def prompt_for_caution_confirmation(self, command_to_confirm: str) -> dict:
+        """Initiates a simple Yes/No confirmation for potentially sensitive commands."""
+        logger.info(f"UIManager: Starting caution confirmation for '{command_to_confirm}'.")
+        # Use existing flow flags to manage UI state, but with a unique state dict
+        self.confirmation_flow_active = True # Re-use this flag to lock scrolling etc.
+        self.confirmation_flow_state = {
+            'command_to_confirm': command_to_confirm,
+            'future': asyncio.Future()
+        }
+
+        self.append_output(f"\n⚠️ CAUTION: The command '{command_to_confirm.split()[0]}' can have significant effects.", style_class='security-warning')
+        self.append_output(f"   Full command: '{command_to_confirm}'", style_class='security-warning')
+        self.append_output("   Are you sure you want to proceed?", style_class='security-warning')
+
+        self.set_flow_input_mode(
+            prompt_text="[Confirm Execution] (yes/no): ",
+            accept_handler_func=self._handle_caution_confirmation_response,
+            is_confirmation=True
+        )
+
+        try:
+            result = await self.confirmation_flow_state['future']
+            logger.info(f"UIManager: Caution flow future resolved with: {result}")
+            return result
+        finally:
+            self.confirmation_flow_active = False
+            logger.info("UIManager: Caution flow ended.")
+
+    def _handle_caution_confirmation_response(self, buff):
+        response = buff.text.strip().lower()
+        future_to_set = self.confirmation_flow_state.get('future')
+        if not future_to_set or future_to_set.done():
+            return
+
+        if response in ['y', 'yes']:
+            future_to_set.set_result({'proceed': True})
+        elif response in ['n', 'no']:
+            future_to_set.set_result({'proceed': False})
+        else:
+            self.append_output("Invalid choice. Please enter 'yes' or 'no'.", style_class='error')
+            # Re-ask the question
+            self.set_flow_input_mode(
+                prompt_text="[Confirm Execution] (yes/no): ",
+                accept_handler_func=self._handle_caution_confirmation_response,
+                is_confirmation=True
+            )
 
     # --- Categorization Flow Methods ---
     async def start_categorization_flow(self, command_initially_proposed: str,
@@ -502,6 +551,7 @@ class UIManager:
     def _ask_confirmation_main_choice(self):
         cmd = self.confirmation_flow_state['command_to_confirm']
         source = self.confirmation_flow_state['display_source']
+        
         self.append_output(f"\n🤖 AI proposed command (from: {source}):", style_class='ai-query')
         self.append_output(f"    👉 {cmd}", style_class='executing')
         self.append_output("Action: [Y]es (Exec, prompt if new) | [Ys] Simple & Run | [Ym] Semi-Interactive & Run | [Yi] TUI & Run | [E]xplain | [M]odify | [C]ancel?", style_class='categorize-prompt')
@@ -696,6 +746,7 @@ class UIManager:
             return
         doc = self.output_field.buffer.document
         render_info = self.output_field.window.render_info
+        
         if not render_info: return
         if doc.line_count <= render_info.window_height:
             if not self.auto_scroll: self.auto_scroll = True
@@ -715,21 +766,35 @@ class UIManager:
             logger.warning("UIManager.append_output called, but output_field is not initialized. Buffering message.")
             if not text.endswith('\n'): text += '\n'
             self.output_buffer.append((style_class, text))
-            # No need to log again here, already logged above
             return
 
         if not text.endswith('\n'): text += '\n'
         
         self.output_buffer.append((style_class, text))
+
+        # --- NEW LOGIC: Enforce buffer size limit ---
+        if len(self.output_buffer) > self.max_output_buffer_lines:
+            # Remove from the beginning of the buffer to maintain size
+            # A simple heuristic might be to remove a block of lines, or just one-by-one.
+            # Removing a block (e.g., 10% of max_output_buffer_lines) when over limit
+            # can be more efficient than removing one-by-one frequently.
+            lines_to_remove = len(self.output_buffer) - self.max_output_buffer_lines + (self.max_output_buffer_lines // 10)
+            self.output_buffer = self.output_buffer[lines_to_remove:]
+            logger.debug(f"Output buffer trimmed. New size: {len(self.output_buffer)} lines.")
+        # --- END NEW LOGIC ---
+
         plain_text_output = "".join([content for _, content in self.output_buffer])
         
         buffer = self.output_field.buffer
-        current_cursor_pos = buffer.cursor_position
+        current_cursor_pos = buffer.cursor_position # Store cursor position before updating document
+        
+        # This line is the core of the re-rendering.
         buffer.set_document(Document(plain_text_output, cursor_position=len(plain_text_output)), bypass_readonly=True)
         
         if self.auto_scroll or self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:
             buffer.cursor_position = len(plain_text_output)
         else:
+            # Restore previous cursor position if not auto-scrolling
             buffer.cursor_position = min(current_cursor_pos, len(plain_text_output))
 
         if not internal_call:
@@ -848,10 +913,12 @@ class UIManager:
             self.categorization_flow_active = True
             self.confirmation_flow_active = False
             self.is_in_edit_mode = False
+            self.append_output("ℹ️ Interaction active. Scrolling disabled until flow completes.", style_class='info', internal_call=True) # Added hint
         elif is_confirmation:
             self.confirmation_flow_active = True
             self.categorization_flow_active = False
             self.is_in_edit_mode = False
+            self.append_output("ℹ️ Interaction active. Scrolling disabled until flow completes.", style_class='info', internal_call=True) # Added hint
 
         self.current_prompt_text = prompt_text
         if self.input_field:
@@ -868,6 +935,7 @@ class UIManager:
         self.confirmation_flow_active = False
         self.is_in_edit_mode = True
         self.current_prompt_text = "[Edit Command]> "
+        self.append_output("ℹ️ Edit mode active. Scrolling disabled until command submitted/cancelled.", style_class='info', internal_call=True) # Added hint
         if self.input_field:
             self.input_field.multiline = self.config.get('behavior', {}).get('input_field_height', 3) > 1
             self.input_field.buffer.accept_handler = accept_handler_func

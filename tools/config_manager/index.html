@@ -269,7 +269,10 @@
                 'integrity_check.protected_branches': "Git branches where integrity checks are enforced (e.g., ['main', 'testing']). Editable as a list of strings.",
                 'integrity_check.developer_branch': "Developer Git branch where checks are relaxed (e.g., 'dev').",
                 'integrity_check.halt_on_integrity_failure': "Halt if critical integrity checks fail on a protected branch.",
-                'integrity_check.allow_run_if_behind_remote': "Allow running on protected branch if only behind remote (shows warning)."
+                'integrity_check.allow_run_if_behind_remote': "Allow running on protected branch if only behind remote (shows warning).",
+                'integrity_check.dev_activation_allowed_branches': "Branches allowed to run the '/dev --activate' utility. Default is ['main'].",
+                'security.dangerous_patterns': "A list of regex patterns for commands that will be blocked from running.",
+                'security.warn_on_commands': "A list of command names (e.g., 'dd', 'fdisk') that will trigger an extra 'Are you sure?' confirmation prompt before execution."
             };
             const PRELOADED_DEFAULT_CONFIG = {
               "ai_models": {
@@ -309,7 +312,8 @@
                 "output_separator_length": 30,
                 "enable_startup_separator": true,
                 "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n",
-                "enable_mouse_support": false
+                "enable_mouse_support": false,
+                "ui_backend": "prompt_toolkit"
               },
               "paths": {
                 "tmux_log_base_path": "/tmp"
@@ -346,7 +350,33 @@
                 ],
                 "developer_branch": "dev",
                 "halt_on_integrity_failure": true,
-                "allow_run_if_behind_remote": true
+                "allow_run_if_behind_remote": true,
+                "dev_activation_allowed_branches": [
+                    "main"
+                ]
+              },
+              "security": {
+                "dangerous_patterns": [
+                  "\\brm\\s+(?:-[a-zA-Z0-9]*f[a-zA-Z0-9]*|-f[a-zA-Z0-9]*)\\s+/(?!(?:tmp|var/tmp)\\b)\\S*",
+                  "\\brm\\s+(?:-[a-zA-Z0-9]*f[a-zA-Z0-9]*|-f[a-zA-Z0-9]*)\\s+/\\s*(?:$|\\.\\.?\\s*$|\\*(?:\\s.*|$))",
+                  "\\bmkfs\\b",
+                  "\\bdd\\b\\s+if=/dev/random",
+                  "\\bdd\\b\\s+if=/dev/zero",
+                  "\\b(shutdown|reboot|halt|poweroff)\\b",
+                  ">\\s*/dev/sd[a-z]+",
+                  ":\\(\\)\\{:|:&\\};:",
+                  "\\b(wget|curl)\\s+.*\\s*\\|\\s*(sh|bash|python|perl)\\b"
+                ],
+                "warn_on_commands": [
+                  "dd",
+                  "fdisk",
+                  "cfdisk",
+                  "parted",
+                  "iptables",
+                  "ufw",
+                  "firewall-cmd",
+                  "visudo"
+                ]
               }
             };
             const PRELOADED_DEFAULT_CATEGORIES = {
@@ -508,7 +538,7 @@
                 });
                 return item;
             }
-            function createFormElement(key, value, path, configType, tooltipText = null) { /* ... (same as v4) ... */
+            function createFormElement(key, value, path, configType, tooltipText = null) {
                 const elementId = `${configType}-${path.join('-')}${path.length > 0 ? '-' : ''}${key}`;
                 const div = document.createElement('div');
                 div.classList.add('mb-3', 'p-3', 'border-l-4', 'border-blue-600', 'bg-gray-750', 'rounded-r-md');
@@ -561,12 +591,11 @@
                     input.id = elementId;
                     input.rows = Math.min(10, Math.max(3, value.split('\n').length + 1));
                     input.classList.add(...inputClasses);
-                } else if (configType === 'userConfig' && key === 'protected_branches' && Array.isArray(value) && value.every(item => typeof item === 'string')) {
-                    const arrayEditorContainer = createArrayEditor(key, value, path, configType, 'Remove Branch', 'Add Branch');
+                } else if (configType === 'userConfig' && (key === 'protected_branches' || key === 'dev_activation_allowed_branches' || key === 'dangerous_patterns' || key === 'warn_on_commands') && Array.isArray(value) && value.every(item => typeof item === 'string')) {
+                    const arrayEditorContainer = createArrayEditor(key, value, path, configType, 'Remove', 'Add');
                     div.appendChild(arrayEditorContainer);
-                    input = null;
-                }
-                 else if (typeof value === 'string') {
+                    input = null; // No single input element, handled by the array editor
+                } else if (typeof value === 'string') {
                     input = document.createElement('input');
                     input.type = 'text';
                     input.value = value;
@@ -667,9 +696,9 @@
                 renderListItems();
                 return container;
             }
-            function renderUserConfigEditor(element, data) { /* ... (same as v4) ... */
+            function renderUserConfigEditor(element, data) {
                 element.innerHTML = '';
-                const definedOrder = ['ai_models', 'timeouts', 'behavior', 'ui', 'paths', 'prompts', 'ollama_service', 'integrity_check'];
+                const definedOrder = ['ai_models', 'timeouts', 'behavior', 'ui', 'paths', 'prompts', 'ollama_service', 'integrity_check', 'security'];
                 const allKeys = Object.keys(data);
                 const sortedKeys = definedOrder.filter(key => allKeys.includes(key));
                 const otherKeys = allKeys.filter(key => !definedOrder.includes(key)).sort();
@@ -704,7 +733,7 @@
                         } else {
                            sectionContent.appendChild(createFormElement(key, value, [], 'userConfig', configUpdateTips[key]));
                         }
-                        const accordionItem = createAccordionItem(key, sectionContent, 'userConfigEditor', key === 'ai_models' || key === 'integrity_check' || key === 'prompts');
+                        const accordionItem = createAccordionItem(key, sectionContent, 'userConfigEditor', key === 'ai_models' || key === 'integrity_check' || key === 'prompts' || key === 'security');
                         element.appendChild(accordionItem);
                     }
                 });

@@ -3,6 +3,8 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
+# Import the custom exception from main to test for it specifically
+from main import StartupIntegrityError
 from modules.git_context_manager import FETCH_SUCCESS, FETCH_TIMEOUT, FETCH_OFFLINE, FETCH_ERROR
 
 # We need to import the function we want to test from main.py.
@@ -343,76 +345,109 @@ async def test_on_other_branch_defaults_to_dev_mode(mock_main_globals, mock_git_
 async def test_main_async_runner_halts_on_integrity_failure(mocker):
     """
     Test that main_async_runner halts if perform_startup_integrity_checks
-    indicates failure on a protected branch.
+    indicates failure on a protected branch. This test now passes if the
+    correct exception is raised.
     """
     mocker.patch('main.perform_startup_integrity_checks', new_callable=AsyncMock, return_value=(False, False))
-    mock_exit_app_main = MagicMock()
-    mocker.patch('main._exit_app_main', new=mock_exit_app_main)
     mocker.patch('main.config', {
         "integrity_check": {"halt_on_integrity_failure": True},
-        "timeouts": {}, "behavior": {}, "ui": {}, "paths": {}, "prompts": {}, "ollama_service": {} 
+        "timeouts": {}, "behavior": {}, "ui": {"ui_backend": "prompt_toolkit"}, "paths": {}, "prompts": {}, "ollama_service": {} 
     })
-    mock_ui_manager_constructor = mocker.patch('main.UIManager') # Mock the constructor
+    mock_ui_manager_constructor = mocker.patch('main.UIManager')
     mock_ui_instance = MagicMock()
     mock_ui_instance.append_output = MagicMock()
-    mock_ui_manager_constructor.return_value = mock_ui_instance # UIManager() returns our mock
-
-    # Prevent further execution by not mocking other dependencies if not needed for this specific test path
-    mocker.patch('main.ShellEngine', side_effect=AssertionError("ShellEngine should not be initialized if halting"))
-
-
+    mock_ui_manager_constructor.return_value = mock_ui_instance
+    
     from main import main_async_runner
-    await main_async_runner()
-    mock_exit_app_main.assert_called_once()
+    # This context manager asserts that the specific error is raised.
+    # If it is, the test passes. If it's not, or a different error is raised, it fails.
+    with pytest.raises(StartupIntegrityError, match="Failed integrity checks on a protected branch."):
+        await main_async_runner()
+
 
 @pytest.mark.asyncio
 async def test_main_async_runner_proceeds_if_dev_mode_and_integrity_fails(mocker):
     """
     Test that main_async_runner proceeds if in dev mode, even if integrity_ok is False.
+    This test is corrected to patch the right module.
     """
     mocker.patch('main.perform_startup_integrity_checks', new_callable=AsyncMock, return_value=(True, False)) # is_dev_mode=True, integrity_ok=False
-    mock_exit_app_main = MagicMock()
-    mocker.patch('main._exit_app_main', new=mock_exit_app_main)
     mocker.patch('main.config', {
         "integrity_check": {"halt_on_integrity_failure": True}, # Halt is true, but dev mode should override
-        "timeouts": {}, "behavior": {}, "ui": {}, "paths": {}, "prompts": {}, "ollama_service": {}
+        "timeouts": {}, "behavior": {}, "ui": {"ui_backend": "prompt_toolkit"}, "paths": {}, "prompts": {}, "ollama_service": {}
     })
     
     mock_ui_manager_constructor = mocker.patch('main.UIManager')
     mock_ui_instance = MagicMock()
     mock_ui_instance.append_output = MagicMock()
+    mock_ui_instance.initialize_ui_elements = MagicMock()
     mock_ui_manager_constructor.return_value = mock_ui_instance
     
-    # Mock ShellEngine to see if it's called, indicating progression
-    mocker.patch('main.ShellEngine', side_effect=RuntimeError("ShellEngine init called, proceeding past integrity check"))
+    mock_shell_engine_constructor = mocker.patch('main.ShellEngine')
+    mock_shell_engine = MagicMock()
+    # *** START OF FIX ***
+    # Configure the mock shell engine instance to have an awaitable mock for the ollama service check
+    mock_shell_engine.ollama_manager_module.ensure_ollama_service = AsyncMock(return_value=True)
+    # *** END OF FIX ***
+    mock_shell_engine_constructor.return_value = mock_shell_engine
+
+    mock_git_context_manager_constructor = mocker.patch('main.GitContextManager')
+    mock_git_context_manager = MagicMock()
+    mock_git_context_manager_constructor.return_value = mock_git_context_manager
+    
+    mocker.patch('main.init_category_manager', MagicMock())
+    mocker.patch('main.FileHistory', MagicMock())
+    mock_app_run_async = mocker.patch('main.Application.run_async', new_callable=AsyncMock)
 
     from main import main_async_runner
-    with pytest.raises(RuntimeError, match="ShellEngine init called, proceeding past integrity check"):
-        await main_async_runner()
-    mock_exit_app_main.assert_not_called() # Should not exit if in dev mode
+    await main_async_runner()
+    
+    # Assert that ShellEngine was initialized, showing the runner proceeded
+    mock_shell_engine_constructor.assert_called_once()
+    
+    # Assert that the application was run
+    mock_app_run_async.assert_called_once()
+
 
 @pytest.mark.asyncio
 async def test_main_async_runner_proceeds_if_integrity_ok_and_not_halting(mocker):
     """
     Test that main_async_runner proceeds if integrity is OK, even if halt_on_failure is true.
-    (This also covers the case where halt_on_integrity_failure is False)
+    This test is corrected to patch the right module.
     """
     mocker.patch('main.perform_startup_integrity_checks', new_callable=AsyncMock, return_value=(False, True)) # is_dev_mode=False, integrity_ok=True
-    mock_exit_app_main = MagicMock()
-    mocker.patch('main._exit_app_main', new=mock_exit_app_main)
     mocker.patch('main.config', {
         "integrity_check": {"halt_on_integrity_failure": True}, # Halt is true, but integrity is OK
-        "timeouts": {}, "behavior": {}, "ui": {}, "paths": {}, "prompts": {}, "ollama_service": {}
+        "timeouts": {}, "behavior": {}, "ui": {"ui_backend": "prompt_toolkit"}, "paths": {}, "prompts": {}, "ollama_service": {}
     })
     
     mock_ui_manager_constructor = mocker.patch('main.UIManager')
     mock_ui_instance = MagicMock()
     mock_ui_instance.append_output = MagicMock()
+    mock_ui_instance.initialize_ui_elements = MagicMock()
     mock_ui_manager_constructor.return_value = mock_ui_instance
     
-    mocker.patch('main.ShellEngine', side_effect=RuntimeError("ShellEngine init called, proceeding past integrity check"))
+    mock_shell_engine_constructor = mocker.patch('main.ShellEngine')
+    mock_shell_engine = MagicMock()
+    # *** START OF FIX ***
+    # Configure the mock shell engine instance to have an awaitable mock for the ollama service check
+    mock_shell_engine.ollama_manager_module.ensure_ollama_service = AsyncMock(return_value=True)
+    # *** END OF FIX ***
+    mock_shell_engine_constructor.return_value = mock_shell_engine
+    
+    mock_git_context_manager_constructor = mocker.patch('main.GitContextManager')
+    mock_git_context_manager = MagicMock()
+    mock_git_context_manager_constructor.return_value = mock_git_context_manager
+    
+    mocker.patch('main.init_category_manager', MagicMock())
+    mocker.patch('main.FileHistory', MagicMock())
+    mock_app_run_async = mocker.patch('main.Application.run_async', new_callable=AsyncMock)
 
     from main import main_async_runner
-    with pytest.raises(RuntimeError, match="ShellEngine init called, proceeding past integrity check"):
-        await main_async_runner()
-    mock_exit_app_main.assert_not_called()
+    await main_async_runner()
+
+    # Assert that ShellEngine was initialized, showing the runner proceeded
+    mock_shell_engine_constructor.assert_called_once()
+    
+    # Assert that the application was run
+    mock_app_run_async.assert_called_once()

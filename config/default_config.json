@@ -32,11 +32,12 @@
   "ui": {
     "max_prompt_length": 20,
     "enable_output_separator": true,
-    "output_separator_character": "\u2500",
+    "output_separator_character": "─",
     "output_separator_length": 30,
     "enable_startup_separator": true,
-    "startup_separator_string": "\ud83d\ude80 micro_X Initialized & Ready \ud83d\ude80\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n",
-    "enable_mouse_support": false
+    "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n",
+    "enable_mouse_support": false,
+    "ui_backend": "prompt_toolkit"
   },
   "paths": {
     "tmux_log_base_path": "/tmp"
@@ -73,6 +74,32 @@
     ],
     "developer_branch": "dev",
     "halt_on_integrity_failure": true,
-    "allow_run_if_behind_remote": true
+    "allow_run_if_behind_remote": true,
+    "dev_activation_allowed_branches": [
+      "main"
+    ]
+  },
+  "security": {
+    "dangerous_patterns": [
+      "\\brm\\s+(?:-[a-zA-Z0-9]*f[a-zA-Z0-9]*|-f[a-zA-Z0-9]*)\\s+/(?!(?:tmp|var/tmp)\\b)\\S*",
+      "\\brm\\s+(?:-[a-zA-Z0-9]*f[a-zA-Z0-9]*|-f[a-zA-Z0-9]*)\\s+/\\s*(?:$|\\.\\.?\\s*$|\\*(?:\\s.*|$))",
+      "\\bmkfs\\b",
+      "\\bdd\\b\\s+if=/dev/random",
+      "\\bdd\\b\\s+if=/dev/zero",
+      "\\b(shutdown|reboot|halt|poweroff)\\b",
+      ">\\s*/dev/sd[a-z]+",
+      ":\\(\\)\\{:|:&\\};:",
+      "\\b(wget|curl)\\s+.*\\s*\\|\\s*(sh|bash|python|perl)\\b"
+    ],
+    "warn_on_commands": [
+      "dd",
+      "fdisk",
+      "cfdisk",
+      "parted",
+      "iptables",
+      "ufw",
+      "firewall-cmd",
+      "visudo"
+    ]
   }
 }

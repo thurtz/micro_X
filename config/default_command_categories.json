@@ -228,7 +228,9 @@
     "python --help",
     "pip --help",
     "npm --help",
-    "node --help"
+    "node --help",
+    "python utils/setup_brew.py",
+    "brew"
   ],
   "interactive_tui": [
     "nano",
@@ -260,6 +262,7 @@
     "sudo parted /dev/sda",
     "sudo ufw enable",
     "sudo ufw default deny incoming",
-    "sudo systemctl edit servicename"
+    "sudo systemctl edit servicename",
+    "bash"
   ]
 }

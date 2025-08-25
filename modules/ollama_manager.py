@@ -402,4 +402,3 @@ async def get_ollama_status_info(main_config: dict, append_output_callback):
     service_config = _config_cached.get(OLLAMA_SERVICE_CONFIG_SECTION, {})
     auto_start = service_config.get(AUTO_START_OLLAMA_KEY, True)
     _append_output_func_cached(f"  Automatic Startup on micro_X launch: {'Enabled' if auto_start else 'Disabled'}", style_class='info')
-
