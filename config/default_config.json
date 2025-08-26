@@ -76,7 +76,8 @@
     "halt_on_integrity_failure": true,
     "allow_run_if_behind_remote": true,
     "dev_activation_allowed_branches": [
-      "main"
+      "main",
+      "testing"
     ]
   },
   "security": {
