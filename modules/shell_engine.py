@@ -105,7 +105,6 @@ class ShellEngine:
                  category_manager_module=None,
                  ai_handler_module=None,
                  ollama_manager_module=None,
-                 main_exit_app_ref=None,
                  main_restore_normal_input_ref=None,
                  main_normal_input_accept_handler_ref=None,
                  is_developer_mode: bool = False,
@@ -119,7 +118,6 @@ class ShellEngine:
         self.category_manager_module = category_manager_module
         self.ai_handler_module = ai_handler_module
         self.ollama_manager_module = ollama_manager_module
-        self.main_exit_app_ref = main_exit_app_ref
         self.main_restore_normal_input_ref = main_restore_normal_input_ref
         self.main_normal_input_accept_handler_ref = main_normal_input_accept_handler_ref
 
@@ -516,11 +514,10 @@ class ShellEngine:
         logger.info(f"ShellEngine.handle_built_in_command received: '{user_input_stripped}'")
         if user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
             self.ui_manager.append_output("Exiting micro_X Shell 🚪", style_class='info')
-            logger.info("Exit command received from built-in handler.")
-            if self.main_exit_app_ref: self.main_exit_app_ref()
-            else:
-                app_instance = self.ui_manager.get_app_instance()
-                if app_instance and app_instance.is_running: app_instance.exit()
+            logger.info("Exit command received. Requesting clean exit from UI manager.")
+            app_instance = self.ui_manager.get_app_instance()
+            if app_instance and app_instance.is_running:
+                app_instance.exit()
             return True
         elif user_input_stripped.startswith("/utils"):
             await self._handle_utils_command_async(user_input_stripped); return True
