@@ -196,3 +196,4 @@ micro_X-testing/
 micro_X-dev/
 development_directives.md
 *.code-workspace
+gemini_startup_prompt.txt
