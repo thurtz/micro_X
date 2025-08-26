@@ -230,6 +230,7 @@
     "npm --help",
     "node --help",
     "python utils/setup_brew.py",
+    "python utils/dev.py --activate",
     "brew"
   ],
   "interactive_tui": [
