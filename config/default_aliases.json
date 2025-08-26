@@ -2,7 +2,7 @@
   "/alias": "/utils alias",
   "/command": "/utils command",
   "/config": "/utils config_manager",
-  "/dev": "/utils dev",
+  "/dev": "python utils/dev.py",
   "/help": "/utils help",
   "help": "/utils help",
   "/list": "/utils list_scripts",
