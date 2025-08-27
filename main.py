@@ -195,6 +195,13 @@ def restore_normal_input_handler():
     elif not shell_engine_instance:
         logger.warning("restore_normal_input_handler: shell_engine_instance is None.")
 
+def _exit_app_main():
+    """Triggers a clean exit of the application by raising SystemExit."""
+    logger.info("Exit requested by a component. Raising SystemExit(0) to terminate.")
+    sys.exit(0)
+
+
+
 # --- FIX: Removed the _exit_app_main() function.
 # Its logic is now handled by the SystemExit exception raised directly by sys.exit().
 
@@ -348,6 +355,7 @@ async def main_async_runner():
                                         category_manager_module=sys.modules['modules.category_manager'],
                                         ai_handler_module=sys.modules['modules.ai_handler'],
                                         ollama_manager_module=sys.modules['modules.ollama_manager'],
+                                        main_exit_app_ref=_exit_app_main,
                                         main_restore_normal_input_ref=restore_normal_input_handler,
                                         main_normal_input_accept_handler_ref=normal_input_accept_handler,
                                         is_developer_mode=False, # Will be set after integrity checks
@@ -357,6 +365,7 @@ async def main_async_runner():
     # 3. For CursesUIManager, ensure the shell_engine_instance is set after its creation.
     if isinstance(ui_manager_instance, CursesUIManager):
       ui_manager_instance.shell_engine_instance = shell_engine_instance
+      ui_manager_instance.main_exit_app_ref = _exit_app_main
     # --- FIX END ---
 
     # Initialize Git context after the shell engine has its ui_manager
@@ -378,6 +387,7 @@ async def main_async_runner():
         logger.critical("Halting micro_X due to failed integrity checks on a protected branch.")
         raise StartupIntegrityError("Failed integrity checks on a protected branch.")
 
+    ui_manager_instance.main_exit_app_ref = _exit_app_main
     ui_manager_instance.main_restore_normal_input_ref = restore_normal_input_handler
 
     ollama_service_ready = await shell_engine_instance.ollama_manager_module.ensure_ollama_service(config, ui_manager_instance.append_output)

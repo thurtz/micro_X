@@ -105,6 +105,7 @@ class ShellEngine:
                  category_manager_module=None,
                  ai_handler_module=None,
                  ollama_manager_module=None,
+                 main_exit_app_ref=None,
                  main_restore_normal_input_ref=None,
                  main_normal_input_accept_handler_ref=None,
                  is_developer_mode: bool = False,
@@ -118,6 +119,7 @@ class ShellEngine:
         self.category_manager_module = category_manager_module
         self.ai_handler_module = ai_handler_module
         self.ollama_manager_module = ollama_manager_module
+        self.main_exit_app_ref = main_exit_app_ref
         self.main_restore_normal_input_ref = main_restore_normal_input_ref
         self.main_normal_input_accept_handler_ref = main_normal_input_accept_handler_ref
 
