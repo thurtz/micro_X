@@ -624,6 +624,9 @@ class ShellEngine:
         if category != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
             await self.process_command(user_input_stripped, user_input_stripped)
         else:
+            if user_input_stripped.startswith('/'):
+                self.ui_manager.append_output(f"❌ Unknown command: {user_input_stripped}", style_class='error')
+                return
             if not await self.ollama_manager_module.is_ollama_server_running():
                 await self.process_command(user_input_stripped, user_input_stripped); return
             self.ui_manager.append_output(f"🔎 Validating '{user_input_stripped}' with AI...", style_class='info')
