@@ -128,7 +128,7 @@ LOG_FILE_BASENAME = "micro_x.log"
 LOG_SEPARATOR_LINE_TEXT = "=" * 80 # Adjusted to match main.py's actual log output (was 68)
 LOG_SESSION_START_TEXT = "micro_X Session Started" 
 LOG_SESSION_END_TEXT = "micro_X Session Ended"   
-LOG_TIMESTAMP_PREFIX_TEXT = "Timestamp:" 
+LOG_TIMESTAMP_PREFIX_TEXT = "Timestamp:"
 
 # Regex to extract the message part from a log line
 LOG_MESSAGE_CAPTURE_PATTERN = re.compile(
@@ -200,13 +200,32 @@ def extract_api_documentation(filepath: str) -> str:
     except Exception as e:
         return f"[Error reading API documentation from {os.path.basename(filepath)}: {e}]\n"
 
-def run_utility_script(script_name: str, project_root: str, utils_dir: str) -> tuple[bool, str]:
-    """Runs a utility script."""
+def run_utility_script(script_name: str, project_root: str, utils_dir: str) -> dict:
+    """
+    Runs a utility script and returns a structured result.
+    
+    Returns:
+        dict: A dictionary containing the execution status.
+              {
+                  "success": bool,
+                  "message": str,
+                  "test_status": "passed" | "failed" | "error" | "no_tests" | "not_run"
+              }
+    """
     script_path = os.path.join(utils_dir, script_name)
+    result = {
+        "success": False,
+        "message": "",
+        "test_status": "not_run"
+    }
+
     if not os.path.exists(script_path):
         message = f"Utility script '{script_name}' not found at '{script_path}'. Skipping."
         print(f"Warning: {message}")
-        return False, f"[NOTICE: {script_name} execution skipped - script not found.]\n"
+        result["message"] = f"[NOTICE: {script_name} execution skipped - script not found.]\n"
+        result["test_status"] = "error"
+        return result
+
     print(f"Attempting to run utility: {script_name}...")
     try:
         process = subprocess.run(
@@ -214,19 +233,38 @@ def run_utility_script(script_name: str, project_root: str, utils_dir: str) -> t
             capture_output=True, text=True, encoding='utf-8', errors='replace'
         )
         if process.stdout: print(f"--- Output from {script_name} ---\n{process.stdout.strip()}\n---------------------------")
-        if process.stderr: print(f"--- Errors from {script_name} ---\n{process.stderr.strip()}\n---------------------------", file=sys.stderr)
+        if process.stderr: print(f"--- Errors from {script_name} ---\n{process.stderr.strip()}\n--------------------------- ", file=sys.stderr)
+        
         if process.returncode == 0:
             print(f"Success: Utility '{script_name}' executed successfully.")
-            return True, ""
-        elif script_name == "run_tests.py" and process.returncode == 1: # Pytest returns 1 for test failures
-            print(f"Notice: Utility '{script_name}' completed. Some tests failed. Results have been updated.")
-            return True, f"[NOTICE: {script_name} reported test failures. Results file updated.]\n"
+            result["success"] = True
+            if script_name == "run_tests.py":
+                result["test_status"] = "passed"
+        elif script_name == "run_tests.py":
+            result["success"] = True # The script ran, even if tests failed
+            if process.returncode == 1:
+                print(f"Notice: Utility '{script_name}' completed. Some tests failed. Results have been updated.")
+                result["message"] = f"[NOTICE: {script_name} reported test failures. Results file updated.]\n"
+                result["test_status"] = "failed"
+            elif process.returncode == 5:
+                print(f"Notice: Utility '{script_name}' completed. No tests were collected.")
+                result["message"] = f"[NOTICE: {script_name} reported no tests were collected. Results file updated.]\n"
+                result["test_status"] = "no_tests"
+            else:
+                print(f"Error: Utility '{script_name}' failed with exit code {process.returncode}.\nStderr:\n{process.stderr.strip() if process.stderr else 'N/A'}")
+                result["message"] = f"[NOTICE: {script_name} execution failed (Code: {process.returncode}). Corresponding artifact may be stale or missing.]\n"
+                result["test_status"] = "error"
         else:
             print(f"Error: Utility '{script_name}' failed with exit code {process.returncode}.\nStderr:\n{process.stderr.strip() if process.stderr else 'N/A'}")
-            return False, f"[NOTICE: {script_name} execution failed (Code: {process.returncode}). Corresponding artifact may be stale or missing.]\n"
+            result["message"] = f"[NOTICE: {script_name} execution failed (Code: {process.returncode}). Corresponding artifact may be stale or missing.]\n"
+
     except Exception as e:
         print(f"Error: An unexpected error occurred while trying to run '{script_name}': {e}")
-        return False, f"[NOTICE: Unexpected error running {script_name}. Corresponding artifact may be stale or missing.]\n"
+        result["message"] = f"[NOTICE: Unexpected error running {script_name}. Corresponding artifact may be stale or missing.]\n"
+        if script_name == "run_tests.py":
+            result["test_status"] = "error"
+            
+    return result
 
 def _get_message_from_log_line(log_line_str: str) -> str | None:
     """Extracts the core message from a formatted log line, normalizes whitespace, and strips."""
@@ -311,7 +349,7 @@ def _get_last_log_session(log_filepath: str) -> tuple[str, str]:
         parsing_debug_log.append(f"LogParser: Searching backwards for corresponding start marker before index {last_session_end_block_start_index}...\n")
         print(f"LogParser: Searching backwards for corresponding start marker before index {last_session_end_block_start_index}...") 
         for i in range(last_session_end_block_start_index - 4, -1, -1): # Search backwards from before the found end block
-            if i + 3 >= len(lines): continue # Ensure we don't go out of bounds
+            if i + 3 >= len(lines): continue
             
             msg0_s = _get_message_from_log_line(lines[i])
             msg1_s = _get_message_from_log_line(lines[i+1])
@@ -408,8 +446,8 @@ def generate_snapshot(summary_message=None, include_logs=False, summarize_module
     snapshots_dir_path = os.path.join(project_root, SNAPSHOT_DIRECTORY)
     try:
         os.makedirs(snapshots_dir_path, exist_ok=True)
-    except Exception as e:
-        print(f"Error creating snapshot directory {snapshots_dir_path}: {e}"); return None
+    except Exception as e: 
+        print(f"Error creating snapshot directory {snapshots_dir_path}: {e}"); return None, "error"
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     snapshot_filename = SNAPSHOT_FILENAME_TEMPLATE.format(timestamp=timestamp)
@@ -421,32 +459,32 @@ def generate_snapshot(summary_message=None, include_logs=False, summarize_module
     if summarize_modules: print("Module summarization requested.")
     print(f"Output will be saved to: {output_filepath}\n")
 
+    prerequisite_notices = []
+    tree_result = run_utility_script("generate_tree.py", project_root, utils_dir)
+    if not tree_result["success"]: prerequisite_notices.append(tree_result["message"])
+    
+    tests_result = run_utility_script("run_tests.py", project_root, utils_dir)
+    if tests_result["message"]: prerequisite_notices.append(tests_result["message"])
+    
+    test_status_for_summary = tests_result["test_status"].replace('_', ' ').title()
+
     snapshot_content = [
         f"micro_X Project Snapshot\n",
         f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
-        f"Summary: {summary_message if summary_message else '[No summary provided for this snapshot]'}\n"
+        f"Summary: {summary_message if summary_message else '[No summary provided for this snapshot]'}\n",
+        f"Test Status: {test_status_for_summary}\n"
     ]
     log_inclusion_message = "[Log Inclusion: Not requested or no log data found]\n"
     log_session_content_for_snapshot = "" 
     log_section_header_for_snapshot = ""
     log_section_footer_for_snapshot = ""
 
-
-    prerequisite_notices = []
-    tree_success, tree_notice = run_utility_script("generate_tree.py", project_root, utils_dir)
-    if not tree_success: prerequisite_notices.append(tree_notice) # Only append notice if script itself failed, not for tree generation logic failure
-    
-    tests_ran_successfully, tests_notice = run_utility_script("run_tests.py", project_root, utils_dir)
-    # tests_notice will contain info about failures if run_tests.py returns 1 (test failures)
-    # or if the script itself had an issue.
-    if tests_notice: prerequisite_notices.append(tests_notice)
-
     if prerequisite_notices:
         snapshot_content.append("\n--- Prerequisite Utility Status ---\n")
         snapshot_content.extend(prerequisite_notices)
         snapshot_content.append("-----------------------------------\n\n")
     else:
-        snapshot_content.append("\n[All prerequisite utilities executed successfully (tests may have passed or failed as reported by the test utility).]\n\n")
+        snapshot_content.append("\n[All prerequisite utilities executed successfully.]\n\n")
     
     log_session_type = "NONE" 
     if include_logs: 
@@ -463,7 +501,7 @@ def generate_snapshot(summary_message=None, include_logs=False, summarize_module
             log_section_footer_for_snapshot = f"\n--- END OF CURRENT ACTIVE LOG SESSION ({LOG_FILE_BASENAME}) ---\n\n"
         else: # "NONE"
             log_inclusion_message = f"Log Inclusion: Attempted, but no suitable log session found. See debug trace below.\n"
-            log_section_header_for_snapshot = f"--- LOG PARSING DEBUG TRACE ({LOG_FILE_BASENAME}) ---\n" 
+            log_section_header_for_snapshot = f"--- LOG PARSING DEBUG TRACE ({LOG_FILE_BASENAME}) ---"
             log_section_footer_for_snapshot = f"\n--- END OF LOG PARSING DEBUG TRACE ({LOG_FILE_BASENAME}) ---\n\n"
     
     snapshot_content.append(log_inclusion_message) 
@@ -472,16 +510,13 @@ def generate_snapshot(summary_message=None, include_logs=False, summarize_module
     for relative_path in FILES_TO_INCLUDE:
         full_path = os.path.join(project_root, relative_path)
         
-        # Default behavior
         is_summarizable_module = summarize_modules and relative_path in MODULE_FILES_TO_SUMMARIZE
         
-        # New logic: Check for exceptions to the summarization rule
         if is_summarizable_module and full_code_exceptions:
             module_basename = os.path.basename(relative_path)
-            # Allow matching with or without the .py extension
             if module_basename in full_code_exceptions or module_basename.replace('.py', '') in full_code_exceptions:
                 print(f"Info: Overriding summarization for '{relative_path}' due to --include-full-module flag.")
-                is_summarizable_module = False # Force full code inclusion for this module
+                is_summarizable_module = False
         
         if is_summarizable_module:
             snapshot_content.append(f"# ==============================================================================\n")
@@ -516,10 +551,10 @@ def generate_snapshot(summary_message=None, include_logs=False, summarize_module
         with open(output_filepath, 'w', encoding='utf-8') as f:
             f.writelines(snapshot_content)
         print(f"Successfully generated snapshot: {output_filepath}")
-        return output_filepath
+        return output_filepath, tests_result["test_status"]
     except Exception as e:
         print(f"Error writing snapshot file: {e}")
-        return None
+        return None, "error"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -530,7 +565,7 @@ if __name__ == "__main__":
                     "to ensure included artifacts like project_tree.txt and pytest_results.txt are up-to-date.",
         epilog="Typically run via '/utils generate_snapshot [options]' from within micro_X, "
                "or directly for development/debugging.",
-        formatter_class=argparse.RawTextHelpFormatter # Allows for newlines in help
+        formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
         "-s", "--summary", type=str,
@@ -549,7 +584,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--include-full-module",
-        nargs='+',  # This allows accepting one or more values
+        nargs='+',
         metavar='MODULE_NAME',
         help="Specify module(s) to include in full, even when --summarize is active. "
              "Provide just the filename, e.g., 'shell_engine.py' or 'shell_engine'.",
@@ -557,11 +592,14 @@ if __name__ == "__main__":
     )
     
     args = parser.parse_args()
-    generated_file = generate_snapshot(
+    generated_file, test_status = generate_snapshot(
         summary_message=args.summary, 
         include_logs=args.include_logs,
         summarize_modules=args.summarize,
         full_code_exceptions=args.include_full_module
     )
-    if generated_file: print(f"\nSnapshot generation complete. File: {generated_file}")
-    else: print("\nSnapshot generation failed.")
+    if generated_file:
+        status_message = f" (Test Status: {test_status.replace('_', ' ').title()})"
+        print(f"\nSnapshot generation complete.{status_message} File: {generated_file}")
+    else:
+        print("\nSnapshot generation failed.")
