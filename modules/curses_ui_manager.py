@@ -37,8 +37,10 @@ class CursesUIManager:
         self.is_in_edit_mode = False
         self.categorization_flow_active = False
         self.confirmation_flow_active = False
+        self.hung_task_flow_active = False
         self.categorization_flow_state = {}
         self.confirmation_flow_state = {}
+        self.hung_task_flow_state = {}
         self.last_output_was_separator = False
         self.startup_separator_added = False
         self.initial_prompt_settled = False
@@ -94,10 +96,10 @@ class CursesUIManager:
     def set_normal_input_mode(self, accept_handler_func=None, current_directory_path: str=''):
         self.categorization_flow_active = False
         self.confirmation_flow_active = False
+        self.hung_task_flow_active = False
         self.is_in_edit_mode = False
         self.input_text = ""
         self.input_handler_callback = accept_handler_func
-        # If no path is provided, we assume the CursesUIManager is handling the prompt update
         if current_directory_path:
             self.update_input_prompt(current_directory_path)
         else:
@@ -131,11 +133,17 @@ class CursesUIManager:
         self.append_output(f"\n{self.config.get('ui', {}).get('startup_separator_string', '--- STARTUP ---')}\n")
 
     def exit(self):
+        logger.info("CursesUIManager: exit() called.")
         self.is_running = False
-        if self.stdscr:
-            curses.endwin()
-        if self.input_loop_task:
+        if self.input_loop_task and not self.input_loop_task.done():
             self.input_loop_task.cancel()
+            logger.info("CursesUIManager: Input loop task cancelled.")
+        if self.stdscr:
+            self.stdscr.keypad(False)
+            curses.nocbreak()
+            curses.echo()
+            curses.endwin()
+            logger.info("CursesUIManager: curses.endwin() called and terminal restored.")
 
     def invalidate(self):
         self._redraw()
@@ -180,15 +188,11 @@ class CursesUIManager:
                     continue
 
                 if key in [curses.KEY_ENTER, 10, 13]:
-                    # Determine if we're in a special flow or normal mode
-                    if self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:
-                        # Use the specific callback for the active flow
+                    if self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode or self.hung_task_flow_active:
                         if self.input_handler_callback:
                             self.input_handler_callback(self.input_text)
                             await asyncio.sleep(0.001)
                     else:
-                        # FIX: In normal mode, first check for a built-in command.
-                        # If it's not a built-in, then submit it for normal processing.
                         if self.shell_engine_instance:
                             if not await self.shell_engine_instance.handle_built_in_command(self.input_text):
                                 await self.shell_engine_instance.submit_user_input(self.input_text)
@@ -211,6 +215,44 @@ class CursesUIManager:
             except Exception as e:
                 logger.error(f"Error in curses input task: {e}")
                 self.exit()
+
+    async def prompt_for_hung_task(self, hung_command: str) -> dict:
+        logger.info(f"CursesUIManager: Starting hung task flow for command: '{hung_command}'")
+        self.hung_task_flow_active = True
+        self.hung_task_flow_state = {
+            'future': asyncio.Future()
+        }
+        self._ask_hung_task_choice(hung_command)
+        try:
+            return await self.hung_task_flow_state['future']
+        finally:
+            self.hung_task_flow_active = False
+            logger.info("CursesUIManager: Hung task flow ended.")
+
+    def _ask_hung_task_choice(self, hung_command: str):
+        self.append_output(f"\n⚠️ The command '{hung_command}' is taking a long time.", 'warning')
+        self.append_output("   What would you like to do?", 'categorize-prompt')
+        self.append_output("   [K]ill the command | [I]gnore and continue waiting | [C]ancel your new command", 'categorize-prompt')
+        self.set_flow_input_mode(
+            prompt_text="[Hung Task] Choice (K/I/C): ",
+            accept_handler_func=self._handle_hung_task_response,
+            is_confirmation=True
+        )
+
+    def _handle_hung_task_response(self, response_text: str):
+        response = response_text.strip().lower()
+        future = self.hung_task_flow_state.get('future')
+        if not future or future.done():
+            return
+
+        if response in ['k', 'kill']:
+            future.set_result({'action': 'kill'})
+        elif response in ['i', 'ignore']:
+            future.set_result({'action': 'ignore'})
+        elif response in ['c', 'cancel']:
+            future.set_result({'action': 'cancel'})
+        else:
+            self.append_output("Invalid choice. Please enter K, I, or C.", 'error')
 
     async def prompt_for_command_confirmation(
         self,
@@ -253,7 +295,7 @@ class CursesUIManager:
         )
 
     def _handle_confirmation_main_choice_response(self, buff):
-        response = buff.text.strip().lower()
+        response = buff.strip().lower()
         future_to_set = self.confirmation_flow_state.get('future')
         cmd_to_confirm = self.confirmation_flow_state['command_to_confirm']
         if not future_to_set or future_to_set.done():
@@ -301,7 +343,7 @@ class CursesUIManager:
         )
 
     def _handle_confirmation_after_explain_response(self, buff):
-        response = buff.text.strip().lower()
+        response = buff.strip().lower()
         future_to_set = self.confirmation_flow_state.get('future')
         cmd_to_confirm = self.confirmation_flow_state['command_to_confirm']
         if not future_to_set or future_to_set.done():
@@ -363,7 +405,7 @@ class CursesUIManager:
         )
 
     def _handle_step_0_5_response(self, buff):
-        response = buff.text.strip()
+        response = buff.strip()
         proposed = self.categorization_flow_state['command_initially_proposed']
         original = self.categorization_flow_state['original_direct_input']
         future_to_set = self.categorization_flow_state.get('future')
@@ -390,7 +432,7 @@ class CursesUIManager:
             self._ask_step_0_5_confirm_command_base()
 
     def _handle_step_3_5_response(self, buff):
-        custom_command = buff.text.strip()
+        custom_command = buff.strip()
         if not custom_command:
             self.append_output("⚠️ Command cannot be empty.", 'warning')
             self._ask_step_3_5_enter_custom_command_for_categorization()
@@ -411,7 +453,7 @@ class CursesUIManager:
         )
 
     def _handle_step_1_main_action_response(self, buff):
-        response = buff.text.strip().lower()
+        response = buff.strip().lower()
         cmd_to_add = self.categorization_flow_state['command_to_add_final']
         future_to_set = self.categorization_flow_state.get('future')
         if not future_to_set or future_to_set.done():
@@ -435,7 +477,7 @@ class CursesUIManager:
             self._ask_step_1_main_action()
 
     def _handle_step_4_modified_command_response(self, buff):
-        modified_command = buff.text.strip()
+        modified_command = buff.strip()
         if not modified_command:
             self.append_output("⚠️ Modified command cannot be empty. Using previous.", 'warning')
         else:
@@ -453,7 +495,7 @@ class CursesUIManager:
         )
 
     def _handle_step_4_5_response(self, buff):
-        response = buff.text.strip()
+        response = buff.strip()
         chosen_category = CM_CATEGORY_MAP.get(response)
         future_to_set = self.categorization_flow_state.get('future')
         cmd_to_add = self.categorization_flow_state['command_to_add_final']

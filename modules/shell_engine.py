@@ -127,6 +127,11 @@ class ShellEngine:
         self.git_context_manager_instance = git_context_manager_instance
 
         self.current_directory = os.getcwd()
+        
+        # --- Process Management State ---
+        self.current_process: Optional[asyncio.subprocess.Process] = None
+        self.current_process_command: str = ""
+
 
         module_file_path = os.path.abspath(__file__)
         modules_dir_path = os.path.dirname(module_file_path)
@@ -154,6 +159,31 @@ class ShellEngine:
             logger.info("ShellEngine received main_normal_input_accept_handler_ref.")
         else:
             logger.warning("ShellEngine did NOT receive main_normal_input_accept_handler_ref. Edit mode might not work correctly.")
+
+    async def kill_current_process(self):
+        """Terminates the currently tracked process, if any."""
+        if not self.current_process or self.current_process.returncode is not None:
+            self.ui_manager.append_output("ℹ️ No active command to kill.", style_class='info')
+            logger.info("kill_current_process called but no active process found.")
+            return
+
+        logger.warning(f"Attempting to terminate process for command: '{self.current_process_command}' (PID: {self.current_process.pid})")
+        try:
+            self.current_process.terminate()
+            await asyncio.wait_for(self.current_process.wait(), timeout=2.0)
+            self.ui_manager.append_output(f"✅ Terminated command: {self.current_process_command}", style_class='success')
+            logger.info(f"Process {self.current_process.pid} terminated successfully.")
+        except asyncio.TimeoutError:
+            logger.warning(f"Process {self.current_process.pid} did not terminate gracefully. Sending SIGKILL.")
+            self.current_process.kill()
+            await self.current_process.wait() # Ensure it's cleaned up
+            self.ui_manager.append_output(f"✅ Killed command: {self.current_process_command}", style_class='success')
+        except Exception as e:
+            logger.error(f"Error terminating process {self.current_process.pid}: {e}", exc_info=True)
+            self.ui_manager.append_output(f"❌ Error killing command: {e}", style_class='error')
+        finally:
+            self.current_process = None
+            self.current_process_command = ""
 
     def _load_single_alias_file(self, file_path):
         """Loads a single alias file."""
@@ -241,53 +271,50 @@ class ShellEngine:
 
     async def execute_shell_command(self, command_to_execute: str, original_user_input_display: str):
         """Executes a simple shell command directly."""
-        if not self.ui_manager:
-            logger.error("ShellEngine.execute_shell_command: UIManager not available.")
-            return
+        if not self.ui_manager: logger.error("ShellEngine.execute_shell_command: UIManager not available."); return
         append_output_func = self.ui_manager.append_output
         logger.info(f"Executing simple command: '{command_to_execute}' in '{self.current_directory}'")
-        try:
-            if not command_to_execute.strip():
-                append_output_func("⚠️ Empty command cannot be executed.", style_class='warning')
-                logger.warning(f"Attempted to execute empty command: '{command_to_execute}' from input: '{original_user_input_display}'")
-                return
+        
+        if not command_to_execute.strip():
+            append_output_func("⚠️ Empty command cannot be executed.", style_class='warning')
+            logger.warning(f"Attempted to execute empty command: '{command_to_execute}' from input: '{original_user_input_display}'")
+            return
 
-            process = await asyncio.create_subprocess_shell(
+        try:
+            self.current_process = await asyncio.create_subprocess_shell(
                 command_to_execute,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=self.current_directory
             )
-            stdout, stderr = await process.communicate()
+            self.current_process_command = command_to_execute
+            logger.info(f"Started process {self.current_process.pid} for command: {command_to_execute}")
+
+            stdout, stderr = await self.current_process.communicate()
 
             show_verbose_prefix = command_to_execute.strip() != original_user_input_display.strip()
 
-            # --- START OF CHANGE ---
             if not show_verbose_prefix:
-                # For direct simple commands, always print the prompt line first.
                 append_output_func(f"$ {original_user_input_display}", style_class='executing')
 
             if stdout:
+                decoded_stdout = stdout.decode(errors='replace').strip()
                 if show_verbose_prefix:
-                    # For AI/aliased commands, use the descriptive prefix
-                    append_output_func(f"Output from '{original_user_input_display}':\n{stdout.decode(errors='replace').strip()}")
+                    append_output_func(f"Output from '{original_user_input_display}':\n{decoded_stdout}")
                 else:
-                    # For direct commands, the prompt is already printed, so just print the output.
-                    append_output_func(stdout.decode(errors='replace').strip())
-            # --- END OF CHANGE ---
+                    append_output_func(decoded_stdout)
 
             if stderr:
                 append_output_func(f"Stderr from '{original_user_input_display}':\n{stderr.decode(errors='replace').strip()}", style_class='warning')
             
-            if not stdout and not stderr and process.returncode == 0:
+            if not stdout and not stderr and self.current_process.returncode == 0:
                 if show_verbose_prefix:
                     append_output_func(f"Output from '{original_user_input_display}': (No output)", style_class='info')
-                # If not show_verbose_prefix, the prompt was already printed, and we do nothing else, which is correct.
             
-            if process.returncode != 0:
-                logger.warning(f"Command '{command_to_execute}' exited with code {process.returncode}")
+            if self.current_process.returncode != 0:
+                logger.warning(f"Command '{command_to_execute}' exited with code {self.current_process.returncode}")
                 if not stderr:
-                    append_output_func(f"⚠️ Command '{original_user_input_display}' exited with code {process.returncode}.", style_class='warning')
+                    append_output_func(f"⚠️ Command '{original_user_input_display}' exited with code {self.current_process.returncode}.", style_class='warning')
 
         except FileNotFoundError:
             append_output_func(f"❌ Shell (bash) or command not found for: {command_to_execute}", style_class='error')
@@ -295,185 +322,152 @@ class ShellEngine:
         except Exception as e:
             append_output_func(f"❌ Error executing '{command_to_execute}': {e}", style_class='error')
             logger.exception(f"Error executing shell command: {e}")
+        finally:
+            logger.info(f"Process for command '{self.current_process_command}' finished.")
+            self.current_process = None
+            self.current_process_command = ""
 
     async def execute_command_in_tmux(self, command_to_execute: str, original_user_input_display: str, category: str):
         """Executes a command in a new tmux window, based on category."""
-        if not self.ui_manager:
-            logger.error("ShellEngine.execute_command_in_tmux: UIManager not available.")
-            return
+        if not self.ui_manager: logger.error("ShellEngine.execute_command_in_tmux: UIManager not available."); return
         append_output_func = self.ui_manager.append_output
         logger.info(f"Executing tmux command ({category}): '{command_to_execute}' in '{self.current_directory}'")
-        try:
-            unique_id = str(uuid.uuid4())[:8]
-            window_name = f"micro_x_{unique_id}"
+        
+        if shutil.which("tmux") is None:
+            append_output_func("❌ Error: tmux not found. Cannot execute command in tmux.", style_class='error')
+            logger.error("tmux not found for tmux execution.")
+            return
 
-            if shutil.which("tmux") is None:
-                append_output_func("❌ Error: tmux not found. Cannot execute command in tmux.", style_class='error')
-                logger.error("tmux not found for tmux execution.")
+        unique_id = str(uuid.uuid4())[:8]
+        window_name = f"micro_x_{unique_id}"
+        
+        try:
+            if category == "semi_interactive":
+                await self._run_semi_interactive_tmux(command_to_execute, original_user_input_display, window_name)
+            else: # "interactive_tui"
+                await self._run_interactive_tui_tmux(command_to_execute, original_user_input_display, window_name)
+        except Exception as e:
+            append_output_func(f"❌ Unexpected error during tmux execution: {e}", style_class='error')
+            logger.exception(f"Unexpected error during tmux execution for command '{command_to_execute}': {e}")
+        finally:
+            logger.info(f"Process for command '{self.current_process_command}' finished.")
+            self.current_process = None
+            self.current_process_command = ""
+
+    async def _run_semi_interactive_tmux(self, command_to_execute, original_user_input_display, window_name):
+        append_output_func = self.ui_manager.append_output
+        tmux_poll_timeout = self.config.get('timeouts', {}).get('tmux_poll_seconds', 300)
+        tmux_sleep_after = self.config.get('timeouts', {}).get('tmux_semi_interactive_sleep_seconds', 1)
+
+        with tempfile.NamedTemporaryFile(mode='w+', delete=True, encoding='utf-8', errors='ignore') as temp_log_file:
+            log_path = temp_log_file.name
+            escaped_command_str = shlex.quote(command_to_execute)
+            wrapped_command = f"bash -c {escaped_command_str} |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
+            tmux_cmd_list_launch = ["tmux", "new-window", "-d", "-n", window_name, wrapped_command] # Added -d to detach
+            
+            logger.info(f"Launching semi_interactive tmux: {' '.join(tmux_cmd_list_launch)} (log: {log_path})")
+            
+            self.current_process = await asyncio.create_subprocess_exec(*tmux_cmd_list_launch, cwd=self.current_directory)
+            self.current_process_command = command_to_execute
+            await self.current_process.wait()
+
+            if self.current_process.returncode != 0:
+                append_output_func(f"❌ Error launching semi-interactive tmux session '{window_name}'.", style_class='error')
                 return
 
-            tmux_poll_timeout = self.config.get('timeouts', {}).get('tmux_poll_seconds', 300)
-            tmux_sleep_after = self.config.get('timeouts', {}).get('tmux_semi_interactive_sleep_seconds', 1)
+            append_output_func(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output...", style_class='info')
+            if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
-            if category == "semi_interactive":
-                with tempfile.NamedTemporaryFile(mode='w+', delete=True, encoding='utf-8', errors='ignore') as temp_log_file:
-                    log_path = temp_log_file.name
-                    logger.debug(f"Using platform-agnostic temporary file for tmux log: {log_path}")
+            # Polling logic remains the same as it checks for window existence, not process completion
+            start_time = asyncio.get_event_loop().time()
+            window_closed_or_cmd_done = False
+            while asyncio.get_event_loop().time() - start_time < tmux_poll_timeout:
+                await asyncio.sleep(1)
+                check_proc = await asyncio.create_subprocess_exec("tmux", "list-windows", "-F", "#{window_name}", stdout=asyncio.subprocess.PIPE)
+                stdout_check, _ = await check_proc.communicate()
+                if window_name not in stdout_check.decode(errors='replace'):
+                    window_closed_or_cmd_done = True; break
+            
+            if not window_closed_or_cmd_done:
+                append_output_func(f"⚠️ Tmux window '{window_name}' poll timed out.", style_class='warning')
 
-                    # Use shlex.quote for robust command escaping
-                    escaped_command_str = shlex.quote(command_to_execute)
+            temp_log_file.seek(0)
+            output_content = temp_log_file.read().strip()
+            # Output processing logic remains the same
+            tui_line_threshold = self.config.get('behavior', {}).get('tui_detection_line_threshold_pct', 30.0)
+            tui_char_threshold = self.config.get('behavior', {}).get('tui_detection_char_threshold_pct', 3.0)
+            if output_content and is_tui_like_output(output_content, tui_line_threshold, tui_char_threshold):
+                suggestion_command = f'/command move "{command_to_execute}" interactive_tui'
+                append_output_func(f"Output from '{original_user_input_display}':\n[Semi-interactive TUI-like output not displayed directly.]\n💡 Tip: Try: {suggestion_command}", style_class='info')
+            elif output_content:
+                append_output_func(f"Output from '{original_user_input_display}':\n{output_content}")
+            elif window_closed_or_cmd_done:
+                append_output_func(f"Output from '{original_user_input_display}': (No output captured)", style_class='info')
 
-                    # The command for tmux to run in a shell. It executes the user's command,
-                    # tees stdout/stderr to a log, and sleeps briefly to ensure the pane is visible.
-                    wrapped_command = f"bash -c {escaped_command_str} |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
-                    #wrapped_command = f"bash -c 'source ~/.bashrc && {command_to_execute}' |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
+    async def _run_interactive_tui_tmux(self, command_to_execute, original_user_input_display, window_name):
+        append_output_func = self.ui_manager.append_output
+        tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", command_to_execute]
+        
+        logger.info(f"Launching interactive_tui tmux: {' '.join(shlex.quote(s) for s in tmux_cmd_list)}")
+        append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait...", style_class='info')
+        if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
-                    tmux_cmd_list_launch = ["tmux", "new-window", "-n", window_name, wrapped_command]
-                    logger.info(f"Launching semi_interactive tmux: {' '.join(tmux_cmd_list_launch)} (log: {log_path})")
+        self.current_process = await asyncio.create_subprocess_exec(*tmux_cmd_list, cwd=self.current_directory)
+        self.current_process_command = command_to_execute
+        await self.current_process.wait()
 
-                    process_launch = await asyncio.create_subprocess_exec(
-                        *tmux_cmd_list_launch, cwd=self.current_directory,
-                        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-                    )
-                    _, stderr_launch = await process_launch.communicate()
-
-                    if process_launch.returncode != 0:
-                        err_msg = stderr_launch.decode(errors='replace').strip() if stderr_launch else "Unknown tmux error"
-                        append_output_func(f"❌ Error launching semi-interactive tmux session '{window_name}': {err_msg}", style_class='error')
-                        logger.error(f"Failed to launch semi-interactive tmux: {err_msg}")
-                        return
-
-                    append_output_func(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output (max {tmux_poll_timeout}s)...", style_class='info')
-                    if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
-
-                    start_time = asyncio.get_event_loop().time()
-                    window_closed_or_cmd_done = False
-
-                    while asyncio.get_event_loop().time() - start_time < tmux_poll_timeout:
-                        await asyncio.sleep(1)
-                        try:
-                            check_proc = await asyncio.create_subprocess_exec(
-                                "tmux", "list-windows", "-F", "#{window_name}",
-                                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-                            )
-                            stdout_check, _ = await check_proc.communicate()
-                            if window_name not in stdout_check.decode(errors='replace'):
-                                logger.info(f"Tmux window '{window_name}' closed or finished.")
-                                window_closed_or_cmd_done = True; break
-                        except Exception as tmux_err:
-                            logger.warning(f"Error checking tmux windows: {tmux_err}")
-                            window_closed_or_cmd_done = True; break
-
-                    if not window_closed_or_cmd_done:
-                        append_output_func(f"⚠️ Tmux window '{window_name}' poll timed out. Output might be incomplete or window still running.", style_class='warning')
-                        logger.warning(f"Tmux poll for '{window_name}' timed out.")
-
-                    temp_log_file.seek(0)
-                    output_content = temp_log_file.read().strip()
-
-                    tui_line_threshold = self.config.get('behavior', {}).get('tui_detection_line_threshold_pct', 30.0)
-                    tui_char_threshold = self.config.get('behavior', {}).get('tui_detection_char_threshold_pct', 3.0)
-
-                    if output_content and is_tui_like_output(output_content, tui_line_threshold, tui_char_threshold):
-                        logger.info(f"Output from '{original_user_input_display}' (semi-interactive) detected as TUI-like.")
-                        suggestion_command = f'/command move "{command_to_execute}" interactive_tui'
-                        append_output_func(f"Output from '{original_user_input_display}':\n[Semi-interactive TUI-like output not displayed directly.]\n💡 Tip: Try: {suggestion_command}", style_class='info')
-                    elif output_content:
-                        append_output_func(f"Output from '{original_user_input_display}':\n{output_content}")
-                    elif window_closed_or_cmd_done:
-                        append_output_func(f"Output from '{original_user_input_display}': (No output captured)", style_class='info')
-
-            else: # "interactive_tui"
-                # For interactive commands, wrap in 'bash -c' to handle complex commands consistently.
-                tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", command_to_execute]
-                #tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", f"source ~/.bashrc && {command_to_execute}"]
-                logger.info(f"Launching interactive_tui tmux: {' '.join(shlex.quote(s) for s in tmux_cmd_list)}")
-                append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait for it to complete or be detached.", style_class='info')
-                if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
-
-                process = await asyncio.to_thread(
-                    subprocess.run, tmux_cmd_list, cwd=self.current_directory, check=False
-                )
-                if process.returncode == 0:
-                    append_output_func(f"✅ Interactive tmux session for '{original_user_input_display}' ended.", style_class='success')
-                else:
-                    err_msg = f"exited with code {process.returncode}"
-                    append_output_func(f"❌ Error or non-zero exit in tmux session '{window_name}': {err_msg}", style_class='error')
-                    logger.error(f"Error reported by tmux run for cmd '{command_to_execute}': {err_msg}")
-
-        except FileNotFoundError:
-            append_output_func("❌ Error: tmux not found.", style_class='error')
-            logger.error("tmux not found during tmux interaction.")
-        except subprocess.CalledProcessError as e:
-            append_output_func(f"❌ Error interacting with tmux: {e.stderr or e}", style_class='error')
-            logger.exception(f"CalledProcessError during tmux interaction: {e}")
-        except Exception as e:
-            append_output_func(f"❌ Unexpected error interacting with tmux: {e}", style_class='error')
-            logger.exception(f"Unexpected error during tmux interaction: {e}")
+        if self.current_process.returncode == 0:
+            append_output_func(f"✅ Interactive tmux session for '{original_user_input_display}' ended.", style_class='success')
+        else:
+            append_output_func(f"❌ Error or non-zero exit in tmux session '{window_name}': exited with code {self.current_process.returncode}", style_class='error')
 
     async def _handle_script_command_async(self, full_command_str: str, script_dir_path: str, script_dir_name: str, command_name: str):
         """Generic handler for executing scripts from a specified directory (e.g., utils or user_scripts)."""
-        if not self.ui_manager:
-            logger.error(f"Cannot handle /{command_name}: UIManager not initialized.")
-            return
-
+        if not self.ui_manager: logger.error(f"Cannot handle /{command_name}: UIManager not initialized."); return
+        
         logger.info(f"Handling /{command_name} command: {full_command_str}")
-
         try:
             parts = shlex.split(full_command_str)
         except ValueError as e:
-            self.ui_manager.append_output(f"❌ Error parsing /{command_name} command: {e}", style_class='error')
-            logger.warning(f"shlex error for /{command_name} '{full_command_str}': {e}")
-            return
+            self.ui_manager.append_output(f"❌ Error parsing /{command_name} command: {e}", style_class='error'); return
 
-        help_message = f"ℹ️ Usage: /{command_name} <script_name> [args... | help | -h | --help] | list"
-        if len(parts) < 2:
-            self.ui_manager.append_output(help_message, style_class='info')
-            return
+        if len(parts) < 2: self.ui_manager.append_output(f"ℹ️ Usage: /{command_name} <script_name> [args... | help] | list", style_class='info'); return
 
         subcommand = parts[1]
-
-        # --- UNIFIED LISTING LOGIC ---
         if subcommand.lower() == "list":
-            # Always run the list_scripts.py utility from the utils directory
-            list_script_path = os.path.join(self.UTILS_DIR_PATH, "list_scripts.py")
-            if not os.path.isfile(list_script_path):
-                self.ui_manager.append_output("❌ Error: The 'list_scripts.py' utility is missing.", style_class='error')
-                return
-
-            # Formulate the command to run the unified lister
             list_command_str = f"/utils list_scripts"
-            # Re-enter the command handling logic with the new command
             await self._handle_utils_command_async(list_command_str)
             return
-        # --- END UNIFIED LISTING LOGIC ---
 
         script_path = os.path.join(script_dir_path, f"{subcommand}.py")
         if not os.path.isfile(script_path):
-            self.ui_manager.append_output(f"❌ Script not found: {subcommand}.py in '{script_dir_name}'.", style_class='error')
-            return
+            self.ui_manager.append_output(f"❌ Script not found: {subcommand}.py in '{script_dir_name}'.", style_class='error'); return
 
-        args_for_script = parts[2:]
-        command_to_execute = [sys.executable, script_path] + args_for_script
-
-        self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute)}", style_class='info')
+        command_to_execute_list = [sys.executable, script_path] + parts[2:]
+        self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute_list)}", style_class='info')
+        
         try:
-            process = await asyncio.to_thread(
-                subprocess.run, command_to_execute, capture_output=True, text=True, cwd=self.PROJECT_ROOT, check=False
+            self.current_process = await asyncio.create_subprocess_exec(
+                *command_to_execute_list,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                cwd=self.PROJECT_ROOT
             )
-            if process.stdout:
-                self.ui_manager.append_output(f"Output from '{subcommand}.py':\n{process.stdout.strip()}")
-            if process.stderr:
-                self.ui_manager.append_output(f"Stderr from '{subcommand}.py':\n{process.stderr.strip()}", style_class='warning')
-            if process.returncode != 0:
-                self.ui_manager.append_output(f"⚠️ Script '{subcommand}.py' exited with code {process.returncode}.", style_class='warning')
-            else:
-                self.ui_manager.append_output(f"✅ Script '{subcommand}.py' completed.", style_class='success')
+            self.current_process_command = full_command_str
+            stdout, stderr = await self.current_process.communicate()
 
-            if subcommand == 'alias':
-                self._reload_aliases()
+            if stdout: self.ui_manager.append_output(f"Output from '{subcommand}.py':\n{stdout.decode(errors='replace').strip()}")
+            if stderr: self.ui_manager.append_output(f"Stderr from '{subcommand}.py':\n{stderr.decode(errors='replace').strip()}", style_class='warning')
+            
+            if self.current_process.returncode == 0:
+                self.ui_manager.append_output(f"✅ Script '{subcommand}.py' completed.", style_class='success')
+                if subcommand == 'alias': self._reload_aliases()
+            else:
+                self.ui_manager.append_output(f"⚠️ Script '{subcommand}.py' exited with code {self.current_process.returncode}.", style_class='warning')
         except Exception as e:
             self.ui_manager.append_output(f"❌ Failed to execute script: {e}", style_class='error')
+        finally:
+            self.current_process = None
+            self.current_process_command = ""
 
     async def _handle_utils_command_async(self, full_command_str: str):
         await self._handle_script_command_async(full_command_str, self.UTILS_DIR_PATH, self.UTILS_DIR_NAME, "utils")

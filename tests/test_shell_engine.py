@@ -361,15 +361,19 @@ async def test_execute_command_in_tmux_semi_interactive_tui_detected(shell_engin
 
 @pytest.mark.asyncio
 async def test_execute_command_in_tmux_interactive_tui_success(shell_engine):
-    mock_subprocess_run_result = MagicMock(returncode=0)
+    mock_process = AsyncMock()
+    mock_process.wait.return_value = 0
+    mock_process.returncode = 0
 
     with patch('shutil.which', return_value="/usr/bin/tmux"), \
-         patch('modules.shell_engine.subprocess.run', return_value=mock_subprocess_run_result):
+         patch('asyncio.create_subprocess_exec', return_value=mock_process) as mock_create_subprocess_exec:
         
-        await shell_engine.execute_command_in_tmux("nano test.txt", "nano test.txt", "interactive_tui")
+        await shell_engine.execute_command_in_tmux("nano dummy_test_file.txt", "nano dummy_test_file.txt", "interactive_tui")
+        
+        mock_create_subprocess_exec.assert_called_once()
         
         # Use regex to match the launch message since the UUID is random
-        expected_pattern = re.compile(r"^⚡ Launching interactive command in tmux \(window: micro_x_[0-9a-fA-F]{8}\)\. micro_X will wait for it to complete or be detached\.$")
+        expected_pattern = re.compile(r"^⚡ Launching interactive command in tmux \(window: micro_x_[0-9a-fA-F]{8}\)\. micro_X will wait...$")
         
         found_launch_message = False
         for call_args in shell_engine.ui_manager.append_output.call_args_list:
@@ -379,5 +383,6 @@ async def test_execute_command_in_tmux_interactive_tui_success(shell_engine):
         assert found_launch_message, "Launch message not found or malformed for interactive TUI"
 
         shell_engine.ui_manager.append_output.assert_any_call(
-            "✅ Interactive tmux session for 'nano test.txt' ended.", style_class='success'
+            "✅ Interactive tmux session for 'nano dummy_test_file.txt' ended.", style_class='success'
         )
+
