@@ -61,7 +61,9 @@ ui_manager_instance = None
 shell_engine_instance = None
 git_context_manager_instance = None
 
-# --- FIX: Define a custom exception for integrity check failures ---
+# --- Process Management & Concurrency Control ---
+input_lock = asyncio.Lock()
+
 class StartupIntegrityError(Exception):
     """Custom exception to signal a fatal integrity check failure during startup."""
     pass
@@ -86,7 +88,6 @@ def load_configuration():
     default_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, DEFAULT_CONFIG_FILENAME)
     user_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, USER_CONFIG_FILENAME)
 
-    # Step 1: Load the mandatory default configuration file.
     base_config = modules.config_handler.load_jsonc_file(default_config_path)
     if base_config is None:
         error_msg = f"CRITICAL ERROR: Default configuration file not found or failed to parse at '{default_config_path}'. Application cannot start."
@@ -96,7 +97,6 @@ def load_configuration():
     logger.info(f"Successfully loaded base configuration from {default_config_path}")
     config = base_config
 
-    # Step 2: Load optional user configuration and merge it.
     user_settings = modules.config_handler.load_jsonc_file(user_config_path)
     if user_settings:
         config = merge_configs(config, user_settings)
@@ -108,61 +108,59 @@ def load_configuration():
 load_configuration() # Load config at startup
 
 def normal_input_accept_handler(buff):
-    """
-    Handles normal user input submission from the prompt_toolkit input field. This is the default handler for the input field.
-    It's also used when submitting an edited command after choosing 'Modify' in AI confirmation.
+    """Universal handler for input submission from both prompt_toolkit and Curses UI."""
+    global shell_engine_instance, ui_manager_instance, config
 
-    This function is a universal handler for both prompt_toolkit's buffer object and the raw
-    string passed from CursesUIManager, ensuring compatibility across both UI backends.
-    """
-    global shell_engine_instance, ui_manager_instance # These are globals
-
-    # Check if the input is a raw string (from the Curses UI) or a buffer (from prompt_toolkit)
-    if isinstance(buff, str):
-        user_input_stripped = buff.strip()
-    else:
-        # Assume it's a prompt_toolkit buffer-like object
-        user_input_stripped = buff.text.strip()
-
+    user_input_stripped = buff.strip() if isinstance(buff, str) else buff.text.strip()
     logger.info(f"normal_input_accept_handler received: '{user_input_stripped}'")
 
-    # FIX: Explicitly clear the CursesUIManager's input buffer to prevent the visual bug
-    # where the text remains on screen while the asynchronous processing runs.
     if isinstance(ui_manager_instance, CursesUIManager):
         ui_manager_instance.input_text = ""
 
-    was_in_edit_mode = False
-    if ui_manager_instance:
-        was_in_edit_mode = ui_manager_instance.is_in_edit_mode
-        if was_in_edit_mode:
-            logger.info("Input submission is from edit mode context.")
+    was_in_edit_mode = ui_manager_instance.is_in_edit_mode if ui_manager_instance else False
+    if was_in_edit_mode:
+        logger.info("Input submission is from edit mode context.")
 
     async def _handle_input():
+        command_lock_timeout = config.get('timeouts', {}).get('command_lock_timeout_seconds', 15.0)
+        
         try:
-            # --- START OF CHANGE ---
-            # This logic ensures that the separator is added after built-in commands like /help.
+            await asyncio.wait_for(input_lock.acquire(), timeout=command_lock_timeout)
+        except asyncio.TimeoutError:
+            logger.error(f"Could not acquire input lock within {command_lock_timeout}s. A previous command may be stuck.")
+            if ui_manager_instance and shell_engine_instance:
+                hung_task_result = await ui_manager_instance.prompt_for_hung_task(shell_engine_instance.current_process_command)
+                action = hung_task_result.get('action')
+                if action == 'kill':
+                    await shell_engine_instance.kill_current_process()
+                    # After killing, we can now re-acquire the lock and proceed with the new command.
+                    # The lock should have been released by the finally block of the killed task's execution wrapper.
+                    # To be safe, we can try to acquire it again here.
+                    if not input_lock.locked():
+                         asyncio.create_task(_handle_input()) # Retry the original input
+                    else:
+                        ui_manager_instance.append_output("⚠️ Lock still held after kill signal. Please restart.", style_class='error')
+                elif action == 'ignore':
+                    ui_manager_instance.append_output("ℹ️ Ignoring hung task. Your new command is queued.", style_class='info')
+                    asyncio.create_task(_handle_input()) # Re-queue the current command
+            return
+
+        try:
             was_handled_as_builtin = await shell_engine_instance.handle_built_in_command(user_input_stripped)
 
             if not was_handled_as_builtin:
-                # If it wasn't a built-in, process it as a normal command.
-                # The separator logic for this path is handled within ShellEngine.process_command.
                 await shell_engine_instance.submit_user_input(user_input_stripped, from_edit_mode=was_in_edit_mode)
             else:
-                # If a built-in command was handled (and it wasn't an exit command, which would have
-                # terminated the process), we need to manually restore the input handler to ensure
-                # the UI state is correct and the separator is added.
-                # We skip this if we were in edit mode, as the 'finally' block below will handle it.
-                if not was_in_edit_mode:
-                    if shell_engine_instance and shell_engine_instance.main_restore_normal_input_ref:
-                        shell_engine_instance.main_restore_normal_input_ref()
-            # --- END OF CHANGE ---
+                if not was_in_edit_mode and shell_engine_instance and shell_engine_instance.main_restore_normal_input_ref:
+                    shell_engine_instance.main_restore_normal_input_ref()
         finally:
+            if input_lock.locked():
+                input_lock.release()
+            
             if was_in_edit_mode:
                 logger.debug("Input was from edit mode; explicitly calling restore_normal_input_handler.")
                 if ui_manager_instance:
-                    logger.debug(f"Before calling restore_normal_input_handler, ui_manager.is_in_edit_mode was {ui_manager_instance.is_in_edit_mode}. Resetting to False.")
                     ui_manager_instance.is_in_edit_mode = False
-
                 if shell_engine_instance and shell_engine_instance.main_restore_normal_input_ref:
                     shell_engine_instance.main_restore_normal_input_ref()
                 else:
@@ -409,8 +407,8 @@ async def main_async_runner():
     current_dir_for_prompt = shell_engine_instance.current_directory
     if current_dir_for_prompt == home_dir: initial_prompt_dir = "~"
     elif current_dir_for_prompt.startswith(home_dir + os.sep):
-        rel_path = current_dir_for_prompt[len(home_dir)+1:]; full_rel_prompt = "~/" + rel_path
-        initial_prompt_dir = full_rel_prompt if len(full_rel_prompt) <= max_prompt_len else "~/" + "..." + rel_path[-(max_prompt_len - 5):] if (max_prompt_len - 5) > 0 else "~/... "
+        rel_path = current_dir_for_prompt[len(home_dir)+1:]; full_rel_prompt = "~/"; full_rel_prompt += rel_path
+        initial_prompt_dir = full_rel_prompt if len(full_rel_prompt) <= max_prompt_len else "~/"; initial_prompt_dir += "..." + rel_path[-(max_prompt_len - 5):] if (max_prompt_len - 5) > 0 else "~/... "
     else:
         base_name = os.path.basename(current_dir_for_prompt)
         initial_prompt_dir = base_name if len(base_name) <= max_prompt_len else "..." + base_name[-(max_prompt_len - 3):] if (max_prompt_len - 3) > 0 else "..."

@@ -111,6 +111,9 @@ class UIManager:
         self.confirmation_flow_active = False
         self.confirmation_flow_state = {}
 
+        self.hung_task_flow_active = False
+        self.hung_task_flow_state = {}
+
         self.is_in_edit_mode = False
 
         self.current_prompt_text = ""
@@ -131,18 +134,18 @@ class UIManager:
         @self.kb.add('c-c')
         @self.kb.add('c-d')
         def _handle_exit_or_cancel(event):
-            # This handler's responsibility is to cancel any active flow by resolving its future.
-            # The responsibility to restore the UI to normal mode lies with the caller of the flow
-            # (e.g., ShellEngine.process_command), which will do so in its 'finally' block
-            # after the flow's future has been resolved. This prevents race conditions.
-            if self.categorization_flow_active:
+            if self.hung_task_flow_active:
+                self.append_output("\n⚠️ Hung task prompt cancelled.", style_class='warning')
+                if 'future' in self.hung_task_flow_state and not self.hung_task_flow_state['future'].done():
+                    self.hung_task_flow_state['future'].set_result({'action': 'cancel'})
+                event.app.invalidate()
+            elif self.categorization_flow_active:
                 self.append_output("\n⚠️ Categorization cancelled by user.", style_class='warning')
                 logger.info("Categorization flow cancelled by Ctrl+C/D.")
                 if 'future' in self.categorization_flow_state and \
                    self.categorization_flow_state.get('future') and \
                    not self.categorization_flow_state['future'].done():
                     self.categorization_flow_state['future'].set_result({'action': 'cancel_execution'})
-                # The call to restore normal input is intentionally removed from here.
                 event.app.invalidate()
             elif self.confirmation_flow_active:
                 self.append_output("\n⚠️ Command confirmation cancelled by user.", style_class='warning')
@@ -151,15 +154,11 @@ class UIManager:
                    self.confirmation_flow_state.get('future') and \
                    not self.confirmation_flow_state['future'].done():
                     self.confirmation_flow_state['future'].set_result({'action': 'cancel'})
-                # The call to restore normal input is intentionally removed from here.
                 event.app.invalidate()
             elif self.is_in_edit_mode:
                 self.append_output("\n⌨️ Command editing cancelled.", style_class='info')
                 logger.info("Command edit mode cancelled by Ctrl+C/D.")
                 self.is_in_edit_mode = False
-                # If edit mode was entered from a flow, that flow is already complete.
-                # Restoring the normal input handler is the correct action here, as it's
-                # the end of a self-contained "edit" operation.
                 if self.main_restore_normal_input_ref:
                     self.main_restore_normal_input_ref()
                 event.app.invalidate()
@@ -250,12 +249,63 @@ class UIManager:
     def get_key_bindings(self) -> KeyBindings:
         return self.kb
 
-    # --- NEW: Caution Confirmation Flow ---
+    def exit(self):
+        """Tells the prompt_toolkit application to exit gracefully."""
+        if self.app and hasattr(self.app, 'exit'):
+            logger.info("UIManager: Calling app.exit() to terminate prompt_toolkit loop.")
+            self.app.exit()
+        else:
+            logger.warning("UIManager: exit() called, but self.app is not set or has no exit method.")
+
+    # --- Hung Task Flow ---
+    async def prompt_for_hung_task(self, hung_command: str) -> dict:
+        """Initiates a flow to ask the user how to handle a hung command."""
+        logger.info(f"UIManager: Starting hung task flow for command: '{hung_command}'")
+        self.hung_task_flow_active = True
+        self.hung_task_flow_state = {
+            'future': asyncio.Future()
+        }
+
+        self._ask_hung_task_choice(hung_command)
+
+        try:
+            result = await self.hung_task_flow_state['future']
+            return result
+        finally:
+            self.hung_task_flow_active = False
+            logger.info("UIManager: Hung task flow ended.")
+
+    def _ask_hung_task_choice(self, hung_command: str):
+        self.append_output(f"\n⚠️ The command '{hung_command}' is taking a long time.", style_class='warning')
+        self.append_output("   What would you like to do?", style_class='categorize-prompt')
+        self.append_output("   [K]ill the command | [I]gnore and continue waiting | [C]ancel your new command", style_class='categorize-prompt')
+        self.set_flow_input_mode(
+            prompt_text="[Hung Task] Choice (K/I/C): ",
+            accept_handler_func=self._handle_hung_task_response,
+            is_confirmation=True # Re-use confirmation flag to lock scrolling etc.
+        )
+
+    def _handle_hung_task_response(self, buff):
+        response = buff.text.strip().lower()
+        future = self.hung_task_flow_state.get('future')
+        if not future or future.done():
+            return
+
+        if response in ['k', 'kill']:
+            future.set_result({'action': 'kill'})
+        elif response in ['i', 'ignore']:
+            future.set_result({'action': 'ignore'})
+        elif response in ['c', 'cancel']:
+            future.set_result({'action': 'cancel'})
+        else:
+            self.append_output("Invalid choice. Please enter K, I, or C.", style_class='error')
+            # No need to re-ask here, the prompt is still visible. The handler will just be called again.
+
+    # --- Caution Confirmation Flow ---
     async def prompt_for_caution_confirmation(self, command_to_confirm: str) -> dict:
         """Initiates a simple Yes/No confirmation for potentially sensitive commands."""
         logger.info(f"UIManager: Starting caution confirmation for '{command_to_confirm}'.")
-        # Use existing flow flags to manage UI state, but with a unique state dict
-        self.confirmation_flow_active = True # Re-use this flag to lock scrolling etc.
+        self.confirmation_flow_active = True
         self.confirmation_flow_state = {
             'command_to_confirm': command_to_confirm,
             'future': asyncio.Future()
@@ -291,7 +341,6 @@ class UIManager:
             future_to_set.set_result({'proceed': False})
         else:
             self.append_output("Invalid choice. Please enter 'yes' or 'no'.", style_class='error')
-            # Re-ask the question
             self.set_flow_input_mode(
                 prompt_text="[Confirm Execution] (yes/no): ",
                 accept_handler_func=self._handle_caution_confirmation_response,

@@ -8,26 +8,29 @@ import sys
 # Using triple-quoted strings for easy multiline formatting.
 
 GENERAL_HELP = """
-micro_X AI-Enhanced Shell - General Help
+micro_X AI-Enhanced Shell
 
-Welcome to micro_X! An intelligent shell that blends traditional command execution with AI capabilities.
+A smart shell that translates natural language and streamlines your workflow.
+Start by typing a command or use '/ai' to translate from English.
 
-Usage:
-  /help [topic]
+Common Commands:
+  /ai <query>         - Translates natural language to a shell command.
+  /help [topic]       - Displays this help message or help for a specific topic.
+  /alias              - Manage command aliases (shortcuts).
+  /command            - Manage command categorizations.
+  /config             - Opens a web UI to manage your configuration.
+  /snapshot           - Creates a snapshot of the project for context sharing.
+  /tree               - Generates a file showing the project structure.
+  /update             - Pulls the latest changes for micro_X.
+  /list               - Lists available utility and user scripts.
+  /ollama             - Manage the Ollama service.
+  /dev                - Manage the multi-branch development environment.
+    -> /dev --activate : Clones 'testing' and 'dev' branches to setup the dev environment.
+  /setup_brew         - Installs Homebrew and required packages on macOS.
 
+For more details on a specific feature, use '/help <topic>'.
 Available Topics:
-  ai        - Details on AI-powered command translation and interaction.
-  alias     - How to use and manage command aliases (shortcuts).
-  command   - How to manage command categorizations (simple, semi_interactive, etc.).
-  config    - Explanation of the configuration files and key settings.
-  dev       - Guide for developers and contributors.
-  keys      - A guide to the keybindings and shortcuts available in the shell.
-  security  - Information on the built-in safety features.
-  utils     - Information on built-in utility scripts like /snapshot, /tree, etc.
-
-Examples:
-  /help ai
-  /help alias
+  ai, alias, command, config, dev, keys, security, utils
 """
 
 AI_HELP = """
@@ -92,22 +95,22 @@ Categories:
 UTILS_HELP = """
 micro_X Help: Built-in Utilities
 
-micro_X comes with several utility scripts to help manage the shell and your project. They are run using the '/utils' command.
+micro_X comes with several utility scripts to help manage the shell and your project.
+While they can be run with '/utils <script_name>', it is recommended to use the shorter alias for them.
 
-Common Utilities:
-  /utils alias            - Manage command aliases. Use '/alias --list' to see all.
-  /utils command          - Manage command categorizations (see '/help command').
-  /utils config_manager   - Start a web-based UI to manage your configuration files.
-  /utils dev              - Manage the multi-branch development environment.
-  /utils generate_snapshot- Create a text snapshot of the entire project for context sharing.
-  /utils generate_tree    - Generate a 'project_tree.txt' file showing the project structure.
-  /utils list_scripts     - List all available utility and user scripts.
-  /utils ollama_cli       - Manage the Ollama service (start, stop, status, restart).
-  /utils run_tests        - Run the project's automated test suite (pytest).
-  /utils update           - Pull the latest changes for micro_X from its Git repository.
+Common Utilities & Their Aliases:
+  /utils alias            (alias: /alias)
+  /utils command          (alias: /command)
+  /utils config_manager   (alias: /config)
+  /utils dev              (alias: /dev)
+  /utils generate_snapshot(alias: /snapshot)
+  /utils generate_tree    (alias: /tree)
+  /utils list_scripts     (alias: /list)
+  /utils ollama_cli       (alias: /ollama)
+  /utils update           (alias: /update)
+  /utils run_tests        (no default alias)
 
-To see all available utilities, run:
-  /utils list
+To see all available utility scripts, run '/list'.
 """
 
 KEYS_HELP = """
