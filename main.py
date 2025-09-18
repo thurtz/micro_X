@@ -198,11 +198,6 @@ def _exit_app_main():
     logger.info("Exit requested by a component. Raising SystemExit(0) to terminate.")
     sys.exit(0)
 
-
-
-# --- FIX: Removed the _exit_app_main() function.
-# Its logic is now handled by the SystemExit exception raised directly by sys.exit().
-
 async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
     """
     Performs Git integrity checks at startup. Returns: (is_developer_mode, integrity_ok)

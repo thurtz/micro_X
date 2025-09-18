@@ -1,52 +1,3 @@
-# --- API DOCUMENTATION for modules/ollama_manager.py ---
-#
-# **Purpose:** Manages the `ollama serve` process lifecycle, including starting,
-# stopping, and checking the status of the Ollama service, typically within a
-# managed tmux session.
-#
-# **Public Functions:**
-#
-# async def ensure_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
-#     """
-#     Ensures the Ollama service is available, performing an automatic startup if needed.
-#
-#     This is the main entry point for the startup sequence in main.py. It checks if
-#     the server is running; if not, and if auto-start is enabled, it attempts
-#     to launch 'ollama serve' in a tmux session and waits for it to become responsive.
-#
-#     Args:
-#         main_config (dict): The main application configuration object.
-#         append_output_callback (callable): Reference to UIManager.append_output.
-#
-#     Returns:
-#         bool: True if the service is ready, False otherwise.
-#     """
-#
-# async def explicit_start_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
-#     """Handles the '/ollama start' command to explicitly start the service."""
-#
-# async def explicit_stop_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
-#     """Handles the '/ollama stop' command to explicitly stop the managed service."""
-#
-# async def explicit_restart_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
-#     """Handles the '/ollama restart' command."""
-#
-# async def get_ollama_status_info(main_config: dict, append_output_callback: callable):
-#     """Handles the '/ollama status' command, printing status info to the UI."""
-#
-# async def is_ollama_server_running() -> bool:
-#     """
-#     Checks if the Ollama server is running and responsive via an API call.
-#
-#     Returns:
-#         bool: True if the server is responsive, False otherwise.
-#     """
-#
-# **Key Global Constants/Variables:**
-#   (None intended for direct external use)
-#
-# --- END API DOCUMENTATION ---
-
 #!/usr/bin/env python
 
 import asyncio
@@ -126,8 +77,10 @@ async def _find_ollama_executable() -> str | None:
     return None
 
 async def is_ollama_server_running() -> bool:
-    """
-    Checks if the Ollama server is running and responsive by trying to list models.
+    """Checks if the Ollama server is running and responsive via an API call.
+
+    Returns:
+        True if the server is responsive, False otherwise.
     """
     if not _is_initialized: # Required for logging/feedback via _append_output_func_cached
         logger.warning("Cannot check Ollama server status: Manager not initialized.")
@@ -233,9 +186,19 @@ async def _wait_for_server_readiness() -> bool:
         _append_output_func_cached(f"   Try checking the '{TMUX_OLLAMA_SESSION_NAME}' tmux session or 'ollama serve' logs.", style_class='error')
     return False
 
-async def ensure_ollama_service(main_config: dict, append_output_callback) -> bool:
-    """
-    Ensures the Ollama service is available (automatic startup check).
+async def ensure_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
+    """Ensures the Ollama service is available, performing an automatic startup if needed.
+
+    This is the main entry point for the startup sequence in main.py. It checks if
+    the server is running; if not, and if auto-start is enabled, it attempts
+    to launch 'ollama serve' in a tmux session and waits for it to become responsive.
+
+    Args:
+        main_config: The main application configuration object.
+        append_output_callback: Reference to UIManager.append_output.
+
+    Returns:
+        True if the service is ready, False otherwise.
     """
     _initialize_manager_if_needed(main_config, append_output_callback)
 
@@ -271,8 +234,8 @@ async def ensure_ollama_service(main_config: dict, append_output_callback) -> bo
     return await _wait_for_server_readiness()
 
 
-async def explicit_start_ollama_service(main_config: dict, append_output_callback) -> bool:
-    """Explicitly tries to start the Ollama service if not already running."""
+async def explicit_start_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
+    """Handles the '/ollama start' command to explicitly start the service."""
     _initialize_manager_if_needed(main_config, append_output_callback)
     if _append_output_func_cached:
         _append_output_func_cached("⚙️ Received command: /ollama start", style_class='info')
@@ -294,8 +257,8 @@ async def explicit_start_ollama_service(main_config: dict, append_output_callbac
     return await _wait_for_server_readiness()
 
 
-async def explicit_stop_ollama_service(main_config: dict, append_output_callback) -> bool:
-    """Explicitly tries to stop the managed Ollama service."""
+async def explicit_stop_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
+    """Handles the '/ollama stop' command to explicitly stop the managed service."""
     _initialize_manager_if_needed(main_config, append_output_callback)
     stopped_managed_session = False
     if _append_output_func_cached:
@@ -351,8 +314,8 @@ async def explicit_stop_ollama_service(main_config: dict, append_output_callback
     return True # True because the action to stop the *managed* session was completed or it wasn't running.
 
 
-async def explicit_restart_ollama_service(main_config: dict, append_output_callback) -> bool:
-    """Explicitly tries to restart the managed Ollama service."""
+async def explicit_restart_ollama_service(main_config: dict, append_output_callback: callable) -> bool:
+    """Handles the '/ollama restart' command."""
     _initialize_manager_if_needed(main_config, append_output_callback)
     if _append_output_func_cached:
         _append_output_func_cached("⚙️ Received command: /ollama restart", style_class='info')
@@ -374,8 +337,8 @@ async def explicit_restart_ollama_service(main_config: dict, append_output_callb
 
     return await explicit_start_ollama_service(main_config, append_output_callback)
 
-async def get_ollama_status_info(main_config: dict, append_output_callback):
-    """Gets and appends the status of the Ollama service and managed session."""
+async def get_ollama_status_info(main_config: dict, append_output_callback: callable):
+    """Handles the '/ollama status' command, printing status info to the UI."""
     _initialize_manager_if_needed(main_config, append_output_callback)
     if not _append_output_func_cached: return
 

@@ -1,67 +1,3 @@
-# --- API DOCUMENTATION for modules/ai_handler.py ---
-#
-# **Purpose:** Handles all interactions with Ollama LLMs for translating natural
-# language to commands, validating command syntax, and explaining commands.
-#
-# **Public Functions:**
-#
-# async def is_valid_linux_command_according_to_ai(command_text: str, config_param: dict) -> bool | None:
-#     """
-#     Asks the Validator AI model if the given text is a likely Linux command.
-#
-#     Performs multiple validation attempts as configured and returns a boolean
-#     based on a majority vote of the AI's 'yes'/'no' responses.
-#
-#     Args:
-#         command_text (str): The string to validate.
-#         config_param (dict): The main application configuration object.
-#
-#     Returns:
-#         bool | None: True if the AI considers it a command, False if not.
-#                      None if the result is inconclusive after all attempts.
-#     """
-#
-# async def get_validated_ai_command(human_query: str, config_param: dict, append_output_func: callable, get_app_func: callable) -> tuple[str | None, str | None]:
-#     """
-#     The main entry point to translate a natural language query into a validated shell command.
-#
-#     This function orchestrates a multi-step process:
-#     1. It tries the 'primary_translator' AI to get a command.
-#     2. If successful, it validates the command using `is_valid_linux_command_according_to_ai`.
-#     3. If the primary translator fails or validation fails, it can fall back to a
-#        'direct_translator' AI if configured.
-#     4. This cycle repeats for a configured number of attempts.
-#
-#     Args:
-#         human_query (str): The user's natural language query.
-#         config_param (dict): The main application configuration object.
-#         append_output_func (callable): A reference to UIManager.append_output for UI updates.
-#         get_app_func (callable): A reference to UIManager.get_app_instance for UI invalidation.
-#
-#     Returns:
-#         tuple[str | None, str | None]: A tuple containing (validated_command, raw_ai_response).
-#                                        The command is None if no valid command could be produced.
-#                                        The raw response is the last candidate from the AI.
-#     """
-#
-# async def explain_linux_command_with_ai(command_to_explain: str, config_param: dict, append_output_func: callable) -> str | None:
-#     """
-#     Uses an AI model to provide a natural language explanation of a given command.
-#
-#     Args:
-#         command_to_explain (str): The command string to be explained.
-#         config_param (dict): The main application configuration object.
-#         append_output_func (callable): A reference to UIManager.append_output for UI updates.
-#
-#     Returns:
-#         str | None: The AI-generated explanation as a string, or a fallback message/None on error.
-#     """
-#
-# **Key Global Constants/Variables:**
-#   (None intended for direct external use)
-#
-# --- END API DOCUMENTATION ---
-
 # modules/ai_handler.py
 
 import asyncio
@@ -73,13 +9,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 # --- AI Integration Constants ---
-_COMMAND_PATTERN_STRING = (
-    r"<bash>\s*'(.*?)'\s*</bash>|<bash>\s*(.*?)\s*</bash>|<bash>\s*`(.*?)`\s*</bash>|"
-    r"```bash\s*\n([\s\S]*?)\n```|<code>\s*'(.*?)'\s*</code>|<code>\s*(.*?)\s*</code>|"
-    r"<pre>\s*'(.*?)'\s*</pre>|<pre>\s*(.*?)\s*</pre>|<command>\s*'(.*?)'\s*</command>|"
-    r"<command>\s*(.*?)\s*</command>|<cmd>\s*'(.*?)'\s*</cmd>|<cmd>\s*(.*?)\s*</cmd>|"
+_COMMAND_PATTERN_STRING = "".join([
+    r"<bash>\s*'(.*?)'\s*</bash>|<bash>\s*(.*?)\s*</bash>|<bash>\s*`(.*?)`\s*</bash>|",
+    r"```bash\s*\n([\s\S]*?)\n```|<code>\s*'(.*?)'\s*</code>|<code>\s*(.*?)</code>|",
+    r"<pre>\s*'(.*?)'\s*</pre>|<pre>\s*(.*?)\s*</pre>|<command>\s*'(.*?)'\s*</command>|",
+    r"<command>\s*(.*?)\s*</command>|<cmd>\s*'(.*?)'\s*</cmd>|<cmd>\s*(.*?)\s*</cmd>|",
     r"```\s*([\s\S]*?)\s*```|<unsafe>\s*([\s\S]*?)\s*</unsafe>"
-)
+])
 COMMAND_PATTERN = None
 EXPECTED_GROUPS = 0
 try:
@@ -87,7 +23,7 @@ try:
     EXPECTED_GROUPS = _COMMAND_PATTERN_STRING.count('|') + 1
     logger.debug(f"COMMAND_PATTERN compiled with {COMMAND_PATTERN.groups} groups (expected {EXPECTED_GROUPS}).")
     if COMMAND_PATTERN.groups != EXPECTED_GROUPS:
-        logger.error(f"CRITICAL: COMMAND_PATTERN groups mismatch: {COMMAND_PATTERN.groups} vs {EXPECTED_GROUPS}.")
+        logger.critical(f"CRITICAL: COMMAND_PATTERN groups mismatch: {COMMAND_PATTERN.groups} vs {EXPECTED_GROUPS}.")
         COMMAND_PATTERN = None
 except re.error as e:
     logger.critical(f"Failed to compile COMMAND_PATTERN regex: {e}", exc_info=True)
@@ -122,10 +58,10 @@ def _clean_extracted_command(extracted_candidate: str) -> str:
             logger.debug(f"Inner tag <{tag_name}> found but not one of expected types to strip. Original: '{original_for_log}'")
 
     if len(processed_candidate) >= 2:
-        if processed_candidate.startswith("'") and processed_candidate.endswith("'"):
+        if processed_candidate.startswith("'" ) and processed_candidate.endswith("'" ):
             processed_candidate = processed_candidate[1:-1].strip()
             logger.debug(f"Stripped outer single quotes: '{original_for_log}' -> '{processed_candidate}'")
-        elif processed_candidate.startswith("`") and processed_candidate.endswith("`"):
+        elif processed_candidate.startswith("`" ) and processed_candidate.endswith("`" ):
             processed_candidate = processed_candidate[1:-1].strip()
             logger.debug(f"Stripped outer backticks: '{original_for_log}' -> '{processed_candidate}'")
 
@@ -164,7 +100,19 @@ def _clean_extracted_command(extracted_candidate: str) -> str:
 
 
 async def is_valid_linux_command_according_to_ai(command_text: str, config_param: dict) -> bool | None:
-    """Asks the Validator AI model if the given text is a valid Linux command."""
+    """Asks the Validator AI model if the given text is a likely Linux command.
+
+    Performs multiple validation attempts as configured and returns a boolean
+    based on a majority vote of the AI's 'yes'/'no' responses.
+
+    Args:
+        command_text: The string to validate.
+        config_param: The main application configuration object.
+
+    Returns:
+        True if the AI considers it a command, False if not.
+        None if the result is inconclusive after all attempts.
+    """
     if not command_text or len(command_text) < 2 or len(command_text) > 200:
         logger.debug(f"Skipping AI validation for command_text of length {len(command_text)}: '{command_text}'")
         return None
@@ -228,7 +176,7 @@ async def is_valid_linux_command_according_to_ai(command_text: str, config_param
 
     yes_count = responses.count(True)
     no_count = responses.count(False)
-    logger.debug(f"Validator AI responses for '{command_text}': Yes: {yes_count}, No: {no_count}, Unclear/Error: {responses.count(None)}")
+    logger.debug(f"Validator AI responses for '{command_text}': Yes: {yes_count}, No: {no_count}, Unclear/Error: {responses.count(None)})")
 
     if yes_count >= (validator_attempts // 2 + 1):
         return True
@@ -457,8 +405,26 @@ async def _get_direct_ai_output(human_input: str, config_param: dict, append_out
 
 
 async def get_validated_ai_command(human_query: str, config_param: dict, append_output_func, get_app_func) -> tuple[str | None, str | None]:
-    """
-    Attempts to get a validated Linux command using primary and secondary AI translators.
+    """Translates a natural language query into a validated shell command.
+
+    This function orchestrates a multi-step process:
+    1. It tries the 'primary_translator' AI to get a command.
+    2. If successful, it validates the command using
+       `is_valid_linux_command_according_to_ai`.
+    3. If the primary translator or validation fails, it can fall back to a
+       'direct_translator' AI if configured.
+    4. This cycle repeats for a configured number of attempts.
+
+    Args:
+        human_query: The user's natural language query.
+        config_param: The main application configuration object.
+        append_output_func: A reference to UIManager.append_output for UI updates.
+        get_app_func: A reference to UIManager.get_app_instance for UI invalidation.
+
+    Returns:
+        A tuple containing (validated_command, raw_ai_response).
+        The command is None if no valid command could be produced.
+        The raw response is the last candidate from the AI.
     """
     logger.info(f"Attempting validated translation for: '{human_query}'")
     last_raw_candidate_primary = None
@@ -545,7 +511,17 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
 
 
 async def explain_linux_command_with_ai(command_to_explain: str, config_param: dict, append_output_func) -> str | None:
-    """Uses an AI model to explain a given Linux command."""
+    """Uses an AI model to explain a given Linux command.
+
+    Args:
+        command_to_explain: The command string to be explained.
+        config_param: The main application configuration object.
+        append_output_func: A reference to UIManager.append_output for UI updates.
+
+    Returns:
+        The AI-generated explanation as a string, or a fallback
+        message/None on error.
+    """
     logger.info(f"Requesting AI explanation for command: '{command_to_explain}'")
     if not command_to_explain:
         return "Cannot explain an empty command."

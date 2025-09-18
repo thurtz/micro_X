@@ -1,56 +1,3 @@
-# --- API DOCUMENTATION for modules/git_context_manager.py ---
-#
-# **Purpose:** Manages interactions with the Git repository for startup integrity
-# checks and gathering context about the project's state (branch, commit).
-#
-# **Public Classes:**
-#
-# class GitContextManager:
-#     """A class to abstract Git command interactions."""
-#
-#     def __init__(self, project_root: str | None = None, fetch_timeout: int = 10):
-#         """
-#         Args:
-#             project_root (str | None): The root directory of the project. If None,
-#                                        uses the current working directory.
-#             fetch_timeout (int): Timeout in seconds for git fetch operations.
-#         """
-#
-#     async def is_git_available(self) -> bool:
-#         """Checks if the 'git' executable is available in the system's PATH."""
-#
-#     async def is_repository(self) -> bool:
-#         """Checks if the project_root is a valid Git repository."""
-#
-#     async def get_current_branch(self) -> str | None:
-#         """Gets the current active branch name (e.g., "main", "dev").
-#         Returns 'HEAD' for a detached HEAD state."""
-#
-#     async def get_head_commit_hash(self) -> str | None:
-#         """Gets the commit hash of the current HEAD."""
-#
-#     async def is_working_directory_clean(self) -> bool:
-#         """Checks for uncommitted changes or untracked files."""
-#
-#     async def compare_head_with_remote_tracking(self, branch_name: str, remote_name: str = "origin") -> tuple[str | None, str | None, str | None, str]:
-#         """
-#         Compares HEAD with its remote-tracking branch, attempting to fetch first.
-#
-#         Returns:
-#             tuple[str | None, str | None, str | None, str]: A tuple containing
-#             (comparison_status, local_hash, remote_hash, fetch_attempt_status).
-#             Comparison Status can be: "synced", "ahead", "behind", "diverged",
-#             "synced_local_cache", "ahead_local_cache", "behind_local_cache",
-#             "diverged_local_cache", "no_upstream", "no_upstream_info_locally", "error".
-#             Fetch Status can be: "success", "timeout", "offline_or_unreachable",
-#             "other_error", "not_a_repo".
-#         """
-#
-# **Key Global Constants/Variables:**
-#   (None intended for direct external use)
-#
-# --- END API DOCUMENTATION ---
-
 # modules/git_context_manager.py
 
 import asyncio
@@ -74,18 +21,17 @@ FETCH_NOT_A_REPO = "not_a_repo"
 
 
 class GitContextManager:
-    """
-    Manages interactions with Git for integrity checks and context gathering.
+    """Manages interactions with the Git repository for startup integrity checks
+    and gathering context about the project's state (branch, commit).
     """
 
     def __init__(self, project_root: Optional[str] = None, fetch_timeout: int = DEFAULT_GIT_FETCH_TIMEOUT):
-        """
-        Initializes the GitContextManager.
+        """Initializes the GitContextManager.
 
         Args:
-            project_root (Optional[str]): The root directory of the project.
-                                          If None, uses the current working directory.
-            fetch_timeout (int): Timeout in seconds for git fetch operations.
+            project_root: The root directory of the project. If None,
+                uses the current working directory.
+            fetch_timeout: Timeout in seconds for git fetch operations.
         """
         self.project_root = os.path.abspath(project_root) if project_root else os.getcwd()
         self.fetch_timeout = fetch_timeout
@@ -96,10 +42,7 @@ class GitContextManager:
         logger.info(f"GitContextManager initialized for project root: {self.project_root}")
 
     async def _run_git_command(self, command_args: List[str], timeout: Optional[int] = None) -> Tuple[bool, str, str]:
-        """
-        Runs a git command and returns its status, stdout, and stderr.
-        Enhanced with more detailed logging.
-        """
+        """Runs a git command and returns its status, stdout, and stderr."""
         if not await self.is_git_available(): # Check relies on cached value after first call
             return False, "", "Git executable not found."
 
@@ -134,7 +77,7 @@ class GitContextManager:
             return False, "", str(e)
 
     async def is_git_available(self) -> bool:
-        """Checks if the git executable is available in PATH. Caches the result."""
+        """Checks if the 'git' executable is available in the system's PATH."""
         if self._is_git_available_cached is None:
             self._git_executable_path = shutil.which("git")
             if not self._git_executable_path:
@@ -146,7 +89,7 @@ class GitContextManager:
         return self._is_git_available_cached
 
     async def is_repository(self) -> bool:
-        """Checks if the project_root is a git repository. Caches the result."""
+        """Checks if the project_root is a valid Git repository."""
         if not await self.is_git_available():
             self._is_git_repo = False 
             return False
@@ -164,7 +107,11 @@ class GitContextManager:
         return self._is_git_repo
 
     async def get_current_branch(self) -> Optional[str]:
-        """Gets the current active branch name. Returns 'HEAD' for detached HEAD state."""
+        """Gets the current active branch name (e.g., "main", "dev").
+
+        Returns:
+            'HEAD' for a detached HEAD state.
+        """
         if not await self.is_repository():
             return None
         success, branch_name, stderr = await self._run_git_command(["rev-parse", "--abbrev-ref", "HEAD"])
@@ -182,10 +129,7 @@ class GitContextManager:
         return commit_hash if success else None
 
     async def is_working_directory_clean(self) -> bool:
-        """
-        Checks if the working directory is clean (no uncommitted changes to tracked files
-        and no untracked files that aren't ignored).
-        """
+        """Checks for uncommitted changes or untracked files."""
         if not await self.is_repository():
             return False 
 
@@ -200,10 +144,12 @@ class GitContextManager:
 
 
     async def fetch_remote_branch(self, branch_name: str, remote_name: str = "origin") -> str:
-        """
-        Fetches updates for a specific branch from the specified remote.
+        """Fetches updates for a specific branch from the specified remote.
+
         Uses the configured fetch_timeout.
-        Returns a status string from predefined constants.
+
+        Returns:
+            A status string from predefined constants.
         """
         if not await self.is_repository():
             return FETCH_NOT_A_REPO
@@ -229,8 +175,8 @@ class GitContextManager:
                 return FETCH_ERROR
 
     async def get_remote_tracking_branch_hash(self, branch_name: str, remote_name: str = "origin") -> Optional[str]:
-        """
-        Gets the commit hash of the remote-tracking branch (e.g., origin/main).
+        """Gets the commit hash of the remote-tracking branch (e.g., origin/main).
+        
         This relies on the local cache of the remote state.
         """
         if not await self.is_repository():
@@ -243,20 +189,19 @@ class GitContextManager:
         return commit_hash
 
     async def compare_head_with_remote_tracking(self, branch_name: str, remote_name: str = "origin") -> Tuple[Optional[str], Optional[str], Optional[str], str]:
-        """
-        Compares HEAD with its remote-tracking branch. Attempts to fetch first.
+        """Compares HEAD with its remote-tracking branch, attempting to fetch first.
 
         Args:
-            branch_name (str): The name of the local branch.
-            remote_name (str): The name of the remote.
+            branch_name: The name of the local branch.
+            remote_name: The name of the remote.
 
         Returns:
-            Tuple[Optional[str], Optional[str], Optional[str], str]:
-                (comparison_status, local_hash, remote_hash, fetch_attempt_status)
-            Comparison Status can be: "synced", "ahead", "behind", "diverged",
-                                      "synced_local_cache", "ahead_local_cache", "behind_local_cache", "diverged_local_cache",
-                                      "no_upstream", "no_upstream_info_locally", "error"
-            Fetch Status can be one of the FETCH_* constants.
+            A tuple containing (comparison_status, local_hash, remote_hash, 
+            fetch_attempt_status). Comparison Status can be: "synced", "ahead",
+            "behind", "diverged", "synced_local_cache", "ahead_local_cache", 
+            "behind_local_cache", "diverged_local_cache", "no_upstream", 
+            "no_upstream_info_locally", "error". Fetch Status can be one of the
+            FETCH_* constants.
         """
         if not await self.is_repository():
             return "error", None, None, FETCH_NOT_A_REPO
