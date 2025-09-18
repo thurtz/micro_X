@@ -55,21 +55,17 @@ def is_tui_like_output(
     line_threshold_pct: float = DEFAULT_LINE_THRESHOLD_PERCENT,
     char_threshold_pct: float = DEFAULT_CHAR_THRESHOLD_PERCENT
 ) -> bool:
-    """
-    Analyzes text_content to determine if it's likely TUI-specific output
-    by checking the density of ANSI escape codes.
+    """Analyzes text to determine if it's likely TUI-specific output.
 
-    TUI applications (like htop, nano, vim) use many ANSI escape codes to control
-    cursor position, colors, clearing parts of the screen, etc. This function
-    tries to identify such output.
+    It checks if the percentage of lines containing ANSI codes or the percentage
+    of total characters that are part of ANSI codes exceeds given thresholds.
 
     Args:
         text_content: The string content captured from a command's output.
-        line_threshold_pct: The minimum percentage of lines that must contain
-                            ANSI escape codes for the output to be flagged as TUI-like.
-        char_threshold_pct: The minimum percentage of the total characters in the output
-                            that must be part of ANSI escape codes for it to be flagged
-                            as TUI-like.
+        line_threshold_pct: The minimum percentage of lines that must
+            contain ANSI codes to be flagged as TUI-like.
+        char_threshold_pct: The minimum percentage of total characters
+            that must be part of ANSI codes to be flagged.
 
     Returns:
         True if the output is determined to be TUI-like, False otherwise.

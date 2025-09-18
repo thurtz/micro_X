@@ -1,64 +1,3 @@
-# --- API DOCUMENTATION for modules/shell_engine.py ---
-#
-# **Purpose:** Acts as the core orchestrator for the shell, processing user
-# input, managing state (like the current directory), and dispatching commands
-# for execution based on their category.
-#
-# **Public Classes:**
-#
-# class ShellEngine:
-#     """The main class for shell logic."""
-#
-#     def __init__(self, config, ui_manager, category_manager_module, ai_handler_module,
-#                  ollama_manager_module, main_exit_app_ref, main_restore_normal_input_ref,
-#                  main_normal_input_accept_handler_ref, is_developer_mode, git_context_manager_instance):
-#         """
-#         Initializes the ShellEngine with all necessary dependencies and callbacks.
-#
-#         Args:
-#             config (dict): The application configuration.
-#             ui_manager (UIManager): The instance of the UI manager.
-#             category_manager_module (module): A reference to the category_manager module.
-#             ai_handler_module (module): A reference to the ai_handler module.
-#             ollama_manager_module (module): A reference to the ollama_manager module.
-#             main_exit_app_ref (callable): Callback to the main application exit function.
-#             main_restore_normal_input_ref (callable): Callback to restore the UI to normal mode.
-#             main_normal_input_accept_handler_ref (callable): Callback for normal input submission.
-#             is_developer_mode (bool): Flag indicating if developer mode is active.
-#             git_context_manager_instance (GitContextManager): Instance for Git operations.
-#         """
-#
-#     async def handle_built_in_command(self, user_input: str) -> bool:
-#         """
-#         Handles built-in commands like /help, /exit, /update, /utils, /ollama, and /command.
-#
-#         This is the first check for any user input.
-#
-#         Returns:
-#             bool: True if the command was a built-in and was handled, False otherwise.
-#         """
-#
-#     async def submit_user_input(self, user_input: str, from_edit_mode: bool = False):
-#         """
-#         The main entry point for processing all user input that isn't a simple built-in.
-#
-#         It orchestrates the flow:
-#         1. Handles `/ai` queries by calling the AI handler.
-#         2. Processes direct command input from the user.
-#         3. For unknown commands, it uses the AI validator and may treat the input
-#            as a natural language query.
-#         4. Ultimately calls `process_command` to execute.
-#
-#         Args:
-#             user_input (str): The raw text from the user's input field.
-#             from_edit_mode (bool): True if the input is a resubmission after
-#                                    the user chose to modify an AI suggestion.
-#         """
-#
-# **Key Global Constants/Variables:**
-#   (None intended for direct external use)
-#
-# --- END API DOCUMENTATION ---
 import asyncio
 import os
 import shlex
@@ -101,6 +40,12 @@ def _set_nested_config(config_dict, key_path, new_value):
     return True, None # Success
 
 class ShellEngine:
+    """The main class for shell logic.
+    
+    Acts as the core orchestrator for the shell, processing user
+    input, managing state (like the current directory), and dispatching commands
+    for execution based on their category.
+    """
     def __init__(self, config, ui_manager,
                  category_manager_module=None,
                  ai_handler_module=None,
@@ -111,8 +56,19 @@ class ShellEngine:
                  is_developer_mode: bool = False,
                  git_context_manager_instance=None
                  ):
-        """
-        Initializes the ShellEngine.
+        """Initializes the ShellEngine with all necessary dependencies and callbacks.
+
+        Args:
+            config: The application configuration.
+            ui_manager: The instance of the UI manager.
+            category_manager_module: A reference to the category_manager module.
+            ai_handler_module: A reference to the ai_handler module.
+            ollama_manager_module: A reference to the ollama_manager module.
+            main_exit_app_ref: Callback to the main application exit function.
+            main_restore_normal_input_ref: Callback to restore the UI to normal mode.
+            main_normal_input_accept_handler_ref: Callback for normal input submission.
+            is_developer_mode: Flag indicating if developer mode is active.
+            git_context_manager_instance: Instance for Git operations.
         """
         self.config = config
         self.ui_manager = ui_manager
@@ -476,6 +432,16 @@ class ShellEngine:
         await self._handle_script_command_async(full_command_str, self.USER_SCRIPTS_DIR_PATH, self.USER_SCRIPTS_DIR_NAME, "run")
 
     async def handle_built_in_command(self, user_input: str) -> bool:
+        """Handles built-in commands like /help, /exit, /update, /utils, /ollama, and /command.
+
+        This is the first check for any user input.
+
+        Args:
+            user_input: The raw text from the user's input field.
+
+        Returns:
+            True if the command was a built-in and was handled, False otherwise.
+        """
         user_input_stripped = user_input.strip()
 
         # --- ALIAS EXPANSION ---
@@ -590,6 +556,20 @@ class ShellEngine:
                 if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
 
     async def submit_user_input(self, user_input: str, from_edit_mode: bool = False):
+        """The main entry point for processing all user input that isn't a simple built-in.
+
+        It orchestrates the flow:
+        1. Handles `/ai` queries by calling the AI handler.
+        2. Processes direct command input from the user.
+        3. For unknown commands, it uses the AI validator and may treat the input
+           as a natural language query.
+        4. Ultimately calls `process_command` to execute.
+
+        Args:
+            user_input: The raw text from the user's input field.
+            from_edit_mode: True if the input is a resubmission after
+                the user chose to modify an AI suggestion.
+        """
         if not self.ui_manager: logger.error("submit_user_input: UIManager not initialized."); return
         user_input_stripped = user_input.strip()
         if not user_input_stripped:
