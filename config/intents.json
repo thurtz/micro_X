@@ -1,0 +1,32 @@
+{
+    "show_help": [
+        "/help", "/h", "help", "how do I use this", "show commands", "what can you do"
+    ],
+    "exit_shell": [
+        "exit", "quit", "/exit", "/quit", "/q", "close the shell", "I'm done"
+    ],
+    "clear_screen": [
+        "/clear", "clear", "clear screen", "cls"
+    ],
+    "show_history": [
+        "/history", "history", "show my command history"
+    ],
+    "run_ai_translation": [
+        "/ai", "/a", "ask ai", "translate this to a command"
+    ],
+    "manage_ollama": [
+        "/ollama", "/ollama status", "/ollama start", "is ollama running", "start the ai service"
+    ],
+    "manage_commands": [
+        "/command", "/command add", "/command list", "add a command", "list my commands"
+    ],
+    "manage_config": [
+        "/config", "/config get", "/config set", "show config", "change a setting"
+    ],
+    "run_update": [
+        "/update", "update micro_x", "check for updates"
+    ],
+    "change_directory": [
+        "cd", "change directory to", "go to"
+    ]
+}
