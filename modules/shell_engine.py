@@ -605,6 +605,17 @@ class ShellEngine:
                     await self.process_command("clear", "clear")
                     return
 
+                elif intent == "run_snapshot":
+                    await self.handle_built_in_command("/snapshot")
+                    return
+
+                elif intent == "run_snapshot_include_logs":
+                    await self.handle_built_in_command("/snapshot --include-logs")
+                    return
+
+                elif intent == "run_snapshot_help":
+                    await self.handle_built_in_command("/snapshot --help")
+                    return
         # --- END INTENT CLASSIFICATION ---
 
         current_app_inst = self.ui_manager.get_app_instance()

@@ -28,5 +28,20 @@
     ],
     "change_directory": [
         "cd", "change directory to", "go to"
+    ],
+    "run_snapshot": [
+        "/snapshot",
+        "snapshot",
+        "create a snapshot"
+    ],
+    "run_snapshot_include_logs": [
+        "/snapshot --include-logs",
+        "create a snapshot with logs",
+        "snapshot with logs"
+    ],
+    "run_snapshot_help": [
+        "/snapshot --help",
+        "snapshot help",
+        "how to use snapshot"
     ]
 }
