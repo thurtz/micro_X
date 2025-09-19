@@ -1,47 +1,187 @@
 {
     "show_help": [
-        "/help", "/h", "help", "how do I use this", "show commands", "what can you do"
+        "/help", 
+        "/h", 
+        "help", 
+        "how do I use this", 
+        "show commands", 
+        "what can you do"
     ],
     "exit_shell": [
-        "exit", "quit", "/exit", "/quit", "/q", "close the shell", "I'm done"
+        "exit", 
+        "quit", 
+        "/exit", 
+        "/quit", 
+        "/q", 
+        "close the shell", 
+        "I'm done"
     ],
     "clear_screen": [
-        "/clear", "clear", "clear screen", "cls"
+        "/clear", 
+        "clear", 
+        "clear screen", 
+        "cls"
     ],
     "show_history": [
-        "/history", "history", "show my command history"
+        "/history", 
+        "history", 
+        "show my command history"
     ],
     "run_ai_translation": [
-        "/ai", "/a", "ask ai", "translate this to a command"
+        "/ai", 
+        "/a", 
+        "ask ai", 
+        "translate this to a command"
     ],
-    "manage_ollama": [
-        "/ollama", "/ollama status", "/ollama start", "is ollama running", "start the ai service"
+    "ollama_start": [
+        "/ollama start", 
+        "start ollama", 
+        "start the ai service"
     ],
-    "manage_commands": [
-        "/command", "/command add", "/command list", "add a command", "list my commands"
+    "ollama_stop": [
+        "/ollama stop", 
+        "stop ollama", 
+        "stop the ai service"
     ],
-    "manage_config": [
-        "/config", "/config get", "/config set", "show config", "change a setting"
+    "ollama_restart": [
+        "/ollama restart", 
+        "restart ollama", 
+        "restart the ai service"
+    ],
+    "ollama_status": [
+        "/ollama status", 
+        "is ollama running", 
+        "get ollama status"
+    ],
+    "command_list": [
+        "/command list", 
+        "list commands", 
+        "show all commands"
+    ],
+    "command_add": [
+        "/command add", 
+        "add command", 
+        "categorize command"
+    ],
+    "command_remove": [
+        "/command remove", 
+        "remove command", 
+        "decategorize command"
+    ],
+    "command_move": [
+        "/command move", 
+        "move command", 
+        "recategorize command"
+    ],
+    "config_start": [
+        "/config", 
+        "start config server", 
+        "open config ui"
     ],
     "run_update": [
-        "/update", "update micro_x", "check for updates"
+        "/update", 
+        "update micro_x", 
+        "check for updates"
     ],
     "change_directory": [
-        "cd", "change directory to", "go to"
+        "cd", 
+        "change directory to", 
+        "go to"
     ],
-    "run_snapshot": [
-        "/snapshot",
-        "snapshot",
+    "snapshot_create": [
+        "/snapshot", 
         "create a snapshot"
     ],
-    "run_snapshot_include_logs": [
-        "/snapshot --include-logs",
-        "create a snapshot with logs",
-        "snapshot with logs"
+    "snapshot_include_logs": [
+        "/snapshot --include-logs", 
+        "create a snapshot with logs"
     ],
-    "run_snapshot_help": [
-        "/snapshot --help",
-        "snapshot help",
-        "how to use snapshot"
+    "snapshot_summarize": [
+        "/snapshot --summarize", 
+        "create a summarized snapshot"
+    ],
+    "snapshot_help": [
+        "/snapshot --help", 
+        "snapshot help"
+    ],
+    "alias_list": [
+        "/alias --list", 
+        "list aliases", 
+        "show all aliases"
+    ],
+    "alias_add": [
+        "/alias --add", 
+        "add alias", 
+        "create alias"
+    ],
+    "alias_remove": [
+        "/alias --remove", 
+        "remove alias", 
+        "delete alias"
+    ],
+    "dev_activate": [
+        "/dev --activate", 
+        "activate dev environment"
+    ],
+    "dev_update_all": [
+        "/dev --update-all", 
+        "update all dev branches"
+    ],
+    "dev_update_testing": [
+        "/dev --update-testing", 
+        "update testing branch"
+    ],
+    "dev_update_dev": [
+        "/dev --update-dev", 
+        "update dev branch"
+    ],
+    "dev_snapshot_main": [
+        "/dev --snapshot-main", 
+        "snapshot main branch"
+    ],
+    "dev_snapshot_testing": [
+        "/dev --snapshot-testing", 
+        "snapshot testing branch"
+    ],
+    "dev_snapshot_dev": [
+        "/dev --snapshot-dev", 
+        "snapshot dev branch"
+    ],
+    "dev_snapshot_all": [
+        "/dev --snapshot-all", 
+        "snapshot all branches"
+    ],
+    "dev_run_tests_main": [
+        "/dev --run-tests-main", 
+        "run tests on main"
+    ],
+    "dev_run_tests_testing": [
+        "/dev --run-tests-testing", 
+        "run tests on testing"
+    ],
+    "dev_run_tests_dev": [
+        "/dev --run-tests-dev", 
+        "run tests on dev"
+    ],
+    "dev_run_tests_all": [
+        "/dev --run-tests-all", 
+        "run tests on all branches"
+    ],
+    "generate_project_tree": [
+        "/tree", 
+        "generate project tree", 
+        "show project structure"
+    ],
+    "run_tests": [
+        "/utils run_tests", 
+        "run tests", 
+        "execute tests", 
+        "run the test suite"
+    ],
+    "list_scripts": [
+        "/list", 
+        "list scripts", 
+        "show available scripts", 
+        "list utilities"
     ]
 }

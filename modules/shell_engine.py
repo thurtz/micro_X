@@ -578,6 +578,37 @@ class ShellEngine:
             return
 
         # --- INTENT CLASSIFICATION (NEW) ---
+        INTENT_COMMAND_MAP = {
+            "show_help": "/utils help",
+            "ollama_start": "/utils ollama_cli start",
+            "ollama_stop": "/utils ollama_cli stop",
+            "ollama_restart": "/utils ollama_cli restart",
+            "ollama_status": "/utils ollama_cli status",
+            "command_list": "/utils command --list",
+            "config_start": "/utils config_manager --start",
+            "run_update": "/utils update",
+            "snapshot_create": "/utils generate_snapshot",
+            "snapshot_include_logs": "/utils generate_snapshot --include-logs",
+            "snapshot_summarize": "/utils generate_snapshot --summarize",
+            "snapshot_help": "/utils generate_snapshot --help",
+            "alias_list": "/utils alias --list",
+            "dev_activate": "/utils dev --activate",
+            "dev_update_all": "/utils dev --update-all",
+            "dev_update_testing": "/utils dev --update-testing",
+            "dev_update_dev": "/utils dev --update-dev",
+            "dev_snapshot_main": "/utils dev --snapshot-main",
+            "dev_snapshot_testing": "/utils dev --snapshot-testing",
+            "dev_snapshot_dev": "/utils dev --snapshot-dev",
+            "dev_snapshot_all": "/utils dev --snapshot-all",
+            "dev_run_tests_main": "/utils dev --run-tests-main",
+            "dev_run_tests_testing": "/utils dev --run-tests-testing",
+            "dev_run_tests_dev": "/utils dev --run-tests-dev",
+            "dev_run_tests_all": "/utils dev --run-tests-all",
+            "generate_project_tree": "/utils generate_tree",
+            "run_tests": "/utils run_tests",
+            "list_scripts": "/utils list_scripts",
+        }
+
         if self.embedding_manager_instance:
             intent, score = self.embedding_manager_instance.classify_intent(user_input_stripped)
             classification_threshold = self.config.get("intent_classification", {}).get("classification_threshold", 0.70)
@@ -590,31 +621,17 @@ class ShellEngine:
                     app_instance = self.ui_manager.get_app_instance()
                     if app_instance and hasattr(app_instance, 'is_running') and app_instance.is_running:
                         app_instance.exit()
-                    elif app_instance and hasattr(app_instance, 'is_running') and not app_instance.is_running:
-                        # For Curses UI, which might already be stopping
-                        pass
                     return
 
-                elif intent == "show_help":
-                    await self._handle_utils_command_async("/utils help")
-                    if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
-                    return
-                
                 elif intent == "clear_screen":
-                    # The safest way to clear is to execute the 'clear' command itself.
                     await self.process_command("clear", "clear")
                     return
 
-                elif intent == "run_snapshot":
-                    await self.handle_built_in_command("/snapshot")
-                    return
-
-                elif intent == "run_snapshot_include_logs":
-                    await self.handle_built_in_command("/snapshot --include-logs")
-                    return
-
-                elif intent == "run_snapshot_help":
-                    await self.handle_built_in_command("/snapshot --help")
+                elif intent in INTENT_COMMAND_MAP:
+                    command_to_run = INTENT_COMMAND_MAP[intent]
+                    # The built-in command handler correctly expands aliases and calls the appropriate script.
+                    await self.handle_built_in_command(command_to_run)
+                    if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
                     return
         # --- END INTENT CLASSIFICATION ---
 
