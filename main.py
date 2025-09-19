@@ -67,7 +67,9 @@ input_lock = asyncio.Lock()
 
 class StartupIntegrityError(Exception):
     """Custom exception to signal a fatal integrity check failure during startup."""
-    pass
+    def __init__(self, message, details=None):
+        super().__init__(message)
+        self.details = details
 
 def merge_configs(base, override):
     """ Helper function to recursively merge dictionaries. """
@@ -246,11 +248,11 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
         if not is_clean:
             status_output_tuple = await git_context_manager_instance._run_git_command(["status", "--porcelain"])
             status_output_details = status_output_tuple[1] if status_output_tuple[0] else "Could not get detailed status."
-            error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Uncommitted local changes or untracked files detected."
-            detail_msg = f"   Git status details:\n{status_output_details}"
-            ui_manager_instance.append_output(error_msg, style_class='error')
-            ui_manager_instance.append_output(detail_msg, style_class='error')
+            error_msg = f"Integrity Check Failed (Branch: {current_branch}): Uncommitted local changes or untracked files detected."
+            detail_msg = f"Git status details:\n{status_output_details}"
             logger.critical(f"{error_msg}\n{detail_msg}")
+            if halt_on_failure:
+                raise StartupIntegrityError(error_msg, details=detail_msg)
             integrity_ok = False
         else:
             ui_manager_instance.append_output(f"✅ Working directory is clean for branch '{current_branch}'.", style_class='info')
@@ -272,44 +274,47 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
                     status_description = comparison_status
                     if comparison_status == "behind" and not allow_run_if_behind:
                         status_description = "behind (and configuration disallows running)"
-                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Local branch has '{status_description}' from 'origin/{current_branch}'."
-                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
-                    ui_manager_instance.append_output(error_msg, style_class='error')
-                    ui_manager_instance.append_output(detail_msg, style_class='error')
+                    error_msg = f"Integrity Check Failed (Branch: {current_branch}): Local branch has '{status_description}' from 'origin/{current_branch}'."
+                    detail_msg = f"Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
                     logger.critical(f"{error_msg} {detail_msg}")
+                    if halt_on_failure:
+                        raise StartupIntegrityError(error_msg, details=detail_msg)
                     integrity_ok = False
                 else:
-                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Cannot reliably compare with remote after successful fetch. Status: {comparison_status}."
-                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
-                    ui_manager_instance.append_output(error_msg, style_class='error')
-                    ui_manager_instance.append_output(detail_msg, style_class='error')
+                    error_msg = f"Integrity Check Failed (Branch: {current_branch}): Cannot reliably compare with remote after successful fetch. Status: {comparison_status}."
+                    detail_msg = f"Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
                     logger.critical(f"{error_msg} {detail_msg}")
+                    if halt_on_failure:
+                        raise StartupIntegrityError(error_msg, details=detail_msg)
                     integrity_ok = False
             elif fetch_status in ["timeout", "offline_or_unreachable"]:
                 ui_manager_instance.append_output(f"⚠️ Could not contact remote for branch '{current_branch}' (Reason: {fetch_status}). Comparing against local cache.", style_class='warning')
                 if comparison_status == "synced_local_cache" or comparison_status == "behind_local_cache":
                     ui_manager_instance.append_output(f"ℹ️ Branch '{current_branch}' is consistent with the last known state of 'origin/{current_branch}'. Running in offline-verified mode.", style_class='info')
                 elif comparison_status == "ahead_local_cache" or comparison_status == "diverged_local_cache":
-                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): Local branch has unpushed changes or diverged from the last known remote state. Status: {comparison_status}"
-                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Last Known Remote: {remote_h[:7] if remote_h else 'N/A'}"
-                    ui_manager_instance.append_output(error_msg, style_class='error')
-                    ui_manager_instance.append_output(detail_msg, style_class='error')
+                    error_msg = f"Integrity Check Failed (Branch: {current_branch}, Offline): Local branch has unpushed changes or diverged from the last known remote state. Status: {comparison_status}"
+                    detail_msg = f"Local: {local_h[:7] if local_h else 'N/A'}, Last Known Remote: {remote_h[:7] if remote_h else 'N/A'}"
                     logger.critical(f"{error_msg} {detail_msg}")
+                    if halt_on_failure:
+                        raise StartupIntegrityError(error_msg, details=detail_msg)
                     integrity_ok = False
                 elif comparison_status == "no_upstream_info_locally":
-                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): No local information about the remote tracking branch. Cannot verify integrity."
-                    ui_manager_instance.append_output(error_msg, style_class='error')
+                    error_msg = f"Integrity Check Failed (Branch: {current_branch}, Offline): No local information about the remote tracking branch. Cannot verify integrity."
                     logger.critical(error_msg)
+                    if halt_on_failure:
+                        raise StartupIntegrityError(error_msg)
                     integrity_ok = False
                 else:
-                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): Error comparing with local cache. Status: {comparison_status}"
-                    ui_manager_instance.append_output(error_msg, style_class='error')
+                    error_msg = f"Integrity Check Failed (Branch: {current_branch}, Offline): Error comparing with local cache. Status: {comparison_status}"
                     logger.critical(error_msg)
+                    if halt_on_failure:
+                        raise StartupIntegrityError(error_msg)
                     integrity_ok = False
             elif fetch_status == "other_error":
-                error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): A non-network error occurred during 'git fetch'."
-                ui_manager_instance.append_output(error_msg, style_class='error')
+                error_msg = f"Integrity Check Failed (Branch: {current_branch}): A non-network error occurred during 'git fetch'."
                 logger.critical(f"{error_msg} - Check git fetch logs or permissions.")
+                if halt_on_failure:
+                    raise StartupIntegrityError(error_msg, details="Check git fetch logs or permissions.")
                 integrity_ok = False
 
         if integrity_ok:
@@ -378,8 +383,12 @@ async def main_async_runner():
     halt_on_failure = integrity_config.get("halt_on_integrity_failure", True)
 
     if not is_developer_mode and not integrity_checks_passed and halt_on_failure:
+        # This block is now primarily for logging, the exception is the key signal
         logger.critical("Halting micro_X due to failed integrity checks on a protected branch.")
-        raise StartupIntegrityError("Failed integrity checks on a protected branch.")
+        # The actual error with details has already been raised by a sub-check.
+        # If it somehow gets here without an exception, raise a generic one.
+        if integrity_ok: # Should not happen if checks failed
+            raise StartupIntegrityError("Failed integrity checks on a protected branch.", details="No specific details were captured.")
 
     ui_manager_instance.main_exit_app_ref = _exit_app_main
     ui_manager_instance.main_restore_normal_input_ref = restore_normal_input_handler
@@ -494,8 +503,10 @@ def run_shell():
         asyncio.run(main_async_runner())
     except StartupIntegrityError as e:
         print(f"\nFATAL STARTUP ERROR: {e}")
-        print("Please resolve the Git integrity issues before running on this protected branch.")
-        logger.critical(f"Application halting due to fatal integrity error: {e}")
+        if e.details:
+            print(f"\n{e.details}")
+        print("\nPlease resolve the Git integrity issues before running on this protected branch.")
+        logger.critical(f"Application halting due to fatal integrity error: {e}", exc_info=True)
     except (FileNotFoundError, ValueError, IOError) as e:
         print(f"\nFATAL STARTUP ERROR: {e}")
         print(f"Please ensure 'config/default_config.json' exists and is a valid JSON file.")
