@@ -81,6 +81,7 @@ class ShellEngine:
 
         self.is_developer_mode = is_developer_mode
         self.git_context_manager_instance = git_context_manager_instance
+        self.embedding_manager_instance = None
 
         self.current_directory = os.getcwd()
         
@@ -575,6 +576,36 @@ class ShellEngine:
         if not user_input_stripped:
             if self.main_restore_normal_input_ref and from_edit_mode: self.main_restore_normal_input_ref()
             return
+
+        # --- INTENT CLASSIFICATION (NEW) ---
+        if self.embedding_manager_instance:
+            intent, score = self.embedding_manager_instance.classify_intent(user_input_stripped)
+            classification_threshold = self.config.get("intent_classification", {}).get("classification_threshold", 0.70)
+
+            if score > classification_threshold:
+                logger.info(f"Handling input as intent '{intent}' with score {score:.2f}")
+
+                if intent == "exit_shell":
+                    self.ui_manager.append_output("Exiting micro_X Shell 🚪", style_class='info')
+                    app_instance = self.ui_manager.get_app_instance()
+                    if app_instance and hasattr(app_instance, 'is_running') and app_instance.is_running:
+                        app_instance.exit()
+                    elif app_instance and hasattr(app_instance, 'is_running') and not app_instance.is_running:
+                        # For Curses UI, which might already be stopping
+                        pass
+                    return
+
+                elif intent == "show_help":
+                    await self._handle_utils_command_async("/utils help")
+                    if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                    return
+                
+                elif intent == "clear_screen":
+                    # The safest way to clear is to execute the 'clear' command itself.
+                    await self.process_command("clear", "clear")
+                    return
+
+        # --- END INTENT CLASSIFICATION ---
 
         current_app_inst = self.ui_manager.get_app_instance()
         if user_input_stripped.startswith("/ai "):

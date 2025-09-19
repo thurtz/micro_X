@@ -31,6 +31,7 @@ from modules.category_manager import (
 )
 from modules.ui_manager import UIManager
 from modules.curses_ui_manager import CursesUIManager
+from modules.embedding_manager import EmbeddingManager
 
 LOG_DIR = "logs"
 CONFIG_DIR = "config"
@@ -391,6 +392,9 @@ async def main_async_runner():
     else:
         ui_manager_instance.append_output("✅ Ollama service is active and ready.", style_class='success')
         logger.info("Ollama service is active.")
+        embedding_manager_instance = EmbeddingManager(config)
+        embedding_manager_instance.initialize()
+        shell_engine_instance.embedding_manager_instance = embedding_manager_instance
 
 
     init_category_manager(SCRIPT_DIR, CONFIG_DIR, ui_manager_instance.append_output)

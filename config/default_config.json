@@ -39,6 +39,11 @@
     "enable_mouse_support": false,
     "ui_backend": "prompt_toolkit"
   },
+  "intent_classification": {
+    "embedding_model": "nomic-embed-text",
+    "classification_threshold": 0.75,
+    "intents_file_path": "config/intents.json"
+  },
   "paths": {
     "tmux_log_base_path": "/tmp"
   },
