@@ -1,0 +1,186 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>micro_X documentation &mdash; micro_X 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            micro_X
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"><ul>
+<li><a class="reference internal" href="#">micro_X documentation</a></li>
+<li><a class="reference internal" href="#module-modules.ai_handler">API Reference</a><ul>
+<li><a class="reference internal" href="#modules.ai_handler.explain_linux_command_with_ai"><code class="docutils literal notranslate"><span class="pre">explain_linux_command_with_ai()</span></code></a></li>
+<li><a class="reference internal" href="#modules.ai_handler.get_validated_ai_command"><code class="docutils literal notranslate"><span class="pre">get_validated_ai_command()</span></code></a></li>
+<li><a class="reference internal" href="#modules.ai_handler.is_valid_linux_command_according_to_ai"><code class="docutils literal notranslate"><span class="pre">is_valid_linux_command_according_to_ai()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">micro_X</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">micro_X documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="micro-x-documentation">
+<h1>micro_X documentation<a class="headerlink" href="#micro-x-documentation" title="Link to this heading"></a></h1>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="module-modules.ai_handler">
+<span id="api-reference"></span><h1>API Reference<a class="headerlink" href="#module-modules.ai_handler" title="Link to this heading"></a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="modules.ai_handler.explain_linux_command_with_ai">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modules.ai_handler.</span></span><span class="sig-name descname"><span class="pre">explain_linux_command_with_ai</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command_to_explain</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config_param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">append_output_func</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/modules/ai_handler.html#explain_linux_command_with_ai"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ai_handler.explain_linux_command_with_ai" title="Link to this definition"></a></dt>
+<dd><p>Uses an AI model to explain a given Linux command.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>command_to_explain</strong> – The command string to be explained.</p></li>
+<li><p><strong>config_param</strong> – The main application configuration object.</p></li>
+<li><p><strong>append_output_func</strong> – A reference to UIManager.append_output for UI updates.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The AI-generated explanation as a string, or a fallback
+message/None on error.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modules.ai_handler.get_validated_ai_command">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modules.ai_handler.</span></span><span class="sig-name descname"><span class="pre">get_validated_ai_command</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">human_query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config_param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">append_output_func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_app_func</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/modules/ai_handler.html#get_validated_ai_command"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ai_handler.get_validated_ai_command" title="Link to this definition"></a></dt>
+<dd><p>Translates a natural language query into a validated shell command.</p>
+<p>This function orchestrates a multi-step process:
+1. It tries the ‘primary_translator’ AI to get a command.
+2. If successful, it validates the command using</p>
+<blockquote>
+<div><p><cite>is_valid_linux_command_according_to_ai</cite>.</p>
+</div></blockquote>
+<ol class="arabic simple" start="3">
+<li><p>If the primary translator or validation fails, it can fall back to a
+‘direct_translator’ AI if configured.</p></li>
+<li><p>This cycle repeats for a configured number of attempts.</p></li>
+</ol>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>human_query</strong> – The user’s natural language query.</p></li>
+<li><p><strong>config_param</strong> – The main application configuration object.</p></li>
+<li><p><strong>append_output_func</strong> – A reference to UIManager.append_output for UI updates.</p></li>
+<li><p><strong>get_app_func</strong> – A reference to UIManager.get_app_instance for UI invalidation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple containing (validated_command, raw_ai_response).
+The command is None if no valid command could be produced.
+The raw response is the last candidate from the AI.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modules.ai_handler.is_valid_linux_command_according_to_ai">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modules.ai_handler.</span></span><span class="sig-name descname"><span class="pre">is_valid_linux_command_according_to_ai</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config_param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/modules/ai_handler.html#is_valid_linux_command_according_to_ai"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ai_handler.is_valid_linux_command_according_to_ai" title="Link to this definition"></a></dt>
+<dd><p>Asks the Validator AI model if the given text is a likely Linux command.</p>
+<p>Performs multiple validation attempts as configured and returns a boolean
+based on a majority vote of the AI’s ‘yes’/’no’ responses.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>command_text</strong> – The string to validate.</p></li>
+<li><p><strong>config_param</strong> – The main application configuration object.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if the AI considers it a command, False if not.
+None if the result is inconclusive after all attempts.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, micro_X Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
