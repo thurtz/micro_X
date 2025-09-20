@@ -201,16 +201,14 @@ def extract_api_documentation(filepath: str) -> str:
         return f"[Error reading API documentation from {os.path.basename(filepath)}: {e}]\n"
 
 def run_utility_script(script_name: str, project_root: str, utils_dir: str) -> dict:
-    """
-    Runs a utility script and returns a structured result.
-    
+    """Runs a utility script and returns a structured result.
+
     Returns:
-        dict: A dictionary containing the execution status.
-              {
-                  "success": bool,
-                  "message": str,
-                  "test_status": "passed" | "failed" | "error" | "no_tests" | "not_run"
-              }
+        dict: A dictionary containing the execution status:
+
+              - success (bool): True if the script ran without unexpected errors.
+              - message (str): A notice or error message.
+              - test_status (str): "passed", "failed", "error", "no_tests", or "not_run".
     """
     script_path = os.path.join(utils_dir, script_name)
     result = {

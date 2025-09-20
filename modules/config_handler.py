@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def load_jsonc_file(filepath: str) -> Optional[Dict[str, Any]]:
     """
-    Loads a JSON file that may contain single-line (//) and multi-line (/* */) comments.
+    Loads a JSON file that may contain single-line (//) and multi-line (`/* */`) comments.
 
     Args:
         filepath (str): The full path to the .jsonc or .json file.

@@ -1,0 +1,276 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>utils.install_requirements &mdash; micro_X 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            micro_X
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">micro_X</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">utils.install_requirements</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for utils.install_requirements</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span> <span class="c1"># Using argparse for cleaner argument handling</span>
+
+<span class="c1"># --- Module-specific logger ---</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<div class="viewcode-block" id="install_requirements">
+<a class="viewcode-back" href="../../index.html#utils.install_requirements.install_requirements">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">install_requirements</span><span class="p">(</span>
+    <span class="n">project_root</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">append_output_func</span><span class="p">,</span>
+    <span class="n">install_dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">install_runtime</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Installs Python dependencies for the micro_X project.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        project_root (str): The absolute path to the micro_X project root.</span>
+<span class="sd">        append_output_func (callable): Function to append output to the UI.</span>
+<span class="sd">                                       If None (e.g., direct script run), prints to console.</span>
+<span class="sd">        install_dev (bool): True to install development dependencies (from requirements-dev.txt).</span>
+<span class="sd">        install_runtime (bool): True to install runtime dependencies (from requirements.txt).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Use a local print function if append_output_func is not provided</span>
+    <span class="n">_print</span> <span class="o">=</span> <span class="n">append_output_func</span> <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">append_output_func</span><span class="p">)</span> <span class="k">else</span> \
+             <span class="k">lambda</span> <span class="n">msg</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;INFO&#39;</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">style_class</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">_print</span><span class="p">(</span><span class="s2">&quot;⚙️ Initiating dependency installation...&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;install_requirements utility started. Project root: </span><span class="si">{</span><span class="n">project_root</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Determine virtual environment&#39;s pip executable</span>
+    <span class="n">venv_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="s2">&quot;.venv&quot;</span><span class="p">)</span>
+    <span class="n">pip_executable</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">venv_dir</span><span class="p">,</span> <span class="s2">&quot;bin&quot;</span><span class="p">,</span> <span class="s2">&quot;pip&quot;</span><span class="p">)</span> <span class="c1"># Default for Linux/macOS venv</span>
+
+    <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;win32&quot;</span><span class="p">:</span> <span class="c1"># Handles cases like Git Bash on Windows, or actual Windows if venv structure differs</span>
+        <span class="n">pip_executable_win_scripts</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">venv_dir</span><span class="p">,</span> <span class="s2">&quot;Scripts&quot;</span><span class="p">,</span> <span class="s2">&quot;pip.exe&quot;</span><span class="p">)</span>
+        <span class="n">pip_executable_win_bin</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">venv_dir</span><span class="p">,</span> <span class="s2">&quot;bin&quot;</span><span class="p">,</span> <span class="s2">&quot;pip.exe&quot;</span><span class="p">)</span> <span class="c1"># Some venvs on Win might use bin</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">pip_executable_win_scripts</span><span class="p">):</span>
+            <span class="n">pip_executable</span> <span class="o">=</span> <span class="n">pip_executable_win_scripts</span>
+        <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">pip_executable_win_bin</span><span class="p">):</span>
+             <span class="n">pip_executable</span> <span class="o">=</span> <span class="n">pip_executable_win_bin</span>
+        <span class="c1"># else, it will use the default Linux/macOS path which will likely fail if on true Windows without WSL venv pathing</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">pip_executable</span><span class="p">):</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;❌ Error: pip executable not found at &#39;</span><span class="si">{</span><span class="n">pip_executable</span><span class="si">}</span><span class="s2">&#39;. &quot;</span> \
+              <span class="s2">&quot;Ensure virtual environment is created (e.g., via &#39;./setup.sh&#39;) and active, &quot;</span> \
+              <span class="s2">&quot;or that this script is run from an environment where the venv&#39;s pip is accessible.&quot;</span>
+        <span class="n">_print</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">success</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="c1"># Install runtime requirements</span>
+    <span class="k">if</span> <span class="n">install_runtime</span><span class="p">:</span>
+        <span class="n">runtime_reqs_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="s2">&quot;requirements.txt&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">runtime_reqs_path</span><span class="p">):</span>
+            <span class="n">_print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Installing runtime dependencies from &#39;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">runtime_reqs_path</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39;...&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running: </span><span class="si">{</span><span class="n">pip_executable</span><span class="si">}</span><span class="s2"> install -r </span><span class="si">{</span><span class="n">runtime_reqs_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">pip_executable</span><span class="p">,</span> <span class="s2">&quot;install&quot;</span><span class="p">,</span> <span class="s2">&quot;-r&quot;</span><span class="p">,</span> <span class="n">runtime_reqs_path</span><span class="p">],</span>
+                    <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="c1"># We check returncode manually</span>
+                    <span class="n">cwd</span><span class="o">=</span><span class="n">project_root</span> <span class="c1"># Run pip from project root</span>
+                <span class="p">)</span>
+                <span class="n">_print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output:</span><span class="se">\n</span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">process</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">_print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Runtime installation failed:</span><span class="se">\n</span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Runtime installation failed. Stderr: </span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">success</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_print</span><span class="p">(</span><span class="s2">&quot;✅ Runtime dependencies installed successfully.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;success&#39;</span><span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Runtime dependencies installed.&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">_print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error running pip for runtime dependencies: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error running pip for runtime dependencies: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">success</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️ Warning: &#39;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">runtime_reqs_path</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39; not found. Skipping runtime installation.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;requirements.txt not found at </span><span class="si">{</span><span class="n">runtime_reqs_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">success</span> <span class="o">=</span> <span class="kc">False</span> <span class="c1"># Consider this a partial failure if runtime reqs are expected</span>
+
+    <span class="c1"># Install development requirements</span>
+    <span class="k">if</span> <span class="n">install_dev</span><span class="p">:</span>
+        <span class="n">dev_reqs_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="s2">&quot;requirements-dev.txt&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dev_reqs_path</span><span class="p">):</span>
+            <span class="n">_print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Installing development dependencies from &#39;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">dev_reqs_path</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39;...&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running: </span><span class="si">{</span><span class="n">pip_executable</span><span class="si">}</span><span class="s2"> install -r </span><span class="si">{</span><span class="n">dev_reqs_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">pip_executable</span><span class="p">,</span> <span class="s2">&quot;install&quot;</span><span class="p">,</span> <span class="s2">&quot;-r&quot;</span><span class="p">,</span> <span class="n">dev_reqs_path</span><span class="p">],</span>
+                    <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                    <span class="n">cwd</span><span class="o">=</span><span class="n">project_root</span> <span class="c1"># Run pip from project root</span>
+                <span class="p">)</span>
+                <span class="n">_print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output:</span><span class="se">\n</span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">process</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">_print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Development installation failed:</span><span class="se">\n</span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Development installation failed. Stderr: </span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">success</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_print</span><span class="p">(</span><span class="s2">&quot;✅ Development dependencies installed successfully.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;success&#39;</span><span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Development dependencies installed.&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">_print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error running pip for development dependencies: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error running pip for development dependencies: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">success</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️ Warning: &#39;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">dev_reqs_path</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39; not found. Skipping development installation.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;requirements-dev.txt not found at </span><span class="si">{</span><span class="n">dev_reqs_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="c1"># Not necessarily a failure if dev reqs are optional and file is missing.</span>
+            <span class="c1"># Set success = False if dev install was explicitly requested and file missing.</span>
+
+    <span class="k">if</span> <span class="n">success</span><span class="p">:</span>
+        <span class="n">_print</span><span class="p">(</span><span class="s2">&quot;✨ Dependency installation process completed.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;success&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_print</span><span class="p">(</span><span class="s2">&quot;❌ Dependency installation process encountered errors.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">success</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="c1"># This block is for direct execution and won&#39;t use micro_X&#39;s UI manager</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">)</span>
+    
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Install Python dependencies for the micro_X project. &quot;</span>
+                    <span class="s2">&quot;This script expects to be run from the project&#39;s &#39;utils&#39; directory &quot;</span>
+                    <span class="s2">&quot;or have the project root correctly determined.&quot;</span><span class="p">,</span>
+        <span class="n">epilog</span><span class="o">=</span><span class="s2">&quot;Typically run via &#39;/utils install_requirements [options]&#39; from within micro_X, &quot;</span>
+               <span class="s2">&quot;or directly for development setup.&quot;</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--runtime&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Install runtime dependencies from requirements.txt (default if no other type specified).&quot;</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--dev&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Install development dependencies from requirements-dev.txt.&quot;</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--all&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Install both runtime and development dependencies.&quot;</span>
+    <span class="p">)</span>
+    
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="c1"># Determine project root if run directly from utils/</span>
+    <span class="n">script_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))</span>
+    <span class="n">project_root_guess</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">script_dir</span><span class="p">)</span> <span class="c1"># Assumes utils is directly under project root</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root_guess</span><span class="p">,</span> <span class="s2">&quot;main.py&quot;</span><span class="p">)):</span>
+        <span class="c1"># Try one level up if main.py isn&#39;t in parent (e.g. if script is in root)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">script_dir</span><span class="p">,</span> <span class="s2">&quot;main.py&quot;</span><span class="p">)):</span>
+            <span class="n">project_root_guess</span> <span class="o">=</span> <span class="n">script_dir</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error: Could not reliably determine project root. Ensure &#39;main.py&#39; is present.&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attempted project root: </span><span class="si">{</span><span class="n">project_root_guess</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Default to runtime if no specific flags are given</span>
+    <span class="n">install_runtime_flag</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">runtime</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">dev</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">all</span><span class="p">)</span>
+    <span class="n">install_dev_flag</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">dev</span> <span class="ow">or</span> <span class="n">args</span><span class="o">.</span><span class="n">all</span>
+    
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attempting to install requirements from project root: </span><span class="si">{</span><span class="n">project_root_guess</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Runtime: </span><span class="si">{</span><span class="n">install_runtime_flag</span><span class="si">}</span><span class="s2">, Dev: </span><span class="si">{</span><span class="n">install_dev_flag</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># For direct execution, append_output_func is None, so it will print to console.</span>
+    <span class="n">install_requirements</span><span class="p">(</span><span class="n">project_root_guess</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">install_dev_flag</span><span class="p">,</span> <span class="n">install_runtime_flag</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, micro_X Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
