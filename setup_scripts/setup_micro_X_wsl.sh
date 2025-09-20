@@ -147,6 +147,7 @@ if [ ! -f "$REQUIREMENTS_FILE" ]; then
 
 prompt_toolkit>=3.0.0
 ollama>=0.1.0
+numpy>=1.20.0
 EOF
     echo "$REQUIREMENTS_FILE created."
 else
