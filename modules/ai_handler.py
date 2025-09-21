@@ -408,6 +408,7 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
     """Translates a natural language query into a validated shell command.
 
     This function orchestrates a multi-step process:
+
     1. It tries the 'primary_translator' AI to get a command.
     2. If successful, it validates the command using
        `is_valid_linux_command_according_to_ai`.
@@ -416,15 +417,15 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
     4. This cycle repeats for a configured number of attempts.
 
     Args:
-        human_query: The user's natural language query.
-        config_param: The main application configuration object.
+        human_query (str): The user's natural language query.
+        config_param (dict): The main application configuration object.
         append_output_func: A reference to UIManager.append_output for UI updates.
         get_app_func: A reference to UIManager.get_app_instance for UI invalidation.
 
     Returns:
-        A tuple containing (validated_command, raw_ai_response).
-        The command is None if no valid command could be produced.
-        The raw response is the last candidate from the AI.
+        tuple[str | None, str | None]: A tuple containing the validated command
+        and the raw AI response. The command is None if no valid command could
+        be produced.
     """
     logger.info(f"Attempting validated translation for: '{human_query}'")
     last_raw_candidate_primary = None

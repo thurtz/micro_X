@@ -1,0 +1,271 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>utils.alias &mdash; micro_X 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            micro_X
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">micro_X</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">utils.alias</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for utils.alias</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="c1"># --- Path Setup ---</span>
+<span class="c1"># Add the project root to the Python path to allow importing from &#39;modules&#39;</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">script_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span>
+    <span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">script_path</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">project_root</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">project_root</span><span class="p">)</span>
+    <span class="c1"># Now we can safely import from modules</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">modules</span><span class="w"> </span><span class="kn">import</span> <span class="n">config_handler</span>
+<span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: Could not import the config_handler module. Ensure this script is run from within the micro_X project structure.&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Details: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># --- Configuration ---</span>
+<span class="n">DEFAULT_ALIASES_FILENAME</span> <span class="o">=</span> <span class="s2">&quot;default_aliases.json&quot;</span>
+<span class="n">USER_ALIASES_FILENAME</span> <span class="o">=</span> <span class="s2">&quot;user_aliases.json&quot;</span>
+<span class="n">CONFIG_DIR_NAME</span> <span class="o">=</span> <span class="s2">&quot;config&quot;</span>
+<span class="n">RESERVED_COMMAND_NAMES</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;/ai&quot;</span><span class="p">,</span> <span class="s2">&quot;/command&quot;</span><span class="p">,</span> <span class="s2">&quot;/ollama&quot;</span><span class="p">,</span> <span class="s2">&quot;/utils&quot;</span><span class="p">,</span> <span class="s2">&quot;/update&quot;</span><span class="p">,</span> <span class="s2">&quot;/help&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;exit&quot;</span><span class="p">,</span> <span class="s2">&quot;quit&quot;</span><span class="p">,</span> <span class="s2">&quot;/exit&quot;</span><span class="p">,</span> <span class="s2">&quot;/quit&quot;</span>
+<span class="p">]</span>
+
+<span class="c1"># --- Logging ---</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">)</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># --- Helper Functions ---</span>
+<div class="viewcode-block" id="get_project_root">
+<a class="viewcode-back" href="../../index.html#utils.alias.get_project_root">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_project_root</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Determines the project root directory.&quot;&quot;&quot;</span>
+    <span class="n">script_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">script_path</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="load_aliases">
+<a class="viewcode-back" href="../../index.html#utils.alias.load_aliases">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_aliases</span><span class="p">(</span><span class="n">aliases_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Loads an alias file using the centralized config handler.&quot;&quot;&quot;</span>
+    <span class="n">aliases</span> <span class="o">=</span> <span class="n">config_handler</span><span class="o">.</span><span class="n">load_jsonc_file</span><span class="p">(</span><span class="n">aliases_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">aliases</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Return an empty dict if file doesn&#39;t exist or is invalid</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">aliases</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Alias file at </span><span class="si">{</span><span class="n">aliases_path</span><span class="si">}</span><span class="s2"> is not a valid dictionary. Ignoring.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{}</span>
+    <span class="k">return</span> <span class="n">aliases</span></div>
+
+
+<div class="viewcode-block" id="save_user_aliases">
+<a class="viewcode-back" href="../../index.html#utils.alias.save_user_aliases">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_user_aliases</span><span class="p">(</span><span class="n">aliases_path</span><span class="p">,</span> <span class="n">aliases_data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Saves user aliases using the centralized config handler.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">config_handler</span><span class="o">.</span><span class="n">save_json_file</span><span class="p">(</span><span class="n">aliases_path</span><span class="p">,</span> <span class="n">aliases_data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="handle_add_alias">
+<a class="viewcode-back" href="../../index.html#utils.alias.handle_add_alias">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_add_alias</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">user_aliases_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handles the --add alias command, modifying only the user aliases.&quot;&quot;&quot;</span>
+    <span class="n">alias_name</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">add</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">command</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">add</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">alias_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;❌ Error: Alias name must begin with a forward slash &#39;/&#39;.&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">alias_name</span> <span class="ow">in</span> <span class="n">RESERVED_COMMAND_NAMES</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: Alias name &#39;</span><span class="si">{</span><span class="n">alias_name</span><span class="si">}</span><span class="s2">&#39; is a reserved command and cannot be used.&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">command</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;❌ Error: The command for the alias cannot be empty.&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">user_aliases</span> <span class="o">=</span> <span class="n">load_aliases</span><span class="p">(</span><span class="n">user_aliases_path</span><span class="p">)</span>
+    
+    <span class="n">user_aliases</span><span class="p">[</span><span class="n">alias_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">command</span>
+    <span class="k">if</span> <span class="n">save_user_aliases</span><span class="p">(</span><span class="n">user_aliases_path</span><span class="p">,</span> <span class="n">user_aliases</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✅ User alias &#39;</span><span class="si">{</span><span class="n">alias_name</span><span class="si">}</span><span class="s2">&#39; successfully mapped to &#39;</span><span class="si">{</span><span class="n">command</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="handle_remove_alias">
+<a class="viewcode-back" href="../../index.html#utils.alias.handle_remove_alias">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_remove_alias</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">user_aliases_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handles the --remove alias command from the user aliases file.&quot;&quot;&quot;</span>
+    <span class="n">alias_name</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">remove</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">alias_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;❌ Error: Alias name must begin with a forward slash &#39;/&#39;.&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">user_aliases</span> <span class="o">=</span> <span class="n">load_aliases</span><span class="p">(</span><span class="n">user_aliases_path</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">alias_name</span> <span class="ow">in</span> <span class="n">user_aliases</span><span class="p">:</span>
+        <span class="k">del</span> <span class="n">user_aliases</span><span class="p">[</span><span class="n">alias_name</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">save_user_aliases</span><span class="p">(</span><span class="n">user_aliases_path</span><span class="p">,</span> <span class="n">user_aliases</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🗑️ User alias &#39;</span><span class="si">{</span><span class="n">alias_name</span><span class="si">}</span><span class="s2">&#39; successfully removed.&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   (If a default alias with the same name exists, it will now be active).&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️ Warning: Alias &#39;</span><span class="si">{</span><span class="n">alias_name</span><span class="si">}</span><span class="s2">&#39; not found in your user-defined aliases.&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="handle_list_aliases">
+<a class="viewcode-back" href="../../index.html#utils.alias.handle_list_aliases">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_list_aliases</span><span class="p">(</span><span class="n">default_path</span><span class="p">,</span> <span class="n">user_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handles the --list alias command, showing merged results.&quot;&quot;&quot;</span>
+    <span class="n">default_aliases</span> <span class="o">=</span> <span class="n">load_aliases</span><span class="p">(</span><span class="n">default_path</span><span class="p">)</span>
+    <span class="n">user_aliases</span> <span class="o">=</span> <span class="n">load_aliases</span><span class="p">(</span><span class="n">user_path</span><span class="p">)</span>
+    <span class="n">merged_aliases</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">default_aliases</span><span class="p">,</span> <span class="o">**</span><span class="n">user_aliases</span><span class="p">}</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">merged_aliases</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No aliases defined.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;📄 Current Aliases (User aliases override defaults):&quot;</span><span class="p">)</span>
+    <span class="n">max_alias_len</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">alias</span><span class="p">)</span> <span class="k">for</span> <span class="n">alias</span> <span class="ow">in</span> <span class="n">merged_aliases</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="k">if</span> <span class="n">merged_aliases</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">alias</span><span class="p">,</span> <span class="n">command</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">merged_aliases</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="s2">&quot; (user)&quot;</span> <span class="k">if</span> <span class="n">alias</span> <span class="ow">in</span> <span class="n">user_aliases</span> <span class="k">else</span> <span class="s2">&quot;(default)&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">alias</span><span class="si">:</span><span class="s2">&lt;</span><span class="si">{</span><span class="n">max_alias_len</span><span class="si">}}</span><span class="s2">  -&gt;  </span><span class="si">{</span><span class="n">command</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="n">source</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../index.html#utils.alias.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Main function to parse arguments and execute alias management.&quot;&quot;&quot;</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Manage command aliases for micro_X.&quot;</span><span class="p">,</span>
+        <span class="n">epilog</span><span class="o">=</span><span class="s2">&quot;Use this utility to create shortcuts for longer or frequently used commands.&quot;</span>
+    <span class="p">)</span>
+    <span class="n">group</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_mutually_exclusive_group</span><span class="p">(</span><span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;--add&#39;</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;&lt;alias_name&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;command&gt;&#39;</span><span class="p">),</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Add or update a user-specific alias. E.g., --add /lsnap /utils generate_snapshot&quot;</span>
+    <span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;--remove&#39;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s1">&#39;&lt;alias_name&gt;&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Remove a user-specific alias.&quot;</span>
+    <span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;--list&#39;</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;List all currently active aliases (defaults and user).&quot;</span>
+    <span class="p">)</span>
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="n">project_root</span> <span class="o">=</span> <span class="n">get_project_root</span><span class="p">()</span>
+    <span class="n">config_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="n">CONFIG_DIR_NAME</span><span class="p">)</span>
+    <span class="n">default_aliases_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config_dir</span><span class="p">,</span> <span class="n">DEFAULT_ALIASES_FILENAME</span><span class="p">)</span>
+    <span class="n">user_aliases_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config_dir</span><span class="p">,</span> <span class="n">USER_ALIASES_FILENAME</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">add</span><span class="p">:</span>
+        <span class="n">handle_add_alias</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">user_aliases_path</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">remove</span><span class="p">:</span>
+        <span class="n">handle_remove_alias</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">user_aliases_path</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">list</span><span class="p">:</span>
+        <span class="n">handle_list_aliases</span><span class="p">(</span><span class="n">default_aliases_path</span><span class="p">,</span> <span class="n">user_aliases_path</span><span class="p">)</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, micro_X Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

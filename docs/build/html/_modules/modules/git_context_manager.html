@@ -1,0 +1,431 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modules.git_context_manager &mdash; micro_X 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            micro_X
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">micro_X</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modules.git_context_manager</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modules.git_context_manager</h1><div class="highlight"><pre>
+<span></span><span class="c1"># modules/git_context_manager.py</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">List</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># Default timeout for git fetch operations (in seconds)</span>
+<span class="n">DEFAULT_GIT_FETCH_TIMEOUT</span> <span class="o">=</span> <span class="mi">10</span>
+
+<span class="c1"># Enhanced: Use constants for fetch status results for clarity and consistency.</span>
+<span class="n">FETCH_SUCCESS</span> <span class="o">=</span> <span class="s2">&quot;success&quot;</span>
+<span class="n">FETCH_TIMEOUT</span> <span class="o">=</span> <span class="s2">&quot;timeout&quot;</span>
+<span class="n">FETCH_OFFLINE</span> <span class="o">=</span> <span class="s2">&quot;offline_or_unreachable&quot;</span>
+<span class="n">FETCH_ERROR</span> <span class="o">=</span> <span class="s2">&quot;other_error&quot;</span>
+<span class="n">FETCH_NOT_A_REPO</span> <span class="o">=</span> <span class="s2">&quot;not_a_repo&quot;</span>
+
+
+<div class="viewcode-block" id="GitContextManager">
+<a class="viewcode-back" href="../../index.html#modules.git_context_manager.GitContextManager">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GitContextManager</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Manages interactions with the Git repository for startup integrity checks</span>
+<span class="sd">    and gathering context about the project&#39;s state (branch, commit).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">project_root</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">fetch_timeout</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_GIT_FETCH_TIMEOUT</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initializes the GitContextManager.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            project_root: The root directory of the project. If None,</span>
+<span class="sd">                uses the current working directory.</span>
+<span class="sd">            fetch_timeout: Timeout in seconds for git fetch operations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">project_root</span><span class="p">)</span> <span class="k">if</span> <span class="n">project_root</span> <span class="k">else</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fetch_timeout</span> <span class="o">=</span> <span class="n">fetch_timeout</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_git_executable_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_repo</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># Cache if it&#39;s a git repo</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_available_cached</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># Cache if git command is available</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;GitContextManager initialized for project root: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">project_root</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_run_git_command</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command_args</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">timeout</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Runs a git command and returns its status, stdout, and stderr.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_git_available</span><span class="p">():</span> <span class="c1"># Check relies on cached value after first call</span>
+            <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;Git executable not found.&quot;</span>
+
+        <span class="n">full_command_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;git </span><span class="si">{</span><span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">command_args</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Executing Git command: &#39;</span><span class="si">{</span><span class="n">full_command_str</span><span class="si">}</span><span class="s2">&#39; in &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">project_root</span><span class="si">}</span><span class="s2">&#39; with timeout </span><span class="si">{</span><span class="n">timeout</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">process</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">to_thread</span><span class="p">(</span>
+                <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">,</span>
+                <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_git_executable_path</span><span class="p">]</span> <span class="o">+</span> <span class="n">command_args</span><span class="p">,</span>
+                <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">cwd</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project_root</span><span class="p">,</span>
+                <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
+                <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+                <span class="n">errors</span><span class="o">=</span><span class="s1">&#39;replace&#39;</span> 
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">process</span><span class="o">.</span><span class="n">returncode</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Git command &#39;</span><span class="si">{</span><span class="n">full_command_str</span><span class="si">}</span><span class="s2">&#39; succeeded. Stdout: </span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span><span class="p">,</span> <span class="n">process</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">process</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Git command &#39;</span><span class="si">{</span><span class="n">full_command_str</span><span class="si">}</span><span class="s2">&#39; failed with RC </span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="n">returncode</span><span class="si">}</span><span class="s2">. Stderr: </span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">, Stdout: </span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="n">process</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">process</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">except</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">TimeoutExpired</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Git command &#39;</span><span class="si">{</span><span class="n">full_command_str</span><span class="si">}</span><span class="s2">&#39; timed out after </span><span class="si">{</span><span class="n">timeout</span><span class="si">}</span><span class="s2"> seconds.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Command timed out after </span><span class="si">{</span><span class="n">timeout</span><span class="si">}</span><span class="s2"> seconds.&quot;</span>
+        <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Git executable not found at &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_git_executable_path</span><span class="si">}</span><span class="s2">&#39; during command execution.&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_available_cached</span> <span class="o">=</span> <span class="kc">False</span> 
+            <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;Git executable not found.&quot;</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error running git command &#39;</span><span class="si">{</span><span class="n">full_command_str</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+
+<div class="viewcode-block" id="GitContextManager.is_git_available">
+<a class="viewcode-back" href="../../index.html#modules.git_context_manager.GitContextManager.is_git_available">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">is_git_available</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Checks if the &#39;git&#39; executable is available in the system&#39;s PATH.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_available_cached</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_git_executable_path</span> <span class="o">=</span> <span class="n">shutil</span><span class="o">.</span><span class="n">which</span><span class="p">(</span><span class="s2">&quot;git&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_git_executable_path</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Git executable (&#39;git&#39;) not found in system PATH.&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_available_cached</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Git executable found at: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_git_executable_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_available_cached</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_available_cached</span></div>
+
+
+<div class="viewcode-block" id="GitContextManager.is_repository">
+<a class="viewcode-back" href="../../index.html#modules.git_context_manager.GitContextManager.is_repository">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">is_repository</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Checks if the project_root is a valid Git repository.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_git_available</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_repo</span> <span class="o">=</span> <span class="kc">False</span> 
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_repo</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">git_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project_root</span><span class="p">,</span> <span class="s2">&quot;.git&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">git_dir</span><span class="p">):</span>
+                <span class="n">success</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_git_command</span><span class="p">([</span><span class="s2">&quot;rev-parse&quot;</span><span class="p">,</span> <span class="s2">&quot;--is-inside-work-tree&quot;</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_repo</span> <span class="o">=</span> <span class="n">success</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_repo</span> <span class="o">=</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_repo</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Path &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">project_root</span><span class="si">}</span><span class="s2">&#39; does not appear to be a git repository.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_git_repo</span></div>
+
+
+<div class="viewcode-block" id="GitContextManager.get_current_branch">
+<a class="viewcode-back" href="../../index.html#modules.git_context_manager.GitContextManager.get_current_branch">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_current_branch</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets the current active branch name (e.g., &quot;main&quot;, &quot;dev&quot;).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            &#39;HEAD&#39; for a detached HEAD state.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_repository</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">success</span><span class="p">,</span> <span class="n">branch_name</span><span class="p">,</span> <span class="n">stderr</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_git_command</span><span class="p">([</span><span class="s2">&quot;rev-parse&quot;</span><span class="p">,</span> <span class="s2">&quot;--abbrev-ref&quot;</span><span class="p">,</span> <span class="s2">&quot;HEAD&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">success</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">branch_name</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not get current branch: </span><span class="si">{</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="GitContextManager.get_head_commit_hash">
+<a class="viewcode-back" href="../../index.html#modules.git_context_manager.GitContextManager.get_head_commit_hash">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_head_commit_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets the commit hash of the current HEAD.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_repository</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">success</span><span class="p">,</span> <span class="n">commit_hash</span><span class="p">,</span> <span class="n">stderr</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_git_command</span><span class="p">([</span><span class="s2">&quot;rev-parse&quot;</span><span class="p">,</span> <span class="s2">&quot;HEAD&quot;</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">commit_hash</span> <span class="k">if</span> <span class="n">success</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="GitContextManager.is_working_directory_clean">
+<a class="viewcode-back" href="../../index.html#modules.git_context_manager.GitContextManager.is_working_directory_clean">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">is_working_directory_clean</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Checks for uncommitted changes or untracked files.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_repository</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">False</span> 
+
+        <span class="n">success</span><span class="p">,</span> <span class="n">porcelain_output</span><span class="p">,</span> <span class="n">stderr</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_git_command</span><span class="p">([</span><span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="s2">&quot;--porcelain&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">success</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to get working directory status: </span><span class="si">{</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span> 
+
+        <span class="n">is_clean</span> <span class="o">=</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">porcelain_output</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Working directory clean status: </span><span class="si">{</span><span class="n">is_clean</span><span class="si">}</span><span class="s2">. Porcelain output: &#39;</span><span class="si">{</span><span class="n">porcelain_output</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">is_clean</span></div>
+
+
+
+<div class="viewcode-block" id="GitContextManager.fetch_remote_branch">
+<a class="viewcode-back" href="../../index.html#modules.git_context_manager.GitContextManager.fetch_remote_branch">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch_remote_branch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">branch_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">remote_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;origin&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fetches updates for a specific branch from the specified remote.</span>
+
+<span class="sd">        Uses the configured fetch_timeout.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A status string from predefined constants.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_repository</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">FETCH_NOT_A_REPO</span>
+        
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attempting to fetch &#39;</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&#39; from remote &#39;</span><span class="si">{</span><span class="n">remote_name</span><span class="si">}</span><span class="s2">&#39; with timeout </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">fetch_timeout</span><span class="si">}</span><span class="s2">s...&quot;</span><span class="p">)</span>
+        <span class="n">success</span><span class="p">,</span> <span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_git_command</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">&quot;fetch&quot;</span><span class="p">,</span> <span class="n">remote_name</span><span class="p">,</span> <span class="n">branch_name</span><span class="p">],</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">fetch_timeout</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">success</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fetch for &#39;</span><span class="si">{</span><span class="n">remote_name</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&#39; completed. Stdout: </span><span class="si">{</span><span class="n">stdout</span><span class="si">}</span><span class="s2">, Stderr: </span><span class="si">{</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">FETCH_SUCCESS</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">stderr_lower</span> <span class="o">=</span> <span class="n">stderr</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="k">if</span> <span class="s2">&quot;command timed out&quot;</span> <span class="ow">in</span> <span class="n">stderr_lower</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">FETCH_TIMEOUT</span>
+            <span class="k">elif</span> <span class="nb">any</span><span class="p">(</span><span class="n">s</span> <span class="ow">in</span> <span class="n">stderr_lower</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;could not resolve hostname&quot;</span><span class="p">,</span> <span class="s2">&quot;name or service not known&quot;</span><span class="p">,</span> <span class="s2">&quot;network is unreachable&quot;</span><span class="p">,</span> <span class="s2">&quot;connection refused&quot;</span><span class="p">]):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fetch for &#39;</span><span class="si">{</span><span class="n">remote_name</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&#39; failed: Host unreachable or offline. Stderr: </span><span class="si">{</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">FETCH_OFFLINE</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fetch for &#39;</span><span class="si">{</span><span class="n">remote_name</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&#39; failed with other error. Stderr: </span><span class="si">{</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">FETCH_ERROR</span></div>
+
+
+<div class="viewcode-block" id="GitContextManager.get_remote_tracking_branch_hash">
+<a class="viewcode-back" href="../../index.html#modules.git_context_manager.GitContextManager.get_remote_tracking_branch_hash">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_remote_tracking_branch_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">branch_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">remote_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;origin&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets the commit hash of the remote-tracking branch (e.g., origin/main).</span>
+<span class="sd">        </span>
+<span class="sd">        This relies on the local cache of the remote state.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_repository</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">remote_branch_ref</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;refs/remotes/</span><span class="si">{</span><span class="n">remote_name</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">success</span><span class="p">,</span> <span class="n">commit_hash</span><span class="p">,</span> <span class="n">stderr</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_git_command</span><span class="p">([</span><span class="s2">&quot;rev-parse&quot;</span><span class="p">,</span> <span class="n">remote_branch_ref</span><span class="p">])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">success</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not get commit hash for remote tracking branch &#39;</span><span class="si">{</span><span class="n">remote_branch_ref</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">commit_hash</span></div>
+
+
+<div class="viewcode-block" id="GitContextManager.compare_head_with_remote_tracking">
+<a class="viewcode-back" href="../../index.html#modules.git_context_manager.GitContextManager.compare_head_with_remote_tracking">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">compare_head_with_remote_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">branch_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">remote_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;origin&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compares HEAD with its remote-tracking branch, attempting to fetch first.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            branch_name: The name of the local branch.</span>
+<span class="sd">            remote_name: The name of the remote.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A tuple containing (comparison_status, local_hash, remote_hash, </span>
+<span class="sd">            fetch_attempt_status). Comparison Status can be: &quot;synced&quot;, &quot;ahead&quot;,</span>
+<span class="sd">            &quot;behind&quot;, &quot;diverged&quot;, &quot;synced_local_cache&quot;, &quot;ahead_local_cache&quot;, </span>
+<span class="sd">            &quot;behind_local_cache&quot;, &quot;diverged_local_cache&quot;, &quot;no_upstream&quot;, </span>
+<span class="sd">            &quot;no_upstream_info_locally&quot;, &quot;error&quot;. Fetch Status can be one of the</span>
+<span class="sd">            FETCH_* constants.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_repository</span><span class="p">():</span>
+            <span class="k">return</span> <span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">FETCH_NOT_A_REPO</span>
+
+        <span class="n">fetch_status</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">fetch_remote_branch</span><span class="p">(</span><span class="n">branch_name</span><span class="p">,</span> <span class="n">remote_name</span><span class="p">)</span>
+        
+        <span class="n">local_hash</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_head_commit_hash</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">local_hash</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">fetch_status</span> <span class="c1"># Error getting local hash</span>
+
+        <span class="n">remote_hash</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_remote_tracking_branch_hash</span><span class="p">(</span><span class="n">branch_name</span><span class="p">,</span> <span class="n">remote_name</span><span class="p">)</span>
+
+        <span class="n">comparison_prefix</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">fetch_status</span> <span class="o">!=</span> <span class="n">FETCH_SUCCESS</span><span class="p">:</span>
+            <span class="n">comparison_prefix</span> <span class="o">=</span> <span class="s2">&quot;_local_cache&quot;</span> 
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">remote_hash</span><span class="p">:</span>
+                 <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Branch &#39;</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&#39; has no remote tracking info locally after fetch issue (status: </span><span class="si">{</span><span class="n">fetch_status</span><span class="si">}</span><span class="s2">).&quot;</span><span class="p">)</span>
+                 <span class="k">return</span> <span class="s2">&quot;no_upstream_info_locally&quot;</span><span class="p">,</span> <span class="n">local_hash</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">fetch_status</span>
+
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">remote_hash</span><span class="p">:</span>
+            <span class="n">success_upstream_ref</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_git_command</span><span class="p">(</span>
+                <span class="p">[</span><span class="s2">&quot;rev-parse&quot;</span><span class="p">,</span> <span class="s2">&quot;--symbolic-full-name&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">@</span><span class="se">{{</span><span class="s2">upstream</span><span class="se">}}</span><span class="s2">&quot;</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">success_upstream_ref</span><span class="p">:</span>
+                 <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Branch &#39;</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&#39; does not have a configured upstream.&quot;</span><span class="p">)</span>
+                 <span class="k">return</span> <span class="s2">&quot;no_upstream&quot;</span><span class="p">,</span> <span class="n">local_hash</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">fetch_status</span>
+            <span class="k">return</span> <span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="n">local_hash</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">fetch_status</span>
+
+        <span class="k">if</span> <span class="n">local_hash</span> <span class="o">==</span> <span class="n">remote_hash</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;synced</span><span class="si">{</span><span class="n">comparison_prefix</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">local_hash</span><span class="p">,</span> <span class="n">remote_hash</span><span class="p">,</span> <span class="n">fetch_status</span>
+
+        <span class="n">is_local_ancestor_of_remote</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_git_command</span><span class="p">([</span><span class="s2">&quot;merge-base&quot;</span><span class="p">,</span> <span class="s2">&quot;--is-ancestor&quot;</span><span class="p">,</span> <span class="n">local_hash</span><span class="p">,</span> <span class="n">remote_hash</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">is_local_ancestor_of_remote</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;behind</span><span class="si">{</span><span class="n">comparison_prefix</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">local_hash</span><span class="p">,</span> <span class="n">remote_hash</span><span class="p">,</span> <span class="n">fetch_status</span>
+
+        <span class="n">is_remote_ancestor_of_local</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_git_command</span><span class="p">([</span><span class="s2">&quot;merge-base&quot;</span><span class="p">,</span> <span class="s2">&quot;--is-ancestor&quot;</span><span class="p">,</span> <span class="n">remote_hash</span><span class="p">,</span> <span class="n">local_hash</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">is_remote_ancestor_of_local</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;ahead</span><span class="si">{</span><span class="n">comparison_prefix</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">local_hash</span><span class="p">,</span> <span class="n">remote_hash</span><span class="p">,</span> <span class="n">fetch_status</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;diverged</span><span class="si">{</span><span class="n">comparison_prefix</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">local_hash</span><span class="p">,</span> <span class="n">remote_hash</span><span class="p">,</span> <span class="n">fetch_status</span></div>
+
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">verify_commit_signature</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">commit_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;GPG commit signature verification is not yet implemented.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Not implemented&quot;</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">verify_tag_signature</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;GPG tag signature verification is not yet implemented.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Not implemented&quot;</span></div>
+
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_main_test</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Internal test function for direct execution of this module.&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Testing GitContextManager...&quot;</span><span class="p">)</span>
+    <span class="n">project_root_for_test</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root_for_test</span><span class="p">,</span> <span class="s2">&quot;.git&quot;</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()),</span> <span class="s2">&quot;.git&quot;</span><span class="p">)):</span>
+                 <span class="n">project_root_for_test</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Testing with current directory &#39;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span><span class="si">}</span><span class="s2">&#39; as project root. Ensure it&#39;s a git repo.&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="n">gcm</span> <span class="o">=</span> <span class="n">GitContextManager</span><span class="p">(</span><span class="n">project_root</span><span class="o">=</span><span class="n">project_root_for_test</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="k">await</span> <span class="n">gcm</span><span class="o">.</span><span class="n">is_git_available</span><span class="p">():</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Git is available: </span><span class="si">{</span><span class="n">gcm</span><span class="o">.</span><span class="n">_git_executable_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="k">await</span> <span class="n">gcm</span><span class="o">.</span><span class="n">is_repository</span><span class="p">():</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Project root &#39;</span><span class="si">{</span><span class="n">gcm</span><span class="o">.</span><span class="n">project_root</span><span class="si">}</span><span class="s2">&#39; is a Git repository.&quot;</span><span class="p">)</span>
+            <span class="n">branch</span> <span class="o">=</span> <span class="k">await</span> <span class="n">gcm</span><span class="o">.</span><span class="n">get_current_branch</span><span class="p">()</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Current branch: </span><span class="si">{</span><span class="n">branch</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">commit</span> <span class="o">=</span> <span class="k">await</span> <span class="n">gcm</span><span class="o">.</span><span class="n">get_head_commit_hash</span><span class="p">()</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;HEAD commit: </span><span class="si">{</span><span class="n">commit</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">is_clean</span> <span class="o">=</span> <span class="k">await</span> <span class="n">gcm</span><span class="o">.</span><span class="n">is_working_directory_clean</span><span class="p">()</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Is working directory clean? </span><span class="si">{</span><span class="n">is_clean</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">is_clean</span><span class="p">:</span>
+                <span class="n">status_porcelain_tuple</span> <span class="o">=</span> <span class="k">await</span> <span class="n">gcm</span><span class="o">.</span><span class="n">_run_git_command</span><span class="p">([</span><span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="s2">&quot;--porcelain&quot;</span><span class="p">])</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Porcelain status: </span><span class="se">\n</span><span class="si">{</span><span class="n">status_porcelain_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">branch</span> <span class="ow">and</span> <span class="n">branch</span> <span class="o">!=</span> <span class="s2">&quot;HEAD&quot;</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Comparing branch &#39;</span><span class="si">{</span><span class="n">branch</span><span class="si">}</span><span class="s2">&#39; with remote &#39;origin&#39;...&quot;</span><span class="p">)</span>
+                <span class="n">comp_status</span><span class="p">,</span> <span class="n">local_h</span><span class="p">,</span> <span class="n">remote_h</span><span class="p">,</span> <span class="n">fetch_s</span> <span class="o">=</span> <span class="k">await</span> <span class="n">gcm</span><span class="o">.</span><span class="n">compare_head_with_remote_tracking</span><span class="p">(</span><span class="n">branch</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Comparison with remote for &#39;</span><span class="si">{</span><span class="n">branch</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">comp_status</span><span class="si">}</span><span class="s2"> (Fetch: </span><span class="si">{</span><span class="n">fetch_s</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Local HEAD: </span><span class="si">{</span><span class="n">local_h</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Remote &#39;</span><span class="si">{</span><span class="n">branch</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">remote_h</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Skipping remote comparison (branch: </span><span class="si">{</span><span class="n">branch</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Project root &#39;</span><span class="si">{</span><span class="n">gcm</span><span class="o">.</span><span class="n">project_root</span><span class="si">}</span><span class="s2">&#39; is NOT a Git repository.&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Git is not available on this system.&quot;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(filename)s</span><span class="s1">:</span><span class="si">%(lineno)d</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running GitContextManager direct test...&quot;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">_main_test</span><span class="p">())</span>
+    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Test interrupted.&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error during test: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error during direct test&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, micro_X Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

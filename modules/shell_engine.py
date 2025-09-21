@@ -560,6 +560,7 @@ class ShellEngine:
         """The main entry point for processing all user input that isn't a simple built-in.
 
         It orchestrates the flow:
+        
         1. Handles `/ai` queries by calling the AI handler.
         2. Processes direct command input from the user.
         3. For unknown commands, it uses the AI validator and may treat the input
@@ -567,8 +568,8 @@ class ShellEngine:
         4. Ultimately calls `process_command` to execute.
 
         Args:
-            user_input: The raw text from the user's input field.
-            from_edit_mode: True if the input is a resubmission after
+            user_input (str): The raw text from the user's input field.
+            from_edit_mode (bool): True if the input is a resubmission after
                 the user chose to modify an AI suggestion.
         """
         if not self.ui_manager: logger.error("submit_user_input: UIManager not initialized."); return

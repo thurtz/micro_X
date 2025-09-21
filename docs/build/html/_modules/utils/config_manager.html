@@ -1,0 +1,452 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>utils.config_manager &mdash; micro_X 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            micro_X
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">micro_X</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">utils.config_manager</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for utils.config_manager</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">webbrowser</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">socket</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">http.server</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">socketserver</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">urllib.parse</span><span class="w"> </span><span class="kn">import</span> <span class="n">urlparse</span><span class="p">,</span> <span class="n">parse_qs</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span> <span class="c1"># Added for sys.executable</span>
+
+<span class="c1"># --- Configuration ---</span>
+<span class="n">TMUX_SESSION_NAME_PREFIX</span> <span class="o">=</span> <span class="s2">&quot;microx_config_server_session&quot;</span> <span class="c1"># Base prefix</span>
+<span class="n">DEFAULT_PORT</span> <span class="o">=</span> <span class="mi">8000</span>
+<span class="c1"># Path relative to where http.server serves from (project root)</span>
+<span class="n">CONFIG_MANAGER_HTML_PATH</span> <span class="o">=</span> <span class="s2">&quot;tools/config_manager/index.html&quot;</span>
+<span class="n">USER_CONFIG_FILENAME</span> <span class="o">=</span> <span class="s2">&quot;user_config.json&quot;</span>
+<span class="n">USER_CATEGORIES_FILENAME</span> <span class="o">=</span> <span class="s2">&quot;user_command_categories.json&quot;</span>
+<span class="n">CONFIG_DIR_NAME</span> <span class="o">=</span> <span class="s2">&quot;config&quot;</span> <span class="c1"># Relative to project root</span>
+
+<span class="c1"># --- Helper Functions ---</span>
+<div class="viewcode-block" id="get_project_root">
+<a class="viewcode-back" href="../../index.html#utils.config_manager.get_project_root">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_project_root</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Determines the project root. Assumes this script is in &#39;utils/&#39;</span>
+<span class="sd">    and the project root is its parent directory.</span>
+<span class="sd">    If run directly from project root (e.g. for dev), it&#39;s os.getcwd().</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">script_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">script_path</span><span class="p">))</span> <span class="o">==</span> <span class="s2">&quot;utils&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">script_path</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="sanitize_branch_name_for_tmux">
+<a class="viewcode-back" href="../../index.html#utils.config_manager.sanitize_branch_name_for_tmux">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">sanitize_branch_name_for_tmux</span><span class="p">(</span><span class="n">branch_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sanitizes a branch name to be safe for tmux session names.&quot;&quot;&quot;</span>
+    <span class="c1"># Tmux session names cannot contain periods, colons, or other special chars.</span>
+    <span class="c1"># Replace problematic characters with underscores.</span>
+    <span class="n">sanitized</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">c</span> <span class="k">if</span> <span class="n">c</span><span class="o">.</span><span class="n">isalnum</span><span class="p">()</span> <span class="ow">or</span> <span class="n">c</span> <span class="o">==</span> <span class="s1">&#39;-&#39;</span> <span class="k">else</span> <span class="s1">&#39;_&#39;</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">branch_name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">sanitized</span><span class="p">[:</span><span class="mi">50</span><span class="p">]</span> <span class="c1"># Keep it reasonably short</span></div>
+
+
+<div class="viewcode-block" id="get_dynamic_tmux_session_name">
+<a class="viewcode-back" href="../../index.html#utils.config_manager.get_dynamic_tmux_session_name">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_dynamic_tmux_session_name</span><span class="p">(</span><span class="n">branch_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a dynamic tmux session name based on the branch.&quot;&quot;&quot;</span>
+    <span class="n">sanitized_branch</span> <span class="o">=</span> <span class="n">sanitize_branch_name_for_tmux</span><span class="p">(</span><span class="n">branch_name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">TMUX_SESSION_NAME_PREFIX</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">sanitized_branch</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="is_tmux_session_running">
+<a class="viewcode-back" href="../../index.html#utils.config_manager.is_tmux_session_running">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_tmux_session_running</span><span class="p">(</span><span class="n">session_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Checks if a tmux session with the given name is currently running.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">&quot;tmux&quot;</span><span class="p">,</span> <span class="s2">&quot;has-session&quot;</span><span class="p">,</span> <span class="s2">&quot;-t&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;=</span><span class="si">{</span><span class="n">session_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">],</span> <span class="c1"># Use exact match for session name</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error: &#39;tmux&#39; command not found. Please ensure tmux is installed.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error checking tmux session &#39;</span><span class="si">{</span><span class="n">session_name</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<div class="viewcode-block" id="find_free_port">
+<a class="viewcode-back" href="../../index.html#utils.config_manager.find_free_port">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">find_free_port</span><span class="p">(</span><span class="n">start_port</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">max_tries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Attempts to find a free port, starting from start_port.&quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">max_tries</span><span class="p">):</span>
+        <span class="n">port</span> <span class="o">=</span> <span class="n">start_port</span> <span class="o">+</span> <span class="n">i</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">socket</span><span class="o">.</span><span class="n">socket</span><span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">AF_INET</span><span class="p">,</span> <span class="n">socket</span><span class="o">.</span><span class="n">SOCK_STREAM</span><span class="p">)</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+                <span class="n">s</span><span class="o">.</span><span class="n">bind</span><span class="p">((</span><span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span> <span class="n">port</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">port</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">continue</span>
+    <span class="k">raise</span> <span class="ne">OSError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not find a free port after </span><span class="si">{</span><span class="n">max_tries</span><span class="si">}</span><span class="s2"> attempts starting from </span><span class="si">{</span><span class="n">start_port</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_preferred_port_for_branch">
+<a class="viewcode-back" href="../../index.html#utils.config_manager.get_preferred_port_for_branch">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_preferred_port_for_branch</span><span class="p">(</span><span class="n">branch_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">base_default_port</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Determines a preferred starting port based on the branch name.&quot;&quot;&quot;</span>
+    <span class="n">sanitized_branch</span> <span class="o">=</span> <span class="n">sanitize_branch_name_for_tmux</span><span class="p">(</span><span class="n">branch_name</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">sanitized_branch</span> <span class="o">==</span> <span class="s2">&quot;main&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">base_default_port</span>
+    <span class="k">elif</span> <span class="n">sanitized_branch</span> <span class="o">==</span> <span class="s2">&quot;dev&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">base_default_port</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">elif</span> <span class="n">sanitized_branch</span> <span class="o">==</span> <span class="s2">&quot;testing&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">base_default_port</span> <span class="o">+</span> <span class="mi">2</span>
+    <span class="k">else</span><span class="p">:</span> 
+        <span class="c1"># Simple hash-based offset for other branches to reduce immediate collisions</span>
+        <span class="n">hash_val</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">ord</span><span class="p">(</span><span class="n">char</span><span class="p">)</span> <span class="k">for</span> <span class="n">char</span> <span class="ow">in</span> <span class="n">sanitized_branch</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">base_default_port</span> <span class="o">+</span> <span class="mi">10</span> <span class="o">+</span> <span class="p">(</span><span class="n">hash_val</span> <span class="o">%</span> <span class="mi">10</span><span class="p">)</span> <span class="c1"># Offset by 10-19</span></div>
+
+
+<span class="c1"># --- HTTP Request Handler with Save Functionality ---</span>
+<div class="viewcode-block" id="ConfigManagerHTTPRequestHandler">
+<a class="viewcode-back" href="../../index.html#utils.config_manager.ConfigManagerHTTPRequestHandler">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ConfigManagerHTTPRequestHandler</span><span class="p">(</span><span class="n">http</span><span class="o">.</span><span class="n">server</span><span class="o">.</span><span class="n">SimpleHTTPRequestHandler</span><span class="p">):</span>
+    <span class="n">PROJECT_ROOT_PATH</span> <span class="o">=</span> <span class="n">get_project_root</span><span class="p">()</span> 
+
+<div class="viewcode-block" id="ConfigManagerHTTPRequestHandler.do_POST">
+<a class="viewcode-back" href="../../index.html#utils.config_manager.ConfigManagerHTTPRequestHandler.do_POST">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">do_POST</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handles POST requests to save configuration files.&quot;&quot;&quot;</span>
+        <span class="n">parsed_path</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">endpoint</span> <span class="o">=</span> <span class="n">parsed_path</span><span class="o">.</span><span class="n">path</span>
+        <span class="n">content_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;Content-Length&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">post_data_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rfile</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">content_length</span><span class="p">)</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">data_to_save</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">post_data_bytes</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+        <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">send_response</span><span class="p">(</span><span class="mi">400</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">send_header</span><span class="p">(</span><span class="s1">&#39;Content-type&#39;</span><span class="p">,</span> <span class="s1">&#39;application/json&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">end_headers</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">wfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="s2">&quot;Invalid JSON data received.&quot;</span><span class="p">})</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error: Received invalid JSON data for saving.&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="n">save_path</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">filename_for_message</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">endpoint</span> <span class="o">==</span> <span class="s1">&#39;/api/save/user_config&#39;</span><span class="p">:</span>
+            <span class="n">save_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">PROJECT_ROOT_PATH</span><span class="p">,</span> <span class="n">CONFIG_DIR_NAME</span><span class="p">,</span> <span class="n">USER_CONFIG_FILENAME</span><span class="p">)</span>
+            <span class="n">filename_for_message</span> <span class="o">=</span> <span class="n">USER_CONFIG_FILENAME</span>
+        <span class="k">elif</span> <span class="n">endpoint</span> <span class="o">==</span> <span class="s1">&#39;/api/save/user_categories&#39;</span><span class="p">:</span>
+            <span class="n">save_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">PROJECT_ROOT_PATH</span><span class="p">,</span> <span class="n">CONFIG_DIR_NAME</span><span class="p">,</span> <span class="n">USER_CATEGORIES_FILENAME</span><span class="p">)</span>
+            <span class="n">filename_for_message</span> <span class="o">=</span> <span class="n">USER_CATEGORIES_FILENAME</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">send_response</span><span class="p">(</span><span class="mi">404</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">send_header</span><span class="p">(</span><span class="s1">&#39;Content-type&#39;</span><span class="p">,</span> <span class="s1">&#39;application/json&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">end_headers</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">wfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="s2">&quot;Invalid save endpoint.&quot;</span><span class="p">})</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: Invalid save endpoint &#39;</span><span class="si">{</span><span class="n">endpoint</span><span class="si">}</span><span class="s2">&#39; requested.&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">save_path</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">save_path</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">save_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">data_to_save</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+                
+                <span class="bp">self</span><span class="o">.</span><span class="n">send_response</span><span class="p">(</span><span class="mi">200</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">send_header</span><span class="p">(</span><span class="s1">&#39;Content-type&#39;</span><span class="p">,</span> <span class="s1">&#39;application/json&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">end_headers</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">wfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">filename_for_message</span><span class="si">}</span><span class="s2"> saved successfully to project.&quot;</span><span class="p">})</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Successfully saved </span><span class="si">{</span><span class="n">filename_for_message</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">save_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">send_response</span><span class="p">(</span><span class="mi">500</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">send_header</span><span class="p">(</span><span class="s1">&#39;Content-type&#39;</span><span class="p">,</span> <span class="s1">&#39;application/json&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">end_headers</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">wfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Error saving </span><span class="si">{</span><span class="n">filename_for_message</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">})</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error writing </span><span class="si">{</span><span class="n">filename_for_message</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">save_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+</div>
+
+
+<span class="c1"># --- Server Management Functions ---</span>
+<span class="n">httpd_instance</span> <span class="o">=</span> <span class="kc">None</span> 
+<span class="n">server_thread_instance</span> <span class="o">=</span> <span class="kc">None</span> 
+
+<div class="viewcode-block" id="start_server_thread">
+<a class="viewcode-back" href="../../index.html#utils.config_manager.start_server_thread">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">start_server_thread</span><span class="p">(</span><span class="n">port</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">project_root</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Starts the HTTP server in a separate thread.&quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">httpd_instance</span>
+    <span class="k">class</span><span class="w"> </span><span class="nc">HandlerWithFixedDirectory</span><span class="p">(</span><span class="n">ConfigManagerHTTPRequestHandler</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">directory</span><span class="o">=</span><span class="n">project_root</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            
+    <span class="n">httpd_instance</span> <span class="o">=</span> <span class="n">socketserver</span><span class="o">.</span><span class="n">TCPServer</span><span class="p">((</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">port</span><span class="p">),</span> <span class="n">HandlerWithFixedDirectory</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;micro_X Config Manager server starting on http://localhost:</span><span class="si">{</span><span class="n">port</span><span class="si">}</span><span class="s2">/&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Serving files from: </span><span class="si">{</span><span class="n">project_root</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Config Manager tool will be at: http://localhost:</span><span class="si">{</span><span class="n">port</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">CONFIG_MANAGER_HTML_PATH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">httpd_instance</span><span class="o">.</span><span class="n">serve_forever</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="start_server_in_tmux">
+<a class="viewcode-back" href="../../index.html#utils.config_manager.start_server_in_tmux">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">start_server_in_tmux</span><span class="p">(</span><span class="n">port_preference</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">project_root</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">branch_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Starts the HTTP server in a branch-specific tmux session and opens the browser.&quot;&quot;&quot;</span>
+    <span class="n">dynamic_session_name</span> <span class="o">=</span> <span class="n">get_dynamic_tmux_session_name</span><span class="p">(</span><span class="n">branch_name</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="n">CONFIG_MANAGER_HTML_PATH</span><span class="p">)):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: Config Manager HTML file not found at expected path: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span><span class="w"> </span><span class="n">CONFIG_MANAGER_HTML_PATH</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Please ensure the web app (index.html) is located at tools/config_manager/ within the project.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">is_tmux_session_running</span><span class="p">(</span><span class="n">dynamic_session_name</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Server session &#39;</span><span class="si">{</span><span class="n">dynamic_session_name</span><span class="si">}</span><span class="s2">&#39; for branch &#39;</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&#39; appears to be already running.&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;If you need to restart it, please stop it first using:&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  /utils config_manager --stop --branch </span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="c1"># Attempt to open browser, assuming it&#39;s running on a previously determined port for this branch.</span>
+        <span class="c1"># This is a best-effort guess if port isn&#39;t stored.</span>
+        <span class="n">url_to_open</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;http://localhost:</span><span class="si">{</span><span class="n">port_preference</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">CONFIG_MANAGER_HTML_PATH</span><span class="si">}</span><span class="s2">&quot;</span> 
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">webbrowser</span><span class="o">.</span><span class="n">open_new_tab</span><span class="p">(</span><span class="n">url_to_open</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attempted to open Config Manager at: </span><span class="si">{</span><span class="n">url_to_open</span><span class="si">}</span><span class="s2"> (assuming server is on preferred port for branch)&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error trying to open browser: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">actual_port</span> <span class="o">=</span> <span class="n">find_free_port</span><span class="p">(</span><span class="n">port_preference</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error finding free port starting from </span><span class="si">{</span><span class="n">port_preference</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+    
+    <span class="n">tmux_internal_command_list</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span>
+        <span class="s2">&quot;--internal-start-actual-server&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--port&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">actual_port</span><span class="p">),</span>
+        <span class="s2">&quot;--project-root&quot;</span><span class="p">,</span> <span class="n">project_root</span><span class="p">,</span>
+        <span class="s2">&quot;--branch&quot;</span><span class="p">,</span> <span class="n">branch_name</span> <span class="c1"># Pass branch for logging within the server script if needed</span>
+    <span class="p">]</span>
+
+    <span class="n">tmux_command_list</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">&quot;tmux&quot;</span><span class="p">,</span> <span class="s2">&quot;new-session&quot;</span><span class="p">,</span> <span class="s2">&quot;-d&quot;</span><span class="p">,</span> <span class="s2">&quot;-s&quot;</span><span class="p">,</span> <span class="n">dynamic_session_name</span><span class="p">,</span>
+        <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmux_internal_command_list</span><span class="p">)</span> 
+    <span class="p">]</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">tmux_command_list</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Tmux session &#39;</span><span class="si">{</span><span class="n">dynamic_session_name</span><span class="si">}</span><span class="s2">&#39; for branch &#39;</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&#39; created.&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Server is being started on port </span><span class="si">{</span><span class="n">actual_port</span><span class="si">}</span><span class="s2"> within that session.&quot;</span><span class="p">)</span>
+        
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> 
+        
+        <span class="n">url_to_open</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;http://localhost:</span><span class="si">{</span><span class="n">actual_port</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">CONFIG_MANAGER_HTML_PATH</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">webbrowser</span><span class="o">.</span><span class="n">open_new_tab</span><span class="p">(</span><span class="n">url_to_open</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Opened Config Manager at: </span><span class="si">{</span><span class="n">url_to_open</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error opening web browser: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;You can manually navigate to: </span><span class="si">{</span><span class="n">url_to_open</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">To view server logs: tmux attach-session -t </span><span class="si">{</span><span class="n">dynamic_session_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;To stop this server, run in micro_X: /utils config_manager --stop --branch </span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error: &#39;tmux&#39; command not found. Please ensure tmux is installed and in your system&#39;s PATH.&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error starting tmux session for server: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;An unexpected error occurred during server start: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="stop_server_tmux_session">
+<a class="viewcode-back" href="../../index.html#utils.config_manager.stop_server_tmux_session">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">stop_server_tmux_session</span><span class="p">(</span><span class="n">branch_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Stops the HTTP server by killing its branch-specific tmux session.&quot;&quot;&quot;</span>
+    <span class="n">dynamic_session_name</span> <span class="o">=</span> <span class="n">get_dynamic_tmux_session_name</span><span class="p">(</span><span class="n">branch_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_tmux_session_running</span><span class="p">(</span><span class="n">dynamic_session_name</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Server session &#39;</span><span class="si">{</span><span class="n">dynamic_session_name</span><span class="si">}</span><span class="s2">&#39; for branch &#39;</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&#39; not found or not running.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">tmux_command_list</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;tmux&quot;</span><span class="p">,</span> <span class="s2">&quot;kill-session&quot;</span><span class="p">,</span> <span class="s2">&quot;-t&quot;</span><span class="p">,</span> <span class="n">dynamic_session_name</span><span class="p">]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">tmux_command_list</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Config Manager server session &#39;</span><span class="si">{</span><span class="n">dynamic_session_name</span><span class="si">}</span><span class="s2">&#39; for branch &#39;</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&#39; stopped successfully.&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error: &#39;tmux&#39; command not found.&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error stopping tmux session &#39;</span><span class="si">{</span><span class="n">dynamic_session_name</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">e</span><span class="o">.</span><span class="n">stderr</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;An unexpected error occurred during server stop: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Manage the micro_X Config Manager web server.&quot;</span><span class="p">,</span>
+        <span class="n">epilog</span><span class="o">=</span><span class="s2">&quot;Typically called by &#39;/utils config_manager&#39; within micro_X.&quot;</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--start&quot;</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Start the web server in a new tmux session and open the Config Manager.&quot;</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--stop&quot;</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Stop the web server&#39;s tmux session.&quot;</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--port&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">DEFAULT_PORT</span><span class="p">,</span> <span class="c1"># This will be the base for branch-specific ports</span>
+        <span class="n">help</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Base preferred port for the web server (default: </span><span class="si">{</span><span class="n">DEFAULT_PORT</span><span class="si">}</span><span class="s2">). Actual port may vary by branch.&quot;</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--branch&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span> <span class="c1"># Fallback if micro_X doesn&#39;t pass it</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;The current Git branch name (used for session and port naming). Passed by micro_X.&quot;</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--internal-start-actual-server&quot;</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">SUPPRESS</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--project-root&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">SUPPRESS</span>
+    <span class="p">)</span>
+    
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">internal_start_actual_server</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">project_root</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error: --project-root is required for --internal-start-actual-server.&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="c1"># The branch name passed to the internal server is mostly for potential logging</span>
+        <span class="c1"># or if the server itself needed to behave differently based on the branch.</span>
+        <span class="c1"># The tmux session it runs in is already named with the branch.</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Internal server starting for branch: </span><span class="si">{</span><span class="n">args</span><span class="o">.</span><span class="n">branch</span><span class="si">}</span><span class="s2"> on port: </span><span class="si">{</span><span class="n">args</span><span class="o">.</span><span class="n">port</span><span class="si">}</span><span class="s2"> in project: </span><span class="si">{</span><span class="n">args</span><span class="o">.</span><span class="n">project_root</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">ConfigManagerHTTPRequestHandler</span><span class="o">.</span><span class="n">PROJECT_ROOT_PATH</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">project_root</span>
+        <span class="n">start_server_thread</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">port</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">project_root</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">project_root</span> <span class="o">=</span> <span class="n">get_project_root</span><span class="p">()</span>
+    
+    <span class="c1"># Determine preferred port based on branch and user&#39;s base preference</span>
+    <span class="n">preferred_port_for_branch</span> <span class="o">=</span> <span class="n">get_preferred_port_for_branch</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">branch</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">port</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">start</span><span class="p">:</span>
+        <span class="n">start_server_in_tmux</span><span class="p">(</span><span class="n">preferred_port_for_branch</span><span class="p">,</span> <span class="n">project_root</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">branch</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">stop</span><span class="p">:</span>
+        <span class="n">stop_server_tmux_session</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">branch</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span> <span class="c1"># Print help to stderr by default for CLI tools</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Example usage from within micro_X (branch will be auto-detected by micro_X):&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  /utils config_manager --start&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  /utils config_manager --start --port 8010  (8010 becomes base for branch-specific port)&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  /utils config_manager --stop&quot;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, micro_X Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
