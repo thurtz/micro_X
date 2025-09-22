@@ -178,28 +178,8 @@ async def test_on_protected_branch_not_clean(mock_main_globals, mock_git_context
     mock_gcm_instance.is_working_directory_clean.return_value = False 
     mock_gcm_instance._run_git_command.return_value = (True, " M some_file.py", "") 
 
-    is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
-
-    assert is_dev_mode is False
-    assert integrity_ok is False
-    
-    expected_error_msg = f"❌ Integrity Check Failed (Branch: {protected_branch}): Uncommitted local changes or untracked files detected."
-    expected_detail_msg_content = "M some_file.py"
-    
-    found_error_msg = False
-    found_detail_msg_content = False
-    for call_args_tuple in mock_ui.append_output.call_args_list:
-        args, kwargs = call_args_tuple
-        msg_text = args[0]
-        style = kwargs.get('style_class')
-
-        if msg_text.strip() == expected_error_msg.strip() and style == 'error':
-            found_error_msg = True
-        if expected_detail_msg_content in msg_text and "Git status details:" in msg_text and style == 'error':
-            found_detail_msg_content = True
-            
-    assert found_error_msg, f"Expected error message '{expected_error_msg}' not found. Calls: {mock_ui.append_output.call_args_list}"
-    assert found_detail_msg_content, f"Expected detail message content '{expected_detail_msg_content}' not found. Calls: {mock_ui.append_output.call_args_list}"
+    with pytest.raises(StartupIntegrityError, match="Uncommitted local changes"):
+        await perform_startup_integrity_checks()
 
 
 @pytest.mark.asyncio
@@ -217,18 +197,8 @@ async def test_on_protected_branch_not_synced_ahead(mock_main_globals, mock_git_
     mock_gcm_instance.is_working_directory_clean.return_value = True
     mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("ahead", "local_ahead", "remote_base", FETCH_SUCCESS)
 
-    is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
-
-    assert is_dev_mode is False
-    assert integrity_ok is False
-    expected_message_part = f"Local branch has 'ahead' from 'origin/{protected_branch}'."
-    found_message = False
-    for call_args_tuple in mock_ui.append_output.call_args_list:
-        args, kwargs = call_args_tuple
-        if expected_message_part in args[0] and kwargs.get('style_class') == 'error':
-            found_message = True
-            break
-    assert found_message, f"Expected error message containing '{expected_message_part}' not found. Calls: {mock_ui.append_output.call_args_list}"
+    with pytest.raises(StartupIntegrityError, match="Local branch has 'ahead'"):
+        await perform_startup_integrity_checks()
 
 @pytest.mark.asyncio
 async def test_on_protected_branch_behind_and_disallowed(mock_main_globals, mock_git_context_manager):
@@ -245,18 +215,8 @@ async def test_on_protected_branch_behind_and_disallowed(mock_main_globals, mock
     mock_gcm_instance.is_working_directory_clean.return_value = True
     mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("behind", "local_base", "remote_new", FETCH_SUCCESS)
 
-    is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
-
-    assert is_dev_mode is False
-    assert integrity_ok is False
-    expected_message_part = "behind (and configuration disallows running)"
-    found_message = False
-    for call_args_tuple in mock_ui.append_output.call_args_list:
-        args, kwargs = call_args_tuple
-        if expected_message_part in args[0] and kwargs.get('style_class') == 'error':
-            found_message = True
-            break
-    assert found_message, f"Expected error message for disallowed 'behind' state not found. Calls: {mock_ui.append_output.call_args_list}"
+    with pytest.raises(StartupIntegrityError, match=r"behind \(and configuration disallows running\)"):
+        await perform_startup_integrity_checks()
 
 @pytest.mark.asyncio
 async def test_on_protected_branch_fetch_offline_and_ahead_cache(mock_main_globals, mock_git_context_manager):
@@ -272,18 +232,8 @@ async def test_on_protected_branch_fetch_offline_and_ahead_cache(mock_main_globa
     mock_gcm_instance.is_working_directory_clean.return_value = True
     mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("ahead_local_cache", "local_ahead", "remote_base", FETCH_OFFLINE)
 
-    is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
-
-    assert is_dev_mode is False
-    assert integrity_ok is False
-    expected_message_part = "Local branch has unpushed changes or diverged from the last known remote state. Status: ahead_local_cache"
-    found_message = False
-    for call_args_tuple in mock_ui.append_output.call_args_list:
-        args, kwargs = call_args_tuple
-        if expected_message_part in args[0] and kwargs.get('style_class') == 'error':
-            found_message = True
-            break
-    assert found_message, f"Expected error for 'ahead_local_cache' not found. Calls: {mock_ui.append_output.call_args_list}"
+    with pytest.raises(StartupIntegrityError, match="Local branch has unpushed changes or diverged"):
+        await perform_startup_integrity_checks()
 
 @pytest.mark.asyncio
 async def test_on_protected_branch_fetch_offline_and_synced_cache(mock_main_globals, mock_git_context_manager):
