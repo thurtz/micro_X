@@ -385,10 +385,9 @@ async def main_async_runner():
     if not is_developer_mode and not integrity_checks_passed and halt_on_failure:
         # This block is now primarily for logging, the exception is the key signal
         logger.critical("Halting micro_X due to failed integrity checks on a protected branch.")
-        # The actual error with details has already been raised by a sub-check.
-        # If it somehow gets here without an exception, raise a generic one.
-        if integrity_checks_passed: # Should not happen if checks failed
-            raise StartupIntegrityError("Failed integrity checks on a protected branch.", details="No specific details were captured.")
+        # The actual error with details should have already been raised by a sub-check.
+        # This is a fallback to ensure halting if a sub-check returns False instead of raising.
+        raise StartupIntegrityError("Failed integrity checks on a protected branch.", details="Halting as per configuration.")
 
     ui_manager_instance.main_exit_app_ref = _exit_app_main
     ui_manager_instance.main_restore_normal_input_ref = restore_normal_input_handler
