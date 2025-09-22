@@ -183,5 +183,11 @@
         "list scripts", 
         "show available scripts", 
         "list utilities"
+    ],
+    "list_scripts_user": [
+        "/list --type scripts", 
+        "list user scripts", 
+        "show available user scripts", 
+        "list user programs"
     ]
 }
