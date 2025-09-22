@@ -17,6 +17,6 @@ This file contains the rules and guidelines for the Gemini AI assistant when wor
 
 ## 3. Committing Changes
 
-- When committing changes using the `run_shell_command` tool, enclose the multi-line commit message in double quotes (`"`). If the commit message itself contains double quotes, they must be escaped with a backslash (`\\"`).
-- Avoid using single quotes for multi-line commit messages if the message contains any single quotes, as this can cause parsing errors.
+- When committing changes using the `run_shell_command` tool, use the `-m` flag for each line of the commit message. This avoids complex shell escaping issues.
+- Example: `git commit -m "feat: Add new feature" -m "Detailed description of the feature."`
 - Files listed in the `.gitignore` file are not tracked by Git and therefore cannot be committed. Do not attempt to commit these files.
