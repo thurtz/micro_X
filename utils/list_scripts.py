@@ -3,36 +3,21 @@
 import os
 import sys
 import argparse
-import json # Added for alias handling
 
 # --- Path Setup ---
-# Add the project root to the Python path to allow importing from 'modules'
+# Add the utils directory to the Python path to allow importing from 'shared'
 try:
     script_path = os.path.abspath(__file__)
-    project_root = os.path.dirname(os.path.dirname(script_path))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-    from modules import config_handler
+    utils_dir = os.path.dirname(script_path)
+    if utils_dir not in sys.path:
+        sys.path.insert(0, utils_dir)
+    # Now we can safely import from shared
+    from shared.helpers import get_project_root, load_json_file, format_aliases_list
+    from shared.consts import *
 except ImportError as e:
-    print(f"❌ Error: Could not import the config_handler module. Ensure this script is run from within the micro_X project structure.", file=sys.stderr)
+    print(f"❌ Error: Could not import the shared module. Ensure this script is run from within the micro_X project structure.", file=sys.stderr)
     print(f"   Details: {e}", file=sys.stderr)
     sys.exit(1)
-
-# --- Configuration ---
-UTILS_DIR_NAME = "utils"
-USER_SCRIPTS_DIR_NAME = "user_scripts"
-
-# Alias Configuration
-DEFAULT_ALIASES_FILENAME = "default_aliases.json"
-USER_ALIASES_FILENAME = "user_aliases.json"
-CONFIG_DIR_NAME = "config"
-
-# --- Helper Functions ---
-def get_project_root():
-    """Determines the project root directory."""
-    script_path = os.path.abspath(__file__)
-    # Assumes this script is in project_root/utils/
-    return os.path.dirname(os.path.dirname(script_path))
 
 def get_scripts_from_directory(directory_path):
     """Scans a directory for .py files and returns their base names."""
@@ -49,17 +34,6 @@ def get_scripts_from_directory(directory_path):
     except OSError as e:
         print(f"Error reading directory {directory_path}: {e}", file=sys.stderr)
         return []
-
-def load_aliases(aliases_path):
-    """Loads an alias file using the centralized config handler."""
-    aliases = config_handler.load_jsonc_file(aliases_path)
-    if aliases is None:
-        return {}  # Return an empty dict if file doesn't exist or is invalid
-    if not isinstance(aliases, dict):
-        # In a CLI tool, we might just print a warning or ignore, not necessarily log
-        print(f"Warning: Alias file at {aliases_path} is not a valid dictionary. Ignoring.", file=sys.stderr)
-        return {}
-    return aliases
 
 def main():
     """Main function to list all available scripts."""
@@ -89,8 +63,8 @@ def main():
     util_scripts = get_scripts_from_directory(utils_path)
     user_scripts = get_scripts_from_directory(user_scripts_path)
 
-    default_aliases = load_aliases(default_aliases_path)
-    user_aliases = load_aliases(user_aliases_path)
+    default_aliases = load_json_file(default_aliases_path)
+    user_aliases = load_json_file(user_aliases_path)
     all_aliases = {**default_aliases, **user_aliases} # User aliases override defaults
 
     print("\nAvailable Commands in micro_X")
@@ -119,18 +93,12 @@ def main():
                 print("  You can add your own .py files to this directory.")
 
     if args.type in ['all', 'aliases']:
-        print("\n--- Aliases (run with <alias_name>) ---")
+        print("")
         filtered_aliases = {
             alias: command for alias, command in all_aliases.items()
             if not name_filter or name_filter in alias.lower() or name_filter in command.lower()
         }
-        if filtered_aliases:
-            max_alias_len = max(len(alias) for alias in filtered_aliases.keys()) if filtered_aliases else 0
-            for alias, command in sorted(filtered_aliases.items()):
-                source = " (user)" if alias in user_aliases else " (default)"
-                print(f"  {alias:<{max_alias_len}}  ->  {command}{source}")
-        else:
-            print("  (No aliases found matching criteria)")
+        print(format_aliases_list(filtered_aliases, user_aliases))
 
     print("\n" + "=" * 30)
 
