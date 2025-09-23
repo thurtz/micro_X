@@ -63,21 +63,6 @@
         "list commands",
         "show all commands"
     ],
-    "command_add": [
-        "/command add",
-        "add command",
-        "categorize command"
-    ],
-    "command_remove": [
-        "/command remove",
-        "remove command",
-        "decategorize command"
-    ],
-    "command_move": [
-        "/command move",
-        "move command",
-        "recategorize command"
-    ],
     "config_start": [
         "/config",
         "start config server",
@@ -93,11 +78,7 @@
         "update micro_x",
         "check for updates"
     ],
-    "change_directory": [
-        "cd",
-        "change directory to",
-        "go to"
-    ],
+
     "snapshot_create": [
         "/snapshot",
         "create a snapshot"
@@ -122,16 +103,6 @@
         "/alias --list",
         "list aliases",
         "show all aliases"
-    ],
-    "alias_add": [
-        "/alias --add",
-        "add alias",
-        "create alias"
-    ],
-    "alias_remove": [
-        "/alias --remove",
-        "remove alias",
-        "delete alias"
     ],
     "dev_activate": [
         "/dev --activate",
