@@ -51,6 +51,7 @@ def main():
         type=str,
         help='Filter by name (case-insensitive substring match).'
     )
+
     args = parser.parse_args()
 
     project_root = get_project_root()

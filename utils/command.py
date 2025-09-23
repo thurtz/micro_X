@@ -69,6 +69,8 @@ def main():
 
     args = parser.parse_args()
 
+
+
     try:
         if args.add:
             command, category = args.add

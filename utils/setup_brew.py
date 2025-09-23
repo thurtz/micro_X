@@ -190,27 +190,35 @@ def main():
         description="Install Homebrew on macOS, Debian-based Linux, or WSL and create an alias for it in micro_X.",
         epilog="This utility helps set up the Homebrew package manager and configures your shell environment."
     )
-    parser.parse_args()
+    parser.add_argument('--install', action='store_true', help='Run the Homebrew installation process.')
 
-    if not (sys.platform == "darwin" or sys.platform.startswith("linux")):
-        print("⚠️ This script is intended for macOS or Linux (including WSL) and may not work on other operating systems.", file=sys.stderr)
-        sys.exit(1)
+    args = parser.parse_args()
 
-    if install_homebrew():
-        setup_brew_path()
-        
-        print("\n🔗 Creating alias '/brew'...")
-        
-        class Args:
-            pass
-        
-        args = Args()
-        args.add = ['/brew', 'brew']
-        
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        user_aliases_path = os.path.join(project_root, 'config', 'user_aliases.json')
-        
-        handle_add_alias(args, user_aliases_path)
+    if not args.install:
+        parser.print_help()
+        sys.exit(0)
+
+
+    if args.install:
+        if not (sys.platform == "darwin" or sys.platform.startswith("linux")):
+            print("⚠️ This script is intended for macOS or Linux (including WSL) and may not work on other operating systems.", file=sys.stderr)
+            sys.exit(1)
+
+        if install_homebrew():
+            setup_brew_path()
+            
+            print("\n🔗 Creating alias '/brew'...")
+            
+            class Args:
+                pass
+            
+            args = Args()
+            args.add = ['/brew', 'brew']
+            
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            user_aliases_path = os.path.join(project_root, 'config', 'user_aliases.json')
+            
+            handle_add_alias(args, user_aliases_path)
 
 if __name__ == "__main__":
     main()

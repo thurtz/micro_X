@@ -5,7 +5,9 @@
         "help",
         "how do I use this",
         "show commands",
-        "what can you do"
+        "what can you do",
+        "what are your commands",
+        "what are your capabilities"
     ],
     "exit_shell": [
         "exit",
@@ -63,8 +65,13 @@
         "list commands",
         "show all commands"
     ],
+    "command_help": [
+        "/command --help",
+        "command help",
+        "how to use command manager"
+    ],
     "config_start": [
-        "/config",
+        "/config --start",
         "start config server",
         "open config ui"
     ],
@@ -72,6 +79,11 @@
         "/config --stop",
         "stop config server",
         "close config ui"
+    ],
+    "config_help": [
+        "/config --help",
+        "config help",
+        "how to use config manager"
     ],
     "run_update": [
         "/update",
@@ -91,10 +103,6 @@
         "/snapshot --summarize",
         "create a summarized snapshot"
     ],
-    "snapshot_include_full_module": [
-        "/snapshot --include-full-module",
-        "snapshot with full module"
-    ],
     "snapshot_help": [
         "/snapshot --help",
         "snapshot help"
@@ -103,6 +111,11 @@
         "/alias --list",
         "list aliases",
         "show all aliases"
+    ],
+    "alias_help": [
+        "/alias --help",
+        "alias help",
+        "how to use alias manager"
     ],
     "dev_activate": [
         "/dev --activate",
@@ -152,16 +165,31 @@
         "/dev --run-tests-all",
         "run tests on all branches"
     ],
+    "dev_help": [
+        "/dev --help",
+        "dev help",
+        "how to use dev manager"
+    ],
     "generate_project_tree": [
         "/tree",
         "generate project tree",
         "show project structure"
+    ],
+    "generate_project_tree_help": [
+        "/tree --help",
+        "project tree help",
+        "how to use project tree generator"
     ],
     "run_tests": [
         "/utils run_tests",
         "run tests",
         "execute tests",
         "run the test suite"
+    ],
+    "run_tests_help": [
+        "/utils run_tests --help",
+        "tests help",
+        "how to use the test runner"
     ],
     "list_scripts": [
         "/list",
@@ -174,10 +202,10 @@
         "list user scripts",
         "show user scripts"
     ],
-    "list_scripts_by_name": [
-        "/list --name",
-        "list scripts by name",
-        "find script"
+    "list_scripts_help": [
+        "/list --help",
+        "list help",
+        "how to use the list command"
     ],
     "install_dependencies_runtime": [
         "/utils install_requirements --runtime",
@@ -196,8 +224,18 @@
         "install homebrew",
         "setup brew"
     ],
+    "setup_brew_help": [
+        "/utils setup_brew --help",
+        "brew help",
+        "how to use setup brew"
+    ],
     "setup_dev_env": [
         "/utils setup_dev_env",
         "setup dev environment"
+    ],
+    "setup_dev_env_help": [
+        "/utils setup_dev_env --help",
+        "dev environment help",
+        "how to use setup dev environment"
     ]
 }

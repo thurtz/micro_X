@@ -302,7 +302,7 @@ def main():
         epilog="This utility is designed to be run from the 'main' branch of a micro_X installation."
     )
     # --- Group for exclusive actions ---
-    action_group = parser.add_mutually_exclusive_group()
+    action_group = parser.add_mutually_exclusive_group(required=True)
     action_group.add_argument(
         "--activate", action="store_true",
         help="Clones and sets up the 'testing' and 'dev' branches into subdirectories."

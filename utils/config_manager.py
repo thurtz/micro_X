@@ -254,12 +254,13 @@ def main():
         description="Manage the micro_X Config Manager web server.",
         epilog="Typically called by '/utils config_manager' within micro_X."
     )
-    parser.add_argument(
+    action_group = parser.add_mutually_exclusive_group(required=False)
+    action_group.add_argument(
         "--start",
         action="store_true",
         help="Start the web server in a new tmux session and open the Config Manager."
     )
-    parser.add_argument(
+    action_group.add_argument(
         "--stop",
         action="store_true",
         help="Stop the web server's tmux session."
@@ -311,11 +312,9 @@ def main():
     elif args.stop:
         stop_server_tmux_session(args.branch)
     else:
-        parser.print_help(sys.stderr) # Print help to stderr by default for CLI tools
-        print(f"\nExample usage from within micro_X (branch will be auto-detected by micro_X):")
-        print(f"  /utils config_manager --start")
-        print(f"  /utils config_manager --start --port 8010  (8010 becomes base for branch-specific port)")
-        print(f"  /utils config_manager --stop")
+        # If no action is specified, print help
+        parser.print_help()
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
