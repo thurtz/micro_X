@@ -93,6 +93,8 @@ def main():
 
     args = parser.parse_args()
 
+
+
     project_root = get_project_root()
     config_dir = os.path.join(project_root, CONFIG_DIR_NAME)
     default_aliases_path = os.path.join(config_dir, DEFAULT_ALIASES_FILENAME)

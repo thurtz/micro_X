@@ -10,5 +10,8 @@
   "/snapshot": "/utils generate_snapshot",
   "/tree": "/utils generate_tree",
   "/update": "/utils update",
-  "/setup_brew": "python utils/setup_brew.py"
+  "/test": "/utils run_tests",
+  "/setup_brew": "python utils/setup_brew.py",
+  "/setup_brew --help": "python utils/setup_brew.py --help",
+  "/setup_brew --install": "python utils/setup_brew.py --install"
 }

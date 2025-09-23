@@ -30,7 +30,7 @@ Common Commands:
 
 For more details on a specific feature, use '/help <topic>'.
 Available Topics:
-  ai, alias, command, config, dev, keys, security, utils
+  ai, alias, command, config, dev, keybindings, security, utilities
 """
 
 AI_HELP = """
@@ -99,16 +99,16 @@ micro_X comes with several utility scripts to help manage the shell and your pro
 While they can be run with '/utils <script_name>', it is recommended to use the shorter alias for them.
 
 Common Utilities & Their Aliases:
-  /utils alias            (alias: /alias)
-  /utils command          (alias: /command)
-  /utils config_manager   (alias: /config)
-  /utils dev              (alias: /dev)
-  /utils generate_snapshot(alias: /snapshot)
-  /utils generate_tree    (alias: /tree)
-  /utils list_scripts     (alias: /list)
-  /utils ollama_cli       (alias: /ollama)
-  /utils update           (alias: /update)
-  /utils run_tests        (no default alias)
+  /alias
+  /command
+  /config
+  /dev
+  /snapshot
+  /tree
+  /list
+  /ollama
+  /update
+  /test             (full command: /utils run_tests)
 
 To see all available utility scripts, run '/list'.
 """
@@ -174,7 +174,8 @@ Branching Strategy & Integrity:
   - dev: The main development branch. Integrity checks are informational and do not block execution, allowing for local changes.
 
 Setting up the Development Environment:
-  - From the 'main' branch, run '/utils dev --activate'.
+  - To set up the development environment, run this command from the 'main' branch:
+    /dev --activate
   - This command will clone the 'testing' and 'dev' branches into subdirectories ('micro_X-testing/' and 'micro_X-dev/') and set up their environments.
 
 Running Tests:
@@ -198,7 +199,7 @@ def main():
         'topic',
         nargs='?',
         default='general',
-        help="The topic to get help on. Available: ai, alias, command, utils, keys, config, security, dev."
+        help="The topic to get help on. Available: ai, alias, command, utilities, keybindings, config, security, dev."
     )
 
     args, unknown = parser.parse_known_args()
