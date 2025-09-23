@@ -621,8 +621,6 @@ class ShellEngine:
             "install_dependencies_runtime": "/utils install_requirements --runtime",
             "install_dependencies_dev": "/utils install_requirements --dev",
             "install_dependencies_all": "/utils install_requirements --all",
-            "setup_brew": "/utils setup_brew",
-            "setup_brew_help": "/utils setup_brew --help",
             "setup_dev_env": "/utils setup_dev_env",
             "setup_dev_env_help": "/utils setup_dev_env --help",
         }

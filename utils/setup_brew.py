@@ -206,19 +206,6 @@ def main():
 
         if install_homebrew():
             setup_brew_path()
-            
-            print("\n🔗 Creating alias '/brew'...")
-            
-            class Args:
-                pass
-            
-            args = Args()
-            args.add = ['/brew', 'brew']
-            
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            user_aliases_path = os.path.join(project_root, 'config', 'user_aliases.json')
-            
-            handle_add_alias(args, user_aliases_path)
 
 if __name__ == "__main__":
     main()

@@ -219,16 +219,6 @@
         "/utils install_requirements --all",
         "install all dependencies"
     ],
-    "setup_brew": [
-        "/utils setup_brew",
-        "install homebrew",
-        "setup brew"
-    ],
-    "setup_brew_help": [
-        "/utils setup_brew --help",
-        "brew help",
-        "how to use setup brew"
-    ],
     "setup_dev_env": [
         "/utils setup_dev_env",
         "setup dev environment"
