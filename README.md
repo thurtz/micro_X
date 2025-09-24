@@ -15,11 +15,7 @@ It is recommended that all users start by cloning and setting up the main branch
     git clone https://github.com/thurtz/micro_X.git
     cd micro_X
     ```
-2.  **Make the Setup Script Executable:**
-    ```bash
-    chmod +x setup.sh
-    ```
-3.  **Run the Unified Setup Script:**
+2.  **Run the Unified Setup Script:**
     ```bash
     ./setup.sh
     ```
