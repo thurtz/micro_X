@@ -2,6 +2,7 @@
 import os
 import sys
 import webbrowser
+import argparse
 
 def main():
     """
@@ -30,4 +31,8 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Finds and opens the local micro_X documentation in a web browser."
+    )
+    args = parser.parse_args()
     main()
