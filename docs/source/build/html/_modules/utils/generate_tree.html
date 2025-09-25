@@ -1,0 +1,292 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>utils.generate_tree &mdash; micro_X 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            micro_X
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/index.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../developer/index.html">Developer Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api_reference.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">micro_X</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">utils.generate_tree</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for utils.generate_tree</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">fnmatch</span> <span class="c1"># Added for robust pattern matching</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span> <span class="c1"># Added for help argument handling</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span> <span class="c1"># Added to exit if path is not a directory</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_generate_recursive</span><span class="p">(</span><span class="n">current_path</span><span class="p">,</span> <span class="n">prefix</span><span class="p">,</span> <span class="n">ignore_dirs</span><span class="p">,</span> <span class="n">ignore_files</span><span class="p">,</span> 
+                        <span class="n">pipe_segment</span><span class="p">,</span> <span class="n">space_segment</span><span class="p">,</span> <span class="n">entry_connector_dir</span><span class="p">,</span> <span class="n">entry_connector_file</span><span class="p">,</span>
+                        <span class="n">output_lines</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Recursively generates the file tree for the current_path and appends to output_lines.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        current_path (str): The directory path to list.</span>
+<span class="sd">        prefix (str): The prefix string for indentation and tree lines.</span>
+<span class="sd">        ignore_dirs (list): List of directory names to ignore.</span>
+<span class="sd">        ignore_files (list): List of file names/extensions/patterns to ignore (supports fnmatch).</span>
+<span class="sd">        pipe_segment (str): String for a pipe segment in the prefix (e.g., &quot;|   &quot;).</span>
+<span class="sd">        space_segment (str): String for a space segment in the prefix (e.g., &quot;    &quot;).</span>
+<span class="sd">        entry_connector_dir (str): Prefix for directory entries (e.g., &quot;├── &quot;).</span>
+<span class="sd">        entry_connector_file (str): Prefix for the last entry in a list (e.g., &quot;└── &quot;).</span>
+<span class="sd">        output_lines (list): A list to accumulate the lines of the tree.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">entries</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">current_path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="c1"># Handle cases where a directory might not be accessible</span>
+        <span class="n">output_lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}{</span><span class="n">entry_connector_file</span><span class="si">}</span><span class="s2">[Error accessing: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">current_path</span><span class="p">)</span><span class="si">}</span><span class="s2"> - </span><span class="si">{</span><span class="n">e</span><span class="o">.</span><span class="n">strerror</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="c1"># Separate directories and files, then filter and sort</span>
+    <span class="n">dirs_to_process</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">files_to_print</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">entry_name</span> <span class="ow">in</span> <span class="n">entries</span><span class="p">:</span>
+        <span class="n">entry_full_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">current_path</span><span class="p">,</span> <span class="n">entry_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">entry_full_path</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">entry_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ignore_dirs</span><span class="p">:</span> <span class="c1"># Simple name check for directories</span>
+                <span class="n">dirs_to_process</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry_name</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span> <span class="c1"># It&#39;s a file</span>
+            <span class="n">is_ignored</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="n">ignore_files</span><span class="p">:</span> <span class="c1"># Use fnmatch for file patterns</span>
+                <span class="k">if</span> <span class="n">fnmatch</span><span class="o">.</span><span class="n">fnmatch</span><span class="p">(</span><span class="n">entry_name</span><span class="p">,</span> <span class="n">pattern</span><span class="p">):</span>
+                    <span class="n">is_ignored</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">break</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">is_ignored</span><span class="p">:</span>
+                <span class="n">files_to_print</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry_name</span><span class="p">)</span>
+    
+    <span class="n">dirs_to_process</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+    <span class="n">files_to_print</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+
+    <span class="c1"># Combine sorted directories and files for ordered printing</span>
+    <span class="n">all_items_to_render</span> <span class="o">=</span> <span class="p">[(</span><span class="n">d</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">dirs_to_process</span><span class="p">]</span> <span class="o">+</span> \
+                          <span class="p">[(</span><span class="n">f</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files_to_print</span><span class="p">]</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">item_name</span><span class="p">,</span> <span class="n">is_dir_item</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">all_items_to_render</span><span class="p">):</span>
+        <span class="n">is_last_entry</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_items_to_render</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">connector</span> <span class="o">=</span> <span class="n">entry_connector_file</span> <span class="k">if</span> <span class="n">is_last_entry</span> <span class="k">else</span> <span class="n">entry_connector_dir</span>
+        
+        <span class="n">display_name</span> <span class="o">=</span> <span class="n">item_name</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="k">if</span> <span class="n">is_dir_item</span> <span class="k">else</span> <span class="n">item_name</span>
+        <span class="n">output_lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}{</span><span class="n">connector</span><span class="si">}{</span><span class="n">display_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">is_dir_item</span><span class="p">:</span>
+            <span class="n">child_prefix</span> <span class="o">=</span> <span class="n">prefix</span> <span class="o">+</span> <span class="p">(</span><span class="n">space_segment</span> <span class="k">if</span> <span class="n">is_last_entry</span> <span class="k">else</span> <span class="n">pipe_segment</span><span class="p">)</span>
+            <span class="n">_generate_recursive</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">current_path</span><span class="p">,</span> <span class="n">item_name</span><span class="p">),</span> 
+                                <span class="n">child_prefix</span><span class="p">,</span> 
+                                <span class="n">ignore_dirs</span><span class="p">,</span> <span class="n">ignore_files</span><span class="p">,</span>
+                                <span class="n">pipe_segment</span><span class="p">,</span> <span class="n">space_segment</span><span class="p">,</span> 
+                                <span class="n">entry_connector_dir</span><span class="p">,</span> <span class="n">entry_connector_file</span><span class="p">,</span>
+                                <span class="n">output_lines</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="generate_file_tree">
+<a class="viewcode-back" href="../../api_reference.html#utils.generate_tree.generate_file_tree">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_file_tree</span><span class="p">(</span><span class="n">startpath</span><span class="p">,</span> <span class="n">output_filepath</span><span class="p">,</span> <span class="n">display_root_name</span><span class="o">=</span><span class="s2">&quot;micro_X&quot;</span><span class="p">,</span> <span class="n">ignore_dirs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ignore_files</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generates a file tree structure and saves it to a file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        startpath (str): The root directory from which to generate the tree.</span>
+<span class="sd">        output_filepath (str): The full path to the file where the tree will be saved.</span>
+<span class="sd">        display_root_name (str, optional): The name to display for the root of the tree.</span>
+<span class="sd">        ignore_dirs (list, optional): A list of directory names to ignore.</span>
+<span class="sd">        ignore_files (list, optional): A list of file names/extensions/patterns to ignore (supports fnmatch).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Define tree drawing elements</span>
+    <span class="n">pipe_segment</span> <span class="o">=</span> <span class="s2">&quot;|   &quot;</span> <span class="c1"># Consistent spacing</span>
+    <span class="n">space_segment</span> <span class="o">=</span> <span class="s2">&quot;    &quot;</span> <span class="c1"># Consistent spacing</span>
+    <span class="n">entry_connector_dir</span> <span class="o">=</span> <span class="s2">&quot;├── &quot;</span>
+    <span class="n">entry_connector_file</span> <span class="o">=</span> <span class="s2">&quot;└── &quot;</span>
+
+    <span class="k">if</span> <span class="n">ignore_dirs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">ignore_dirs</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;.git&#39;</span><span class="p">,</span> <span class="s1">&#39;__pycache__&#39;</span><span class="p">,</span> <span class="s1">&#39;.venv&#39;</span><span class="p">,</span> <span class="s1">&#39;venv&#39;</span><span class="p">,</span> <span class="s1">&#39;env&#39;</span><span class="p">,</span> <span class="s1">&#39;ENV&#39;</span><span class="p">,</span> 
+                       <span class="s1">&#39;.pytest_cache&#39;</span><span class="p">,</span> <span class="s1">&#39;.mypy_cache&#39;</span><span class="p">,</span> <span class="s1">&#39;.ruff_cache&#39;</span><span class="p">,</span> <span class="s1">&#39;logs&#39;</span><span class="p">,</span> 
+                       <span class="s1">&#39;build&#39;</span><span class="p">,</span> <span class="s1">&#39;dist&#39;</span><span class="p">,</span> <span class="s1">&#39;site&#39;</span><span class="p">,</span> <span class="s1">&#39;*.egg-info&#39;</span><span class="p">,</span> 
+                       <span class="s1">&#39;snapshots&#39;</span><span class="p">]</span> <span class="c1"># Added snapshots to default ignore_dirs</span>
+    <span class="k">if</span> <span class="n">ignore_files</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Default ignore_files, including the pattern for timestamped pytest results</span>
+        <span class="n">ignore_files</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;.DS_Store&#39;</span><span class="p">,</span> <span class="s1">&#39;*.pyc&#39;</span><span class="p">,</span> <span class="s1">&#39;*.pyo&#39;</span><span class="p">,</span> <span class="s1">&#39;.coverage&#39;</span><span class="p">,</span> <span class="s1">&#39;pytest_results_*.txt&#39;</span><span class="p">]</span> 
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">startpath</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: Provided path &#39;</span><span class="si">{</span><span class="n">startpath</span><span class="si">}</span><span class="s2">&#39; is not a directory or does not exist.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span> <span class="c1"># Indicate failure</span>
+
+    <span class="n">output_lines</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="c1"># Add the desired display root name as the first line</span>
+    <span class="n">output_lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generating file tree for: </span><span class="si">{</span><span class="n">display_root_name</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">output_lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">display_root_name</span><span class="p">)</span> <span class="c1"># The actual root name for the tree structure</span>
+
+    <span class="c1"># Start the recursive generation for the contents of the root directory</span>
+    <span class="n">_generate_recursive</span><span class="p">(</span><span class="n">startpath</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> 
+                        <span class="n">ignore_dirs</span><span class="p">,</span> <span class="n">ignore_files</span><span class="p">,</span>
+                        <span class="n">pipe_segment</span><span class="p">,</span> <span class="n">space_segment</span><span class="p">,</span>
+                        <span class="n">entry_connector_dir</span><span class="p">,</span> <span class="n">entry_connector_file</span><span class="p">,</span>
+                        <span class="n">output_lines</span><span class="p">)</span>
+    
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">output_filepath</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">output_lines</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">line</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File tree successfully saved to: </span><span class="si">{</span><span class="n">output_filepath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span> <span class="c1"># Indicate success</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error writing file tree to </span><span class="si">{</span><span class="n">output_filepath</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span> <span class="c1"># Indicate failure</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Generate a directory tree structure for the micro_X project.&quot;</span><span class="p">,</span>
+        <span class="n">epilog</span><span class="o">=</span><span class="s2">&quot;This script is typically run from the &#39;/utils list&#39; or &#39;/utils generate_tree&#39; command within the micro_X shell.&quot;</span>
+    <span class="p">)</span>
+    <span class="c1"># Add a dummy argument if you want to allow -h/--help but not other args</span>
+    <span class="c1"># Or, if you plan to add arguments later, define them here.</span>
+    <span class="c1"># For now, just having argparse will enable -h/--help.</span>
+    <span class="c1"># parser.add_argument(&quot;--output&quot;, default=&quot;project_tree.txt&quot;, help=&quot;Output filename (default: project_tree.txt)&quot;)</span>
+    
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span> <span class="c1"># This will handle -h/--help</span>
+
+    <span class="n">script_location_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))</span>
+    
+    <span class="c1"># Determine project root (assuming script is in &#39;utils&#39; or project root)</span>
+    <span class="n">project_root_candidate</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">script_location_dir</span><span class="p">)</span> \
+                             <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">script_location_dir</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;utils&#39;</span><span class="p">,</span> <span class="s1">&#39;scripts&#39;</span><span class="p">]</span> \
+                             <span class="k">else</span> <span class="n">script_location_dir</span>
+    
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root_candidate</span><span class="p">,</span> <span class="s2">&quot;main.py&quot;</span><span class="p">)):</span> 
+        <span class="n">project_root</span> <span class="o">=</span> <span class="n">project_root_candidate</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Fallback if main.py not found, or if script is run from an unexpected location</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: Could not reliably determine project root based on &#39;main.py&#39;.&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Assuming project root is: </span><span class="si">{</span><span class="n">project_root_candidate</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">project_root</span> <span class="o">=</span> <span class="n">project_root_candidate</span>
+
+    <span class="c1"># Define the output file path</span>
+    <span class="n">output_filename</span> <span class="o">=</span> <span class="s2">&quot;project_tree.txt&quot;</span> <span class="c1"># Keep this fixed for now, or use args.output if defined</span>
+    <span class="n">output_file_full_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="n">output_filename</span><span class="p">)</span>
+
+    <span class="n">desired_root_display_name</span> <span class="o">=</span> <span class="s2">&quot;micro_X&quot;</span> <span class="c1"># This is the name displayed at the top of the tree</span>
+
+    <span class="c1"># Sensible defaults for viewing the micro_X project structure</span>
+    <span class="n">custom_ignore_dirs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s1">&#39;.git&#39;</span><span class="p">,</span> <span class="s1">&#39;__pycache__&#39;</span><span class="p">,</span> <span class="s1">&#39;.venv&#39;</span><span class="p">,</span> <span class="s1">&#39;venv&#39;</span><span class="p">,</span> <span class="s1">&#39;env&#39;</span><span class="p">,</span> <span class="s1">&#39;ENV&#39;</span><span class="p">,</span> 
+        <span class="s1">&#39;.pytest_cache&#39;</span><span class="p">,</span> <span class="s1">&#39;.mypy_cache&#39;</span><span class="p">,</span> <span class="s1">&#39;.ruff_cache&#39;</span><span class="p">,</span> <span class="s1">&#39;logs&#39;</span><span class="p">,</span> 
+        <span class="s1">&#39;build&#39;</span><span class="p">,</span> <span class="s1">&#39;dist&#39;</span><span class="p">,</span> <span class="s1">&#39;site&#39;</span><span class="p">,</span> <span class="s1">&#39;*.egg-info&#39;</span><span class="p">,</span> <span class="s1">&#39;main_versions&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;snapshots&#39;</span> <span class="c1"># Also ignore the snapshots directory itself from the tree</span>
+    <span class="p">]</span>
+    <span class="n">custom_ignore_files</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s1">&#39;.DS_Store&#39;</span><span class="p">,</span> <span class="s1">&#39;*.pyc&#39;</span><span class="p">,</span> <span class="s1">&#39;*.pyo&#39;</span><span class="p">,</span> <span class="s1">&#39;.coverage&#39;</span><span class="p">,</span> 
+        <span class="s1">&#39;pytest_results_*.txt&#39;</span><span class="p">,</span> <span class="c1"># Corrected pattern for timestamped pytest results</span>
+        <span class="n">output_filename</span><span class="p">,</span> <span class="c1"># Ignore the tree file itself if it exists</span>
+        <span class="s1">&#39;*.old.*&#39;</span> <span class="c1"># Exclude user&#39;s local backup files (e.g., file.old.py)</span>
+    <span class="p">]</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attempting to generate file tree and save to: </span><span class="si">{</span><span class="n">output_file_full_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="n">success</span> <span class="o">=</span> <span class="n">generate_file_tree</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span>
+                                 <span class="n">output_filepath</span><span class="o">=</span><span class="n">output_file_full_path</span><span class="p">,</span>
+                                 <span class="n">display_root_name</span><span class="o">=</span><span class="n">desired_root_display_name</span><span class="p">,</span>
+                                 <span class="n">ignore_dirs</span><span class="o">=</span><span class="n">custom_ignore_dirs</span><span class="p">,</span> 
+                                 <span class="n">ignore_files</span><span class="o">=</span><span class="n">custom_ignore_files</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">success</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Generation complete. Tree saved in: </span><span class="si">{</span><span class="n">output_file_full_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Tree generation failed or could not be saved.&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, micro_X Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -78,7 +78,9 @@
     "lsof -i :80",
     "lsof -p 1234",
     "dpkg -l packagename",
-    "rpm -q packagename"
+    "rpm -q packagename",
+    "python utils/docs.py",
+    "python utils/docs.py --help"
   ],
   "semi_interactive": [
     "less",
@@ -266,6 +268,7 @@
     "sudo ufw enable",
     "sudo ufw default deny incoming",
     "sudo systemctl edit servicename",
-    "bash"
+    "bash",
+    "python utils/docs.py --lynx"
   ]
 }

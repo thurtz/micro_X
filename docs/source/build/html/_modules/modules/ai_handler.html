@@ -1,0 +1,709 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modules.ai_handler &mdash; micro_X 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            micro_X
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/index.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../developer/index.html">Developer Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api_reference.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">micro_X</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modules.ai_handler</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modules.ai_handler</h1><div class="highlight"><pre>
+<span></span><span class="c1"># modules/ai_handler.py</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">ollama</span> <span class="c1"># Assuming ollama is installed and accessible</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="c1"># --- Logging Setup ---</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># --- AI Integration Constants ---</span>
+<span class="n">_COMMAND_PATTERN_STRING</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span>
+    <span class="sa">r</span><span class="s2">&quot;&lt;bash&gt;\s*&#39;(.*?)&#39;\s*&lt;/bash&gt;|&lt;bash&gt;\s*(.*?)\s*&lt;/bash&gt;|&lt;bash&gt;\s*`(.*?)`\s*&lt;/bash&gt;|&quot;</span><span class="p">,</span>
+    <span class="sa">r</span><span class="s2">&quot;```bash\s*\n([\s\S]*?)\n```|&lt;code&gt;\s*&#39;(.*?)&#39;\s*&lt;/code&gt;|&lt;code&gt;\s*(.*?)&lt;/code&gt;|&quot;</span><span class="p">,</span>
+    <span class="sa">r</span><span class="s2">&quot;&lt;pre&gt;\s*&#39;(.*?)&#39;\s*&lt;/pre&gt;|&lt;pre&gt;\s*(.*?)\s*&lt;/pre&gt;|&lt;command&gt;\s*&#39;(.*?)&#39;\s*&lt;/command&gt;|&quot;</span><span class="p">,</span>
+    <span class="sa">r</span><span class="s2">&quot;&lt;command&gt;\s*(.*?)\s*&lt;/command&gt;|&lt;cmd&gt;\s*&#39;(.*?)&#39;\s*&lt;/cmd&gt;|&lt;cmd&gt;\s*(.*?)\s*&lt;/cmd&gt;|&quot;</span><span class="p">,</span>
+    <span class="sa">r</span><span class="s2">&quot;```\s*([\s\S]*?)\s*```|&lt;unsafe&gt;\s*([\s\S]*?)\s*&lt;/unsafe&gt;&quot;</span>
+<span class="p">])</span>
+<span class="n">COMMAND_PATTERN</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">EXPECTED_GROUPS</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">COMMAND_PATTERN</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">_COMMAND_PATTERN_STRING</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span>
+    <span class="n">EXPECTED_GROUPS</span> <span class="o">=</span> <span class="n">_COMMAND_PATTERN_STRING</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s1">&#39;|&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;COMMAND_PATTERN compiled with </span><span class="si">{</span><span class="n">COMMAND_PATTERN</span><span class="o">.</span><span class="n">groups</span><span class="si">}</span><span class="s2"> groups (expected </span><span class="si">{</span><span class="n">EXPECTED_GROUPS</span><span class="si">}</span><span class="s2">).&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">COMMAND_PATTERN</span><span class="o">.</span><span class="n">groups</span> <span class="o">!=</span> <span class="n">EXPECTED_GROUPS</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CRITICAL: COMMAND_PATTERN groups mismatch: </span><span class="si">{</span><span class="n">COMMAND_PATTERN</span><span class="o">.</span><span class="n">groups</span><span class="si">}</span><span class="s2"> vs </span><span class="si">{</span><span class="n">EXPECTED_GROUPS</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="n">COMMAND_PATTERN</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="k">except</span> <span class="n">re</span><span class="o">.</span><span class="n">error</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to compile COMMAND_PATTERN regex: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">COMMAND_PATTERN</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">EXPECTED_GROUPS</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="n">_COMMAND_EXTRACT_GROUPS</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">EXPECTED_GROUPS</span><span class="p">))</span> <span class="k">if</span> <span class="n">EXPECTED_GROUPS</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">COMMAND_PATTERN</span> <span class="k">else</span> <span class="p">[]</span>
+<span class="n">_UNSAFE_TAG_CONTENT_GROUP</span> <span class="o">=</span> <span class="n">EXPECTED_GROUPS</span> <span class="k">if</span> <span class="n">EXPECTED_GROUPS</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">COMMAND_PATTERN</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span>
+
+<span class="n">_INNER_TAG_EXTRACT_PATTERN</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^\s*&lt;([a-zA-Z0-9_:]+)(?:\s+[^&gt;]*)?&gt;([\s\S]*?)&lt;\/\1&gt;\s*$&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span>
+
+<span class="c1"># --- AI Helper Functions ---</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_ai_refusal</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Checks if a given text is likely an AI refusal to generate a command.&quot;&quot;&quot;</span>
+    <span class="n">refusal_prefixes</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;sorry&quot;</span><span class="p">,</span> <span class="s2">&quot;i cannot&quot;</span><span class="p">,</span> <span class="s2">&quot;unable to&quot;</span><span class="p">,</span> <span class="s2">&quot;cannot translate&quot;</span><span class="p">,</span> <span class="s2">&quot;i am unable to&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">text</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">refusal_prefixes</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_clean_extracted_command</span><span class="p">(</span><span class="n">extracted_candidate</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Applies common cleaning steps to a potential command string.&quot;&quot;&quot;</span>
+    <span class="n">processed_candidate</span> <span class="o">=</span> <span class="n">extracted_candidate</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">original_for_log</span> <span class="o">=</span> <span class="n">processed_candidate</span>
+
+    <span class="n">inner_match</span> <span class="o">=</span> <span class="n">_INNER_TAG_EXTRACT_PATTERN</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">processed_candidate</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">inner_match</span><span class="p">:</span>
+        <span class="n">tag_name</span> <span class="o">=</span> <span class="n">inner_match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">tag_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;bash&quot;</span><span class="p">,</span> <span class="s2">&quot;code&quot;</span><span class="p">,</span> <span class="s2">&quot;cmd&quot;</span><span class="p">,</span> <span class="s2">&quot;command&quot;</span><span class="p">,</span> <span class="s2">&quot;pre&quot;</span><span class="p">]:</span>
+            <span class="n">extracted_content</span> <span class="o">=</span> <span class="n">inner_match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Stripped inner tag &lt;</span><span class="si">{</span><span class="n">tag_name</span><span class="si">}</span><span class="s2">&gt;: &#39;</span><span class="si">{</span><span class="n">original_for_log</span><span class="si">}</span><span class="s2">&#39; -&gt; &#39;</span><span class="si">{</span><span class="n">extracted_content</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="n">processed_candidate</span> <span class="o">=</span> <span class="n">extracted_content</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Inner tag &lt;</span><span class="si">{</span><span class="n">tag_name</span><span class="si">}</span><span class="s2">&gt; found but not one of expected types to strip. Original: &#39;</span><span class="si">{</span><span class="n">original_for_log</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">processed_candidate</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">processed_candidate</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;&#39;&quot;</span> <span class="p">)</span> <span class="ow">and</span> <span class="n">processed_candidate</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;&#39;&quot;</span> <span class="p">):</span>
+            <span class="n">processed_candidate</span> <span class="o">=</span> <span class="n">processed_candidate</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Stripped outer single quotes: &#39;</span><span class="si">{</span><span class="n">original_for_log</span><span class="si">}</span><span class="s2">&#39; -&gt; &#39;</span><span class="si">{</span><span class="n">processed_candidate</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">processed_candidate</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;`&quot;</span> <span class="p">)</span> <span class="ow">and</span> <span class="n">processed_candidate</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;`&quot;</span> <span class="p">):</span>
+            <span class="n">processed_candidate</span> <span class="o">=</span> <span class="n">processed_candidate</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Stripped outer backticks: &#39;</span><span class="si">{</span><span class="n">original_for_log</span><span class="si">}</span><span class="s2">&#39; -&gt; &#39;</span><span class="si">{</span><span class="n">processed_candidate</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">processed_candidate</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;bash &quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">processed_candidate</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;sh &quot;</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">processed_candidate</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">6</span><span class="p">:</span>
+        <span class="n">prefix_len</span> <span class="o">=</span> <span class="mi">5</span> <span class="k">if</span> <span class="n">processed_candidate</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;bash &quot;</span><span class="p">)</span> <span class="k">else</span> <span class="mi">3</span>
+        <span class="n">potential_inner_cmd</span> <span class="o">=</span> <span class="n">processed_candidate</span><span class="p">[</span><span class="n">prefix_len</span><span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">potential_inner_cmd</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;&lt;&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">potential_inner_cmd</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;&gt;&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">potential_inner_cmd</span><span class="p">)</span> <span class="o">&gt;=</span><span class="mi">2</span><span class="p">:</span>
+            <span class="n">inner_cmd_content</span> <span class="o">=</span> <span class="n">potential_inner_cmd</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">c</span> <span class="ow">in</span> <span class="n">inner_cmd_content</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="s1">&#39;&lt;&gt;|&amp;;&#39;</span><span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Stripped &#39;</span><span class="si">{</span><span class="n">processed_candidate</span><span class="p">[:</span><span class="n">prefix_len</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;cmd&gt;&#39; pattern: &#39;</span><span class="si">{</span><span class="n">original_for_log</span><span class="si">}</span><span class="s2">&#39; -&gt; &#39;</span><span class="si">{</span><span class="n">inner_cmd_content</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                <span class="n">processed_candidate</span> <span class="o">=</span> <span class="n">inner_cmd_content</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retained &#39;</span><span class="si">{</span><span class="n">processed_candidate</span><span class="p">[:</span><span class="n">prefix_len</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;cmd&gt;&#39; structure due to special chars: &#39;</span><span class="si">{</span><span class="n">original_for_log</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">processed_candidate</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">processed_candidate</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;&lt;&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">processed_candidate</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;&gt;&quot;</span><span class="p">):</span>
+        <span class="n">inner_content</span> <span class="o">=</span> <span class="n">processed_candidate</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">c</span> <span class="ow">in</span> <span class="n">inner_content</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="s1">&#39;&lt;&gt;|&amp;;&#39;</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Stripped general angle brackets: &#39;</span><span class="si">{</span><span class="n">original_for_log</span><span class="si">}</span><span class="s2">&#39; -&gt; &#39;</span><span class="si">{</span><span class="n">inner_content</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="n">processed_candidate</span> <span class="o">=</span> <span class="n">inner_content</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retained general angle brackets due to special chars: &#39;</span><span class="si">{</span><span class="n">original_for_log</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+
+    <span class="n">cleaned_linux_command</span> <span class="o">=</span> <span class="n">processed_candidate</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">cleaned_linux_command</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="s1">&#39;/&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">cleaned_linux_command</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+        <span class="n">cleaned_linux_command</span> <span class="o">=</span> <span class="n">cleaned_linux_command</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Stripped leading slash: &#39;</span><span class="si">{</span><span class="n">original_for_log</span><span class="si">}</span><span class="s2">&#39; -&gt; &#39;</span><span class="si">{</span><span class="n">cleaned_linux_command</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;After cleaning: &#39;</span><span class="si">{</span><span class="n">original_for_log</span><span class="si">}</span><span class="s2">&#39; -&gt; &#39;</span><span class="si">{</span><span class="n">cleaned_linux_command</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">_is_ai_refusal</span><span class="p">(</span><span class="n">cleaned_linux_command</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Command discarded after cleaning (AI refusal): &#39;</span><span class="si">{</span><span class="n">original_for_log</span><span class="si">}</span><span class="s2">&#39; -&gt; &#39;</span><span class="si">{</span><span class="n">cleaned_linux_command</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">cleaned_linux_command</span>
+
+
+<div class="viewcode-block" id="is_valid_linux_command_according_to_ai">
+<a class="viewcode-back" href="../../api_reference.html#modules.ai_handler.is_valid_linux_command_according_to_ai">[docs]</a>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">is_valid_linux_command_according_to_ai</span><span class="p">(</span><span class="n">command_text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config_param</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Asks the Validator AI model if the given text is a likely Linux command.</span>
+
+<span class="sd">    Performs multiple validation attempts as configured and returns a boolean</span>
+<span class="sd">    based on a majority vote of the AI&#39;s &#39;yes&#39;/&#39;no&#39; responses.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        command_text: The string to validate.</span>
+<span class="sd">        config_param: The main application configuration object.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        True if the AI considers it a command, False if not.</span>
+<span class="sd">        None if the result is inconclusive after all attempts.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">command_text</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">command_text</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">command_text</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">200</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Skipping AI validation for command_text of length </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">command_text</span><span class="p">)</span><span class="si">}</span><span class="s2">: &#39;</span><span class="si">{</span><span class="n">command_text</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">validator_system_prompt</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;prompts&#39;</span><span class="p">][</span><span class="s1">&#39;validator&#39;</span><span class="p">][</span><span class="s1">&#39;system&#39;</span><span class="p">]</span>
+    <span class="n">validator_user_prompt</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;prompts&#39;</span><span class="p">][</span><span class="s1">&#39;validator&#39;</span><span class="p">][</span><span class="s1">&#39;user_template&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">command_text</span><span class="o">=</span><span class="n">command_text</span><span class="p">)</span>
+    
+    <span class="c1"># FIX: Robustly get model config, handling both old (str) and new (dict) formats</span>
+    <span class="n">validator_model_config</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ai_models&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;validator&#39;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">validator_model_config</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">validator_model</span> <span class="o">=</span> <span class="n">validator_model_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;model&#39;</span><span class="p">)</span>
+        <span class="n">validator_options</span> <span class="o">=</span> <span class="n">validator_model_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;options&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">validator_model_config</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">validator_model</span> <span class="o">=</span> <span class="n">validator_model_config</span>
+        <span class="n">validator_options</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">validator_model</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">validator_options</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">validator_model</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Validator AI model name not configured.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">validator_attempts</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;behavior&#39;</span><span class="p">][</span><span class="s1">&#39;validator_ai_attempts&#39;</span><span class="p">]</span>
+    <span class="n">retry_delay</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;behavior&#39;</span><span class="p">][</span><span class="s1">&#39;ai_retry_delay_seconds&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="mi">2</span>
+
+    <span class="n">responses</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">validator_attempts</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;To Validator AI (model: </span><span class="si">{</span><span class="n">validator_model</span><span class="si">}</span><span class="s2">, attempt </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">validator_attempts</span><span class="si">}</span><span class="s2">): &#39;</span><span class="si">{</span><span class="n">command_text</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">chat_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="n">validator_model</span><span class="p">,</span>
+                <span class="s2">&quot;messages&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span><span class="s1">&#39;role&#39;</span><span class="p">:</span> <span class="s1">&#39;system&#39;</span><span class="p">,</span> <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="n">validator_system_prompt</span><span class="p">},</span>
+                    <span class="p">{</span><span class="s1">&#39;role&#39;</span><span class="p">:</span> <span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="n">validator_user_prompt</span><span class="p">}</span>
+                <span class="p">]</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="n">validator_options</span><span class="p">:</span>
+                <span class="n">chat_kwargs</span><span class="p">[</span><span class="s1">&#39;options&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">validator_options</span>
+
+            <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">to_thread</span><span class="p">(</span><span class="n">ollama</span><span class="o">.</span><span class="n">chat</span><span class="p">,</span> <span class="o">**</span><span class="n">chat_kwargs</span><span class="p">)</span>
+            <span class="n">ai_answer</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">][</span><span class="s1">&#39;content&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validator AI response (attempt </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">) for &#39;</span><span class="si">{</span><span class="n">command_text</span><span class="si">}</span><span class="s2">&#39;: &#39;</span><span class="si">{</span><span class="n">ai_answer</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+
+            <span class="n">is_yes</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\byes\b&#39;</span><span class="p">,</span> <span class="n">ai_answer</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="n">is_no</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\bno\b&#39;</span><span class="p">,</span> <span class="n">ai_answer</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+            <span class="k">if</span> <span class="n">is_yes</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_no</span><span class="p">:</span>
+                <span class="n">responses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">is_no</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_yes</span><span class="p">:</span>
+                <span class="n">responses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">responses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validator AI unclear answer (attempt </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">): &#39;</span><span class="si">{</span><span class="n">ai_answer</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error calling Validator AI (attempt </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">) for &#39;</span><span class="si">{</span><span class="n">command_text</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">responses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">validator_attempts</span> <span class="o">-</span> <span class="mi">1</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">responses</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">i</span><span class="o">+</span><span class="mi">1</span> <span class="ow">or</span> <span class="n">responses</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry_delay</span><span class="p">)</span>
+
+    <span class="n">yes_count</span> <span class="o">=</span> <span class="n">responses</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">no_count</span> <span class="o">=</span> <span class="n">responses</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validator AI responses for &#39;</span><span class="si">{</span><span class="n">command_text</span><span class="si">}</span><span class="s2">&#39;: Yes: </span><span class="si">{</span><span class="n">yes_count</span><span class="si">}</span><span class="s2">, No: </span><span class="si">{</span><span class="n">no_count</span><span class="si">}</span><span class="s2">, Unclear/Error: </span><span class="si">{</span><span class="n">responses</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">yes_count</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="n">validator_attempts</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">elif</span> <span class="n">no_count</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="n">validator_attempts</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validator AI result inconclusive for &#39;</span><span class="si">{</span><span class="n">command_text</span><span class="si">}</span><span class="s2">&#39; after </span><span class="si">{</span><span class="n">validator_attempts</span><span class="si">}</span><span class="s2"> attempts.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_interpret_and_clean_tagged_ai_output</span><span class="p">(</span><span class="n">human_input</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config_param</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">append_output_func</span><span class="p">,</span> <span class="n">get_app_func</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calls primary translation AI, parses, and cleans.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">COMMAND_PATTERN</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;COMMAND_PATTERN regex not compiled. Cannot interpret AI output.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+
+    <span class="n">raw_candidate_from_regex</span> <span class="o">=</span> <span class="kc">None</span>
+    
+    <span class="c1"># FIX: Robustly get model config</span>
+    <span class="n">primary_translator_config</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ai_models&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;primary_translator&#39;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">primary_translator_config</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">ollama_model</span> <span class="o">=</span> <span class="n">primary_translator_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;model&#39;</span><span class="p">)</span>
+        <span class="n">model_options</span> <span class="o">=</span> <span class="n">primary_translator_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;options&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">primary_translator_config</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">ollama_model</span> <span class="o">=</span> <span class="n">primary_translator_config</span>
+        <span class="n">model_options</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">ollama_model</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">model_options</span> <span class="o">=</span> <span class="kc">None</span>
+        
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ollama_model</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Primary Translator AI model name not configured.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+        
+    <span class="n">system_prompt</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;prompts&#39;</span><span class="p">][</span><span class="s1">&#39;primary_translator&#39;</span><span class="p">][</span><span class="s1">&#39;system&#39;</span><span class="p">]</span>
+    <span class="n">user_prompt_template</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;prompts&#39;</span><span class="p">][</span><span class="s1">&#39;primary_translator&#39;</span><span class="p">][</span><span class="s1">&#39;user_template&#39;</span><span class="p">]</span>
+    <span class="n">retry_delay</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;behavior&#39;</span><span class="p">][</span><span class="s1">&#39;ai_retry_delay_seconds&#39;</span><span class="p">]</span>
+    <span class="n">ollama_call_retries</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;behavior&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ollama_api_call_retries&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">last_exception_in_ollama_call</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ollama_call_retries</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">current_attempt_exception</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;To Primary AI (model: </span><span class="si">{</span><span class="n">ollama_model</span><span class="si">}</span><span class="s2">, attempt </span><span class="si">{</span><span class="n">attempt</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">ollama_call_retries</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">): &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="n">user_prompt</span> <span class="o">=</span> <span class="n">user_prompt_template</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">human_input</span><span class="o">=</span><span class="n">human_input</span><span class="p">)</span>
+            
+            <span class="n">chat_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="n">ollama_model</span><span class="p">,</span>
+                <span class="s2">&quot;messages&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span><span class="s1">&#39;role&#39;</span><span class="p">:</span> <span class="s1">&#39;system&#39;</span><span class="p">,</span> <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="n">system_prompt</span><span class="p">},</span>
+                    <span class="p">{</span><span class="s1">&#39;role&#39;</span><span class="p">:</span> <span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="n">user_prompt</span><span class="p">}</span>
+                <span class="p">]</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="n">model_options</span><span class="p">:</span>
+                <span class="n">chat_kwargs</span><span class="p">[</span><span class="s1">&#39;options&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model_options</span>
+
+            <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">to_thread</span><span class="p">(</span><span class="n">ollama</span><span class="o">.</span><span class="n">chat</span><span class="p">,</span> <span class="o">**</span><span class="n">chat_kwargs</span><span class="p">)</span>
+            
+            <span class="n">ai_response</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">][</span><span class="s1">&#39;content&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw Primary AI response (attempt </span><span class="si">{</span><span class="n">attempt</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">ai_response</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Get the new configuration switch value</span>
+            <span class="n">use_strict_extraction</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;behavior&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;use_strict_extraction_for_primary_translator&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+            <span class="c1"># If strict extraction is OFF, treat it like the direct translator and return early</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">use_strict_extraction</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Strict extraction for primary translator is OFF. Treating output as direct.&quot;</span><span class="p">)</span>
+                <span class="n">cleaned_linux_command</span> <span class="o">=</span> <span class="n">_clean_extracted_command</span><span class="p">(</span><span class="n">ai_response</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">cleaned_linux_command</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">cleaned_linux_command</span><span class="p">,</span> <span class="n">ai_response</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Handle case where cleaning results in an empty command (e.g., it was an AI refusal)</span>
+                    <span class="k">if</span> <span class="n">_is_ai_refusal</span><span class="p">(</span><span class="n">ai_response</span><span class="p">):</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Primary AI refused query (direct mode): &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;. Message: &#39;</span><span class="si">{</span><span class="n">ai_response</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                        <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️ AI (Primary) Refusal: </span><span class="si">{</span><span class="n">ai_response</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;ai-unsafe&#39;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ai_response</span>
+
+            <span class="c1"># --- Existing logic for strict extraction (if use_strict_extraction is True) ---</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">COMMAND_PATTERN</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">ai_response</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">_UNSAFE_TAG_CONTENT_GROUP</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span> <span class="ow">and</span> <span class="n">COMMAND_PATTERN</span><span class="o">.</span><span class="n">groups</span> <span class="o">&gt;=</span> <span class="n">_UNSAFE_TAG_CONTENT_GROUP</span> <span class="ow">and</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="n">_UNSAFE_TAG_CONTENT_GROUP</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">unsafe_message</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="n">_UNSAFE_TAG_CONTENT_GROUP</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Primary AI indicated unsafe query: &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;. Message: &#39;</span><span class="si">{</span><span class="n">unsafe_message</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                    <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️ AI (Primary) Refusal: </span><span class="si">{</span><span class="n">unsafe_message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;ai-unsafe&#39;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ai_response</span>
+
+                <span class="k">for</span> <span class="n">group_index</span> <span class="ow">in</span> <span class="n">_COMMAND_EXTRACT_GROUPS</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">COMMAND_PATTERN</span><span class="o">.</span><span class="n">groups</span> <span class="o">&gt;=</span> <span class="n">group_index</span> <span class="ow">and</span> <span class="p">(</span><span class="n">extracted_candidate</span> <span class="o">:=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="n">group_index</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">raw_candidate_from_regex</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="n">raw_candidate_from_regex</span> <span class="o">=</span> <span class="n">extracted_candidate</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                        <span class="n">cleaned_linux_command</span> <span class="o">=</span> <span class="n">_clean_extracted_command</span><span class="p">(</span><span class="n">extracted_candidate</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">cleaned_linux_command</span><span class="p">:</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;_interpret_and_clean_tagged_ai_output returning: Cleaned=&#39;</span><span class="si">{</span><span class="n">cleaned_linux_command</span><span class="si">}</span><span class="s2">&#39;, Raw=&#39;</span><span class="si">{</span><span class="n">raw_candidate_from_regex</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                            <span class="k">return</span> <span class="n">cleaned_linux_command</span><span class="p">,</span> <span class="n">raw_candidate_from_regex</span>
+                
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Primary AI matched pattern but no valid command extracted. Raw: </span><span class="si">{</span><span class="n">ai_response</span><span class="si">}</span><span class="s2">, Match: &#39;</span><span class="si">{</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">_is_ai_refusal</span><span class="p">(</span><span class="n">ai_response</span><span class="p">):</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Primary AI refused query (no tags): &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;. Message: &#39;</span><span class="si">{</span><span class="n">ai_response</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                    <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️ AI (Primary) Refusal: </span><span class="si">{</span><span class="n">ai_response</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;ai-unsafe&#39;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ai_response</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Primary AI response did not match expected patterns. Response: </span><span class="si">{</span><span class="n">ai_response</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">&lt;</span> <span class="n">ollama_call_retries</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retrying Primary AI call (parsing/match fail) (attempt </span><span class="si">{</span><span class="n">attempt</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">2</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">ollama_call_retries</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">) for &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+                <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry_delay</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Primary AI parsing/match failed after </span><span class="si">{</span><span class="n">ollama_call_retries</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2"> attempts. Last response: </span><span class="si">{</span><span class="n">ai_response</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">raw_candidate_from_regex</span> <span class="k">if</span> <span class="n">raw_candidate_from_regex</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ai_response</span>
+
+        <span class="k">except</span> <span class="n">ollama</span><span class="o">.</span><span class="n">ResponseError</span> <span class="k">as</span> <span class="n">e_resp</span><span class="p">:</span>
+            <span class="n">current_attempt_exception</span> <span class="o">=</span> <span class="n">e_resp</span>
+            <span class="n">error_message</span> <span class="o">=</span> <span class="n">e_resp</span><span class="o">.</span><span class="n">error</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">e_resp</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">e_resp</span><span class="p">)</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Ollama API Error (Primary): </span><span class="si">{</span><span class="n">error_message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ollama API Error (Primary): </span><span class="si">{</span><span class="n">e_resp</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">==</span> <span class="n">ollama_call_retries</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">raw_candidate_from_regex</span>
+        <span class="k">except</span> <span class="n">ollama</span><span class="o">.</span><span class="n">RequestError</span> <span class="k">as</span> <span class="n">e_req</span><span class="p">:</span>
+            <span class="n">current_attempt_exception</span> <span class="o">=</span> <span class="n">e_req</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Ollama Connection Error (Primary): </span><span class="si">{</span><span class="n">e_req</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ollama Connection Error (Primary): </span><span class="si">{</span><span class="n">e_req</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">==</span> <span class="n">ollama_call_retries</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">raw_candidate_from_regex</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e_gen</span><span class="p">:</span>
+            <span class="n">current_attempt_exception</span> <span class="o">=</span> <span class="n">e_gen</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ AI Processing Error (Primary): </span><span class="si">{</span><span class="n">e_gen</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error in _interpret_and_clean_tagged_ai_output for &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">==</span> <span class="n">ollama_call_retries</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">raw_candidate_from_regex</span>
+        
+        <span class="k">if</span> <span class="n">current_attempt_exception</span><span class="p">:</span>
+            <span class="n">last_exception_in_ollama_call</span> <span class="o">=</span> <span class="n">current_attempt_exception</span>
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">&lt;</span> <span class="n">ollama_call_retries</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retrying Primary AI call after error &#39;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">current_attempt_exception</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&#39; (attempt </span><span class="si">{</span><span class="n">attempt</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">2</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">ollama_call_retries</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">) for &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+                <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry_delay</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;_interpret_and_clean_tagged_ai_output exhausted retries for &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;. Last exception: </span><span class="si">{</span><span class="n">last_exception_in_ollama_call</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">raw_candidate_from_regex</span>
+
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_get_direct_ai_output</span><span class="p">(</span><span class="n">human_input</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config_param</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">append_output_func</span><span class="p">,</span> <span class="n">get_app_func</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calls secondary translation AI, cleans response.&quot;&quot;&quot;</span>
+    <span class="c1"># FIX: Robustly get model config</span>
+    <span class="n">direct_translator_config</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ai_models&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;direct_translator&#39;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">direct_translator_config</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">direct_translator_model</span> <span class="o">=</span> <span class="n">direct_translator_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;model&#39;</span><span class="p">)</span>
+        <span class="n">model_options</span> <span class="o">=</span> <span class="n">direct_translator_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;options&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">direct_translator_config</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">direct_translator_model</span> <span class="o">=</span> <span class="n">direct_translator_config</span>
+        <span class="n">model_options</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">direct_translator_model</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">model_options</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">direct_translator_model</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;_get_direct_ai_output skipped: No direct_translator model configured.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+
+    <span class="n">system_prompt</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;prompts&#39;</span><span class="p">][</span><span class="s1">&#39;direct_translator&#39;</span><span class="p">][</span><span class="s1">&#39;system&#39;</span><span class="p">]</span>
+    <span class="n">user_prompt_template</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;prompts&#39;</span><span class="p">][</span><span class="s1">&#39;direct_translator&#39;</span><span class="p">][</span><span class="s1">&#39;user_template&#39;</span><span class="p">]</span>
+    <span class="n">retry_delay</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;behavior&#39;</span><span class="p">][</span><span class="s1">&#39;ai_retry_delay_seconds&#39;</span><span class="p">]</span>
+    <span class="n">ollama_call_retries</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;behavior&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ollama_api_call_retries&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">raw_response_content</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">last_exception_in_ollama_call</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ollama_call_retries</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">current_attempt_exception</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;To Direct AI (model: </span><span class="si">{</span><span class="n">direct_translator_model</span><span class="si">}</span><span class="s2">, attempt </span><span class="si">{</span><span class="n">attempt</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">ollama_call_retries</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">): &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="n">user_prompt</span> <span class="o">=</span> <span class="n">user_prompt_template</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">human_input</span><span class="o">=</span><span class="n">human_input</span><span class="p">)</span>
+
+            <span class="n">chat_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="n">direct_translator_model</span><span class="p">,</span>
+                <span class="s2">&quot;messages&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span><span class="s1">&#39;role&#39;</span><span class="p">:</span> <span class="s1">&#39;system&#39;</span><span class="p">,</span> <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="n">system_prompt</span><span class="p">},</span>
+                    <span class="p">{</span><span class="s1">&#39;role&#39;</span><span class="p">:</span> <span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="n">user_prompt</span><span class="p">}</span>
+                <span class="p">]</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="n">model_options</span><span class="p">:</span>
+                <span class="n">chat_kwargs</span><span class="p">[</span><span class="s1">&#39;options&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model_options</span>
+
+            <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">to_thread</span><span class="p">(</span><span class="n">ollama</span><span class="o">.</span><span class="n">chat</span><span class="p">,</span> <span class="o">**</span><span class="n">chat_kwargs</span><span class="p">)</span>
+            <span class="n">raw_response_content</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">][</span><span class="s1">&#39;content&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw Direct AI response (attempt </span><span class="si">{</span><span class="n">attempt</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">raw_response_content</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">cleaned_linux_command</span> <span class="o">=</span> <span class="n">_clean_extracted_command</span><span class="p">(</span><span class="n">raw_response_content</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">cleaned_linux_command</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;_get_direct_ai_output returning: Cleaned=&#39;</span><span class="si">{</span><span class="n">cleaned_linux_command</span><span class="si">}</span><span class="s2">&#39;, Raw=&#39;</span><span class="si">{</span><span class="n">raw_response_content</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">cleaned_linux_command</span><span class="p">,</span> <span class="n">raw_response_content</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">_is_ai_refusal</span><span class="p">(</span><span class="n">raw_response_content</span><span class="p">):</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Direct AI refused query (after cleaning). Raw: </span><span class="si">{</span><span class="n">raw_response_content</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">raw_response_content</span>
+                
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Direct AI response resulted in empty command after cleaning. Raw: </span><span class="si">{</span><span class="n">raw_response_content</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">attempt</span> <span class="o">&lt;</span> <span class="n">ollama_call_retries</span><span class="p">:</span>
+                    <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry_delay</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">raw_response_content</span>
+
+        <span class="k">except</span> <span class="n">ollama</span><span class="o">.</span><span class="n">ResponseError</span> <span class="k">as</span> <span class="n">e_resp</span><span class="p">:</span>
+            <span class="n">current_attempt_exception</span> <span class="o">=</span> <span class="n">e_resp</span>
+            <span class="n">error_message</span> <span class="o">=</span> <span class="n">e_resp</span><span class="o">.</span><span class="n">error</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">e_resp</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">e_resp</span><span class="p">)</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Ollama API Error (Direct): </span><span class="si">{</span><span class="n">error_message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ollama API Error (Direct): </span><span class="si">{</span><span class="n">e_resp</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">==</span> <span class="n">ollama_call_retries</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">raw_response_content</span>
+        <span class="k">except</span> <span class="n">ollama</span><span class="o">.</span><span class="n">RequestError</span> <span class="k">as</span> <span class="n">e_req</span><span class="p">:</span>
+            <span class="n">current_attempt_exception</span> <span class="o">=</span> <span class="n">e_req</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Ollama Connection Error (Direct): </span><span class="si">{</span><span class="n">e_req</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ollama Connection Error (Direct): </span><span class="si">{</span><span class="n">e_req</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">==</span> <span class="n">ollama_call_retries</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">raw_response_content</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e_gen</span><span class="p">:</span>
+            <span class="n">current_attempt_exception</span> <span class="o">=</span> <span class="n">e_gen</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ AI Processing Error (Direct): </span><span class="si">{</span><span class="n">e_gen</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error in _get_direct_ai_output for &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">==</span> <span class="n">ollama_call_retries</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">raw_response_content</span>
+        
+        <span class="k">if</span> <span class="n">current_attempt_exception</span><span class="p">:</span>
+            <span class="n">last_exception_in_ollama_call</span> <span class="o">=</span> <span class="n">current_attempt_exception</span>
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">&lt;</span> <span class="n">ollama_call_retries</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retrying Direct AI call after error &#39;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">current_attempt_exception</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&#39; (attempt </span><span class="si">{</span><span class="n">attempt</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">2</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">ollama_call_retries</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">) for &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+                <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry_delay</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;_get_direct_ai_output exhausted retries for &#39;</span><span class="si">{</span><span class="n">human_input</span><span class="si">}</span><span class="s2">&#39;. Last exception: </span><span class="si">{</span><span class="n">last_exception_in_ollama_call</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">raw_response_content</span>
+
+
+<div class="viewcode-block" id="get_validated_ai_command">
+<a class="viewcode-back" href="../../api_reference.html#modules.ai_handler.get_validated_ai_command">[docs]</a>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_validated_ai_command</span><span class="p">(</span><span class="n">human_query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config_param</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">append_output_func</span><span class="p">,</span> <span class="n">get_app_func</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Translates a natural language query into a validated shell command.</span>
+
+<span class="sd">    This function orchestrates a multi-step process:</span>
+
+<span class="sd">    1. It tries the &#39;primary_translator&#39; AI to get a command.</span>
+<span class="sd">    2. If successful, it validates the command using</span>
+<span class="sd">       `is_valid_linux_command_according_to_ai`.</span>
+<span class="sd">    3. If the primary translator or validation fails, it can fall back to a</span>
+<span class="sd">       &#39;direct_translator&#39; AI if configured.</span>
+<span class="sd">    4. This cycle repeats for a configured number of attempts.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        human_query (str): The user&#39;s natural language query.</span>
+<span class="sd">        config_param (dict): The main application configuration object.</span>
+<span class="sd">        append_output_func: A reference to UIManager.append_output for UI updates.</span>
+<span class="sd">        get_app_func: A reference to UIManager.get_app_instance for UI invalidation.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[str | None, str | None]: A tuple containing the validated command</span>
+<span class="sd">        and the raw AI response. The command is None if no valid command could</span>
+<span class="sd">        be produced.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attempting validated translation for: &#39;</span><span class="si">{</span><span class="n">human_query</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+    <span class="n">last_raw_candidate_primary</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">last_raw_candidate_secondary</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">last_cleaned_command_attempt</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">translation_cycles</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;behavior&#39;</span><span class="p">][</span><span class="s1">&#39;translation_validation_cycles&#39;</span><span class="p">]</span>
+    <span class="n">retry_delay</span> <span class="o">=</span> <span class="n">config_param</span><span class="p">[</span><span class="s1">&#39;behavior&#39;</span><span class="p">][</span><span class="s1">&#39;ai_retry_delay_seconds&#39;</span><span class="p">]</span>
+
+    <span class="n">primary_model_config</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ai_models&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;primary_translator&#39;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="n">primary_model_name</span> <span class="o">=</span> <span class="n">primary_model_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;model&#39;</span><span class="p">,</span> <span class="s1">&#39;N/A&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">primary_model_config</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="n">primary_model_config</span>
+    
+    <span class="n">secondary_model_config</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ai_models&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;direct_translator&#39;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="n">secondary_model_name</span> <span class="o">=</span> <span class="n">secondary_model_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;model&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">secondary_model_config</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="n">secondary_model_config</span>
+
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">translation_cycles</span><span class="p">):</span>
+        <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🧠 AI translation &amp; validation cycle </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">translation_cycles</span><span class="si">}</span><span class="s2"> for: &#39;</span><span class="si">{</span><span class="n">human_query</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;ai-thinking&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">get_app_func</span><span class="p">()</span><span class="o">.</span><span class="n">is_running</span> <span class="p">:</span> <span class="n">get_app_func</span><span class="p">()</span><span class="o">.</span><span class="n">invalidate</span><span class="p">()</span>
+
+        <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;      P-&gt; Trying Primary Translator (</span><span class="si">{</span><span class="n">primary_model_name</span><span class="si">}</span><span class="s2">)...&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;ai-thinking-detail&#39;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cycle </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">: Trying primary translator.&quot;</span><span class="p">)</span>
+        <span class="n">cleaned_command_p</span><span class="p">,</span> <span class="n">raw_candidate_p</span> <span class="o">=</span> <span class="k">await</span> <span class="n">_interpret_and_clean_tagged_ai_output</span><span class="p">(</span><span class="n">human_query</span><span class="p">,</span> <span class="n">config_param</span><span class="p">,</span> <span class="n">append_output_func</span><span class="p">,</span> <span class="n">get_app_func</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">raw_candidate_p</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span> <span class="n">last_raw_candidate_primary</span> <span class="o">=</span> <span class="n">raw_candidate_p</span>
+
+        <span class="k">if</span> <span class="n">cleaned_command_p</span><span class="p">:</span>
+            <span class="n">last_cleaned_command_attempt</span> <span class="o">=</span> <span class="n">cleaned_command_p</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  P-&gt; Primary Translated to: &#39;</span><span class="si">{</span><span class="n">cleaned_command_p</span><span class="si">}</span><span class="s2">&#39;. Validating...&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;ai-thinking-detail&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">get_app_func</span><span class="p">()</span><span class="o">.</span><span class="n">is_running</span> <span class="p">:</span> <span class="n">get_app_func</span><span class="p">()</span><span class="o">.</span><span class="n">invalidate</span><span class="p">()</span>
+            <span class="n">is_valid_by_validator</span> <span class="o">=</span> <span class="k">await</span> <span class="n">is_valid_linux_command_according_to_ai</span><span class="p">(</span><span class="n">cleaned_command_p</span><span class="p">,</span> <span class="n">config_param</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_valid_by_validator</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validator confirmed primary: &#39;</span><span class="si">{</span><span class="n">cleaned_command_p</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  P-&gt; ✅ AI Validator confirmed: &#39;</span><span class="si">{</span><span class="n">cleaned_command_p</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;success&#39;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">cleaned_command_p</span><span class="p">,</span> <span class="n">raw_candidate_p</span>
+            <span class="k">elif</span> <span class="n">is_valid_by_validator</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validator rejected primary: &#39;</span><span class="si">{</span><span class="n">cleaned_command_p</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  P-&gt; ❌ AI Validator rejected: &#39;</span><span class="si">{</span><span class="n">cleaned_command_p</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validator inconclusive for primary: &#39;</span><span class="si">{</span><span class="n">cleaned_command_p</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  P-&gt; ⚠️ AI Validator inconclusive for: &#39;</span><span class="si">{</span><span class="n">cleaned_command_p</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Primary AI translation (cycle </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">) failed. Raw candidate: </span><span class="si">{</span><span class="n">raw_candidate_p</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  P-&gt; Primary translation failed.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">secondary_model_name</span><span class="p">:</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;      S-&gt; Trying Secondary Translator (</span><span class="si">{</span><span class="n">secondary_model_name</span><span class="si">}</span><span class="s2">)...&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;ai-thinking-detail&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cycle </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">: Trying secondary translator.&quot;</span><span class="p">)</span>
+            <span class="n">cleaned_command_s</span><span class="p">,</span> <span class="n">raw_candidate_s</span> <span class="o">=</span> <span class="k">await</span> <span class="n">_get_direct_ai_output</span><span class="p">(</span><span class="n">human_query</span><span class="p">,</span> <span class="n">config_param</span><span class="p">,</span> <span class="n">append_output_func</span><span class="p">,</span> <span class="n">get_app_func</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">raw_candidate_s</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span> <span class="n">last_raw_candidate_secondary</span> <span class="o">=</span> <span class="n">raw_candidate_s</span>
+
+            <span class="k">if</span> <span class="n">cleaned_command_s</span><span class="p">:</span>
+                <span class="n">last_cleaned_command_attempt</span> <span class="o">=</span> <span class="n">cleaned_command_s</span>
+                <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  S-&gt; Secondary Translated to: &#39;</span><span class="si">{</span><span class="n">cleaned_command_s</span><span class="si">}</span><span class="s2">&#39;. Validating...&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;ai-thinking-detail&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">get_app_func</span><span class="p">()</span><span class="o">.</span><span class="n">is_running</span> <span class="p">:</span> <span class="n">get_app_func</span><span class="p">()</span><span class="o">.</span><span class="n">invalidate</span><span class="p">()</span>
+                <span class="n">is_valid_by_validator</span> <span class="o">=</span> <span class="k">await</span> <span class="n">is_valid_linux_command_according_to_ai</span><span class="p">(</span><span class="n">cleaned_command_s</span><span class="p">,</span> <span class="n">config_param</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">is_valid_by_validator</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validator confirmed secondary: &#39;</span><span class="si">{</span><span class="n">cleaned_command_s</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                    <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  S-&gt; ✅ AI Validator confirmed: &#39;</span><span class="si">{</span><span class="n">cleaned_command_s</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;success&#39;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">cleaned_command_s</span><span class="p">,</span> <span class="n">raw_candidate_s</span>
+                <span class="k">elif</span> <span class="n">is_valid_by_validator</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validator rejected secondary: &#39;</span><span class="si">{</span><span class="n">cleaned_command_s</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                    <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  S-&gt; ❌ AI Validator rejected: &#39;</span><span class="si">{</span><span class="n">cleaned_command_s</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validator inconclusive for secondary: &#39;</span><span class="si">{</span><span class="n">cleaned_command_s</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                    <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  S-&gt; ⚠️ AI Validator inconclusive for: &#39;</span><span class="si">{</span><span class="n">cleaned_command_s</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Secondary AI translation (cycle </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">) failed. Raw candidate: </span><span class="si">{</span><span class="n">raw_candidate_s</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  S-&gt; Secondary translation failed.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cycle </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">: Secondary translator not configured or not used this cycle.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">translation_cycles</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retrying translation &amp; validation cycle </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">2</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">translation_cycles</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;ai-thinking&#39;</span><span class="p">)</span>
+            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry_delay</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;All </span><span class="si">{</span><span class="n">translation_cycles</span><span class="si">}</span><span class="s2"> translation cycles failed for &#39;</span><span class="si">{</span><span class="n">human_query</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ AI failed to produce validated command after </span><span class="si">{</span><span class="n">translation_cycles</span><span class="si">}</span><span class="s2"> cycles.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+            <span class="n">final_raw_candidate</span> <span class="o">=</span> <span class="n">last_raw_candidate_secondary</span> <span class="k">if</span> <span class="n">last_raw_candidate_secondary</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">last_raw_candidate_primary</span>
+            <span class="k">if</span> <span class="n">last_cleaned_command_attempt</span><span class="p">:</span>
+                <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ℹ️ Offering last unvalidated attempt for categorization: &#39;</span><span class="si">{</span><span class="n">last_cleaned_command_attempt</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">last_cleaned_command_attempt</span><span class="p">,</span> <span class="n">final_raw_candidate</span>
+
+    <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="explain_linux_command_with_ai">
+<a class="viewcode-back" href="../../api_reference.html#modules.ai_handler.explain_linux_command_with_ai">[docs]</a>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">explain_linux_command_with_ai</span><span class="p">(</span><span class="n">command_to_explain</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config_param</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">append_output_func</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Uses an AI model to explain a given Linux command.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        command_to_explain: The command string to be explained.</span>
+<span class="sd">        config_param: The main application configuration object.</span>
+<span class="sd">        append_output_func: A reference to UIManager.append_output for UI updates.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The AI-generated explanation as a string, or a fallback</span>
+<span class="sd">        message/None on error.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Requesting AI explanation for command: &#39;</span><span class="si">{</span><span class="n">command_to_explain</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">command_to_explain</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;Cannot explain an empty command.&quot;</span>
+
+    <span class="c1"># FIX: Robustly get model config</span>
+    <span class="n">explainer_config</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ai_models&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;explainer&#39;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">explainer_config</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">explainer_model</span> <span class="o">=</span> <span class="n">explainer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;model&#39;</span><span class="p">)</span>
+        <span class="n">model_options</span> <span class="o">=</span> <span class="n">explainer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;options&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">explainer_config</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">explainer_model</span> <span class="o">=</span> <span class="n">explainer_config</span>
+        <span class="n">model_options</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">explainer_model</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">model_options</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">explainer_prompts</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;prompts&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;explainer&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">explainer_model</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">explainer_prompts</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Explainer AI model or prompts not configured.&quot;</span><span class="p">)</span>
+        <span class="n">append_output_func</span><span class="p">(</span><span class="s2">&quot;❌ AI Explainer model/prompts not configured.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">system_prompt</span> <span class="o">=</span> <span class="n">explainer_prompts</span><span class="p">[</span><span class="s1">&#39;system&#39;</span><span class="p">]</span>
+    <span class="n">user_prompt</span> <span class="o">=</span> <span class="n">explainer_prompts</span><span class="p">[</span><span class="s1">&#39;user_template&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">command_text</span><span class="o">=</span><span class="n">command_to_explain</span><span class="p">)</span>
+    
+    <span class="n">retry_delay</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;behavior&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ai_retry_delay_seconds&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">ollama_call_retries</span> <span class="o">=</span> <span class="n">config_param</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;behavior&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ollama_api_call_retries&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ollama_call_retries</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;To Explainer AI (model: </span><span class="si">{</span><span class="n">explainer_model</span><span class="si">}</span><span class="s2">, attempt </span><span class="si">{</span><span class="n">attempt</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">ollama_call_retries</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">): &#39;</span><span class="si">{</span><span class="n">command_to_explain</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            
+            <span class="n">chat_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="n">explainer_model</span><span class="p">,</span>
+                <span class="s2">&quot;messages&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span><span class="s1">&#39;role&#39;</span><span class="p">:</span> <span class="s1">&#39;system&#39;</span><span class="p">,</span> <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="n">system_prompt</span><span class="p">},</span>
+                    <span class="p">{</span><span class="s1">&#39;role&#39;</span><span class="p">:</span> <span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="n">user_prompt</span><span class="p">}</span>
+                <span class="p">]</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="n">model_options</span><span class="p">:</span>
+                <span class="n">chat_kwargs</span><span class="p">[</span><span class="s1">&#39;options&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model_options</span>
+
+            <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">to_thread</span><span class="p">(</span><span class="n">ollama</span><span class="o">.</span><span class="n">chat</span><span class="p">,</span> <span class="o">**</span><span class="n">chat_kwargs</span><span class="p">)</span>
+            
+            <span class="n">explanation</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">][</span><span class="s1">&#39;content&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Explainer AI response: </span><span class="si">{</span><span class="n">explanation</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">explanation</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">explanation</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Explainer AI returned an empty response for &#39;</span><span class="si">{</span><span class="n">command_to_explain</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">attempt</span> <span class="o">==</span> <span class="n">ollama_call_retries</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="s2">&quot;AI Explainer returned an empty response.&quot;</span>
+        <span class="k">except</span> <span class="n">ollama</span><span class="o">.</span><span class="n">ResponseError</span> <span class="k">as</span> <span class="n">e_resp</span><span class="p">:</span>
+            <span class="n">error_message</span> <span class="o">=</span> <span class="n">e_resp</span><span class="o">.</span><span class="n">error</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">e_resp</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">e_resp</span><span class="p">)</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Ollama API Error (Explainer): </span><span class="si">{</span><span class="n">error_message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ollama API Error (Explainer): </span><span class="si">{</span><span class="n">e_resp</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">==</span> <span class="n">ollama_call_retries</span><span class="p">:</span> <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Ollama API error during explanation: </span><span class="si">{</span><span class="n">error_message</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">except</span> <span class="n">ollama</span><span class="o">.</span><span class="n">RequestError</span> <span class="k">as</span> <span class="n">e_req</span><span class="p">:</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Ollama Connection Error (Explainer): </span><span class="si">{</span><span class="n">e_req</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ollama Connection Error (Explainer): </span><span class="si">{</span><span class="n">e_req</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">==</span> <span class="n">ollama_call_retries</span><span class="p">:</span> <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Ollama connection error during explanation: </span><span class="si">{</span><span class="n">e_req</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error calling Explainer AI for &#39;</span><span class="si">{</span><span class="n">command_to_explain</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Unexpected error during AI explanation: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">attempt</span> <span class="o">==</span> <span class="n">ollama_call_retries</span><span class="p">:</span> <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Unexpected error during AI explanation: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+        
+        <span class="k">if</span> <span class="n">attempt</span> <span class="o">&lt;</span> <span class="n">ollama_call_retries</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retrying Explainer AI call (attempt </span><span class="si">{</span><span class="n">attempt</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">2</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">ollama_call_retries</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">) for &#39;</span><span class="si">{</span><span class="n">command_to_explain</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry_delay</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="s2">&quot;AI explanation failed after multiple retries.&quot;</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, micro_X Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

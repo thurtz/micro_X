@@ -1,0 +1,425 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comprehensive Testing List for micro_X &mdash; micro_X 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Expert Review of the micro_X Project" href="review_of_micro_X_project.html" />
+    <link rel="prev" title="micro_X Code Quality Assessment for Testing Branch Promotion" href="micro_X_Code_Quality_Review.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            micro_X
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/index.html">User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Developer Documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="development_principles.html"><strong>micro_X Development and Collaboration Principles</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="generate_snapshot.html"><strong>Analysis of generate_snapshot.py</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="generate_tree.html"><strong>Analysis of generate_tree.py</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html">Code Quality Review Accomplishments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-ui-manager-state-handling"><strong>Change Log: UI Manager State Handling</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-startup-integrity-check-hardening"><strong>Change Log: Startup Integrity Check Hardening</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-tmux-interaction-hardening"><strong>Change Log: tmux Interaction Hardening</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-ai-handler-test-suite-hardening"><strong>Change Log: AI Handler Test Suite Hardening</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review.html"><strong>micro_X Code Quality Assessment for Testing Branch Promotion</strong></a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#"><strong>Comprehensive Testing List for micro_X</strong></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#i-core-shell-functionality-basic-commands"><strong>I. Core Shell Functionality &amp; Basic Commands:</strong></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#startup-exit">1. <strong>Startup &amp; Exit:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cd-command-thorough-check">2. <strong>cd Command (Thorough Check):</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#simple-direct-commands-verify-execution-and-output">3. <strong>Simple Direct Commands (Verify execution and output):</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#command-history">4. <strong>Command History:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#multi-line-input">5. <strong>Multi-line Input:</strong></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#ii-ui-manager-keybindings-post-refactor"><strong>II. UI Manager &amp; Keybindings (Post-Refactor):</strong></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flow-cancellation-ctrl-c-ctrl-d">1. <strong>Flow Cancellation (Ctrl+C / Ctrl+D):</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#input-field-behavior">2. <strong>Input Field Behavior:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#output-area">3. <strong>Output Area:</strong></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#iii-ai-features-flows"><strong>III. AI Features &amp; Flows:</strong></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#ai-command-translation-confirmation-flow">1. <strong>/ai Command Translation &amp; Confirmation Flow:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#direct-unknown-command-ai-validation-potential-translation-categorization">2. <strong>Direct Unknown Command -&gt; AI Validation -&gt; Potential Translation/Categorization:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ollama-service-not-ready">3. <strong>Ollama Service Not Ready:</strong></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#iv-command-categorization-execution"><strong>IV. Command Categorization &amp; Execution:</strong></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#trigger-categorization-flow-unknown-command">1. <strong>Trigger Categorization Flow (Unknown Command):</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#command-subsystem-now-a-utility-script">2. <strong>/command Subsystem (Now a Utility Script):</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#execution-types">3. <strong>Execution Types:</strong></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#v-ollama-service-management-ollama"><strong>V. Ollama Service Management (/ollama):</strong></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#pre-test-ensure-ollama-is-running-independently">1. <strong>Pre-test:</strong> Ensure Ollama is running independently.</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#vi-miscellaneous"><strong>VI. Miscellaneous:</strong></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#update-command">1. <strong>/update command:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#utils-command">2. <strong>/utils command:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#configuration-loading">3. <strong>Configuration Loading:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#error-handling">4. <strong>Error Handling:</strong></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="review_of_micro_X_project.html"><strong>Expert Review of the micro_X Project</strong></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">micro_X</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Developer Documentation</a></li>
+      <li class="breadcrumb-item active"><strong>Comprehensive Testing List for micro_X</strong></li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/developer/micro_X_testing_guide.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="comprehensive-testing-list-for-micro-x">
+<h1><strong>Comprehensive Testing List for micro_X</strong><a class="headerlink" href="#comprehensive-testing-list-for-micro-x" title="Link to this heading"></a></h1>
+<p>This list covers core functionality, UI interactions, AI features, and recent refactoring changes.</p>
+<section id="i-core-shell-functionality-basic-commands">
+<h2><strong>I. Core Shell Functionality &amp; Basic Commands:</strong><a class="headerlink" href="#i-core-shell-functionality-basic-commands" title="Link to this heading"></a></h2>
+<section id="startup-exit">
+<h3>1. <strong>Startup &amp; Exit:</strong><a class="headerlink" href="#startup-exit" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Launch micro_X successfully.</p></li>
+<li><p>[ ] Exit micro_X using exit command.</p></li>
+<li><p>[ ] Exit micro_X using quit command.</p></li>
+<li><p>[ ] Exit micro_X using Ctrl+D (from normal input mode).</p></li>
+<li><p>[ ] Exit micro_X using Ctrl+C (from normal input mode).</p></li>
+</ul>
+</section>
+<section id="cd-command-thorough-check">
+<h3>2. <strong>cd Command (Thorough Check):</strong><a class="headerlink" href="#cd-command-thorough-check" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] cd (should go to home directory, prompt updates).</p></li>
+<li><p>[ ] cd .. (should go to parent directory, prompt updates).</p></li>
+<li><p>[ ] cd &lt;existing_directory_name&gt; (e.g., cd logs, prompt updates).</p></li>
+<li><p>[ ] cd /tmp (absolute path, prompt updates).</p></li>
+<li><p>[ ] cd ~ (home directory, prompt updates).</p></li>
+<li><p>[ ] cd non_existent_folder (should show error, directory/prompt should not change).</p></li>
+<li><p>[ ] cd with multiple arguments (e.g., cd foo bar) - should likely fail or take the first argument. Verify behavior.</p></li>
+<li><p>[ ] <strong>Verify no AI validation/categorization is triggered for any cd variant.</strong></p></li>
+</ul>
+</section>
+<section id="simple-direct-commands-verify-execution-and-output">
+<h3>3. <strong>Simple Direct Commands (Verify execution and output):</strong><a class="headerlink" href="#simple-direct-commands-verify-execution-and-output" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] ls</p></li>
+<li><p>[ ] ls -l</p></li>
+<li><p>[ ] pwd</p></li>
+<li><p>[ ] echo “hello world”</p></li>
+<li><p>[ ] echo $SHELL (or other environment variables)</p></li>
+<li><p>[ ] clear (should clear the output screen effectively).</p></li>
+</ul>
+</section>
+<section id="command-history">
+<h3>4. <strong>Command History:</strong><a class="headerlink" href="#command-history" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Enter several commands.</p></li>
+<li><p>[ ] Navigate history using Up Arrow.</p></li>
+<li><p>[ ] Navigate history using Down Arrow.</p></li>
+<li><p>[ ] Edit a command from history and execute.</p></li>
+</ul>
+</section>
+<section id="multi-line-input">
+<h3>5. <strong>Multi-line Input:</strong><a class="headerlink" href="#multi-line-input" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Use Ctrl+N to create multi-line input.</p></li>
+<li><p>[ ] Execute a simple multi-line command (e.g., echo “line1”; echo “line2”).</p></li>
+<li><p>[ ] Navigate within multi-line input using Up/Down/Ctrl+Up/Ctrl+Down arrows.</p></li>
+</ul>
+</section>
+</section>
+<section id="ii-ui-manager-keybindings-post-refactor">
+<h2><strong>II. UI Manager &amp; Keybindings (Post-Refactor):</strong><a class="headerlink" href="#ii-ui-manager-keybindings-post-refactor" title="Link to this heading"></a></h2>
+<section id="flow-cancellation-ctrl-c-ctrl-d">
+<h3>1. <strong>Flow Cancellation (Ctrl+C / Ctrl+D):</strong><a class="headerlink" href="#flow-cancellation-ctrl-c-ctrl-d" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Categorization Flow:</strong></p>
+<ul>
+<li><p>[ ] Trigger categorization (e.g., type unknown_command_for_cat_test).</p></li>
+<li><p>[ ] At “Which version to categorize?” prompt, press Ctrl+C. (Should cancel, return to normal prompt).</p></li>
+<li><p>[ ] Trigger again. Choose “1”. At “How to categorize?” prompt, press Ctrl+C. (Should cancel, return to normal prompt).</p></li>
+<li><p>[ ] Trigger again. Choose “3” (Modify/Enter new). At “New command:” prompt, press Ctrl+C.</p></li>
+<li><p>[ ] Trigger again. Choose “M” (Modify). At “Modified Cmd:” prompt, press Ctrl+C.</p></li>
+</ul>
+</li>
+<li><p><strong>Command Confirmation Flow:</strong></p>
+<ul>
+<li><p>[ ] Trigger confirmation (e.g., /ai list files).</p></li>
+<li><p>[ ] At “Action: [Y]es…” prompt, press Ctrl+C. (Should cancel, return to normal prompt).</p></li>
+<li><p>[ ] Trigger again. Choose “E” (Explain). After explanation, at “Action: [Y]es…” prompt, press Ctrl+C.</p></li>
+</ul>
+</li>
+<li><p><strong>Edit Mode (from Confirmation Flow):</strong></p>
+<ul>
+<li><p>[ ] Trigger confirmation (e.g., /ai show current date).</p></li>
+<li><p>[ ] Choose “M” (Modify). Input field should show the command.</p></li>
+<li><p>[ ] Press Ctrl+C. (Should cancel edit mode, print “Command editing cancelled”, return to normal prompt).</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="input-field-behavior">
+<h3>2. <strong>Input Field Behavior:</strong><a class="headerlink" href="#input-field-behavior" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Verify prompt updates correctly after cd.</p></li>
+<li><p>[ ] Verify prompt changes for categorization flow.</p></li>
+<li><p>[ ] Verify prompt changes for confirmation flow.</p></li>
+<li><p>[ ] Verify prompt changes for edit mode.</p></li>
+<li><p>[ ] Verify input field switches between single-line (flows) and multi-line (normal/edit) correctly.</p></li>
+</ul>
+</section>
+<section id="output-area">
+<h3>3. <strong>Output Area:</strong><a class="headerlink" href="#output-area" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Test PgUp / PgDn for scrolling.</p></li>
+<li><p>[ ] Verify auto-scroll behavior (scrolls to bottom for new output, stops if user scrolls up, resumes if user scrolls back to bottom).</p></li>
+<li><p>[ ] Verify auto-scroll is forced during active flows (categorization, confirmation, edit mode messages).</p></li>
+</ul>
+</section>
+</section>
+<section id="iii-ai-features-flows">
+<h2><strong>III. AI Features &amp; Flows:</strong><a class="headerlink" href="#iii-ai-features-flows" title="Link to this heading"></a></h2>
+<section id="ai-command-translation-confirmation-flow">
+<h3>1. <strong>/ai Command Translation &amp; Confirmation Flow:</strong><a class="headerlink" href="#ai-command-translation-confirmation-flow" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] /ai list text files</p>
+<ul>
+<li><p>[ ] Choose “Y” (Yes). If command is new, proceed to categorization.</p></li>
+</ul>
+</li>
+<li><p>[ ] /ai find python files -&gt; Choose “Ys” (Simple &amp; Run). Verify execution and categorization.</p></li>
+<li><p>[ ] /ai show running processes -&gt; Choose “Ym” (Semi-Interactive &amp; Run). Verify.</p></li>
+<li><p>[ ] /ai open a text editor -&gt; Choose “Yi” (TUI &amp; Run). Verify.</p></li>
+<li><p>[ ] /ai what is my ip -&gt; Choose “E” (Explain). Review explanation. Then choose “Y” to execute.</p></li>
+<li><p>[ ] /ai delete all .tmp files -&gt; Choose “M” (Modify). Change command in input field (e.g., to ls *.tmp). Press Enter. (Should execute modified command, potentially trigger categorization).</p></li>
+<li><p>[ ] /ai format my hard drive -&gt; Choose “C” (Cancel). Verify command is not executed.</p></li>
+<li><p>[ ] /ai with an empty query (should show warning).</p></li>
+<li><p>[ ] /ai with a query the AI might refuse (e.g., /ai tell me a secret). Observe behavior.</p></li>
+</ul>
+</section>
+<section id="direct-unknown-command-ai-validation-potential-translation-categorization">
+<h3>2. <strong>Direct Unknown Command -&gt; AI Validation -&gt; Potential Translation/Categorization:</strong><a class="headerlink" href="#direct-unknown-command-ai-validation-potential-translation-categorization" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Type a plausible but unknown command (e.g., list_large_files –size 10M).</p>
+<ul>
+<li><p>Verify “Validating with AI…” message.</p></li>
+<li><p>If AI validates as command: Verify it goes to categorization.</p></li>
+<li><p>If AI validates as not a command / phrase: Verify it attempts NL translation.</p>
+<ul>
+<li><p>If translation successful, verify confirmation flow is triggered.</p></li>
+<li><p>If translation fails, verify it attempts to run original as direct command (leading to categorization).</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>[ ] Type a natural language phrase directly (e.g., show me disk space).</p>
+<ul>
+<li><p>Verify AI validation (likely fails as command).</p></li>
+<li><p>Verify it attempts NL translation.</p></li>
+<li><p>Verify confirmation flow if translation successful.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="ollama-service-not-ready">
+<h3>3. <strong>Ollama Service Not Ready:</strong><a class="headerlink" href="#ollama-service-not-ready" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Stop Ollama service manually.</p></li>
+<li><p>[ ] Try /ai list files. Verify “Ollama service is not available” message and guidance.</p></li>
+<li><p>[ ] Try typing an unknown command. Verify message about Ollama not being available for validation/translation and that it proceeds to categorization.</p></li>
+</ul>
+</section>
+</section>
+<section id="iv-command-categorization-execution">
+<h2><strong>IV. Command Categorization &amp; Execution:</strong><a class="headerlink" href="#iv-command-categorization-execution" title="Link to this heading"></a></h2>
+<section id="trigger-categorization-flow-unknown-command">
+<h3>1. <strong>Trigger Categorization Flow (Unknown Command):</strong><a class="headerlink" href="#trigger-categorization-flow-unknown-command" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Type my_very_unique_script –option value</p></li>
+<li><p><strong>Step 0.5 (Confirm Command Base - if applicable, e.g., if input was slightly modified by a pre-parser, though not currently the case for direct input):</strong></p>
+<ul>
+<li><p>[ ] Test choosing “Processed”.</p></li>
+<li><p>[ ] Test choosing “Original” (if different).</p></li>
+<li><p>[ ] Test choosing “Modify/Enter new command” -&gt; Enter a new command -&gt; Verify it goes to Step 1 for the new command.</p></li>
+<li><p>[ ] Test choosing “Cancel”.</p></li>
+</ul>
+</li>
+<li><p><strong>Step 1 (Main Action):</strong></p>
+<ul>
+<li><p>[ ] Choose “1” (simple). Verify command is added to user_command_categories.json and executed as simple.</p></li>
+<li><p>[ ] Choose “2” (semi_interactive). Verify and check tmux execution.</p></li>
+<li><p>[ ] Choose “3” (interactive_tui). Verify and check tmux execution.</p></li>
+<li><p>[ ] Choose “M” (Modify). Modify the command. Then categorize the modified command.</p></li>
+<li><p>[ ] Choose “D” (Default). Verify it runs with default category and is NOT saved.</p></li>
+<li><p>[ ] Choose “C” (Cancel). Verify no execution, no save.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="command-subsystem-now-a-utility-script">
+<h3>2. <strong>/command Subsystem (Now a Utility Script):</strong><a class="headerlink" href="#command-subsystem-now-a-utility-script" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] /command –list (or /utils command –list). Verify output format, presence of default and user commands.</p></li>
+<li><p>[ ] /command –add “mytestcmd –verbose” simple</p></li>
+<li><p>[ ] /command –add “myinteractivecmd” 3</p></li>
+<li><p>[ ] Verify newly added commands appear in /command –list and are classified correctly when typed directly.</p></li>
+<li><p>[ ] /command –move “mytestcmd –verbose” interactive_tui</p></li>
+<li><p>[ ] Verify mytestcmd –verbose is now interactive_tui.</p></li>
+<li><p>[ ] /command –remove “myinteractivecmd”</p></li>
+<li><p>[ ] Verify myinteractivecmd is removed from user settings (may revert to default or unknown).</p></li>
+<li><p>[ ] /command (or /command help). Verify help message from the script is displayed.</p></li>
+<li><p>[ ] Invalid /command usage (e.g., /command –add_typo, /command –add “cmd”). Verify error messages from the script.</p></li>
+</ul>
+</section>
+<section id="execution-types">
+<h3>3. <strong>Execution Types:</strong><a class="headerlink" href="#execution-types" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Execute a known “simple” command.</p></li>
+<li><p>[ ] Execute a known “semi_interactive” command (e.g., sleep 5 &amp;&amp; echo done from tmux). Check for output capture and TUI-like output detection if applicable.</p></li>
+<li><p>[ ] Execute a known “interactive_tui” command (e.g., nano). Verify tmux session.</p></li>
+</ul>
+</section>
+</section>
+<section id="v-ollama-service-management-ollama">
+<h2><strong>V. Ollama Service Management (/ollama):</strong><a class="headerlink" href="#v-ollama-service-management-ollama" title="Link to this heading"></a></h2>
+<section id="pre-test-ensure-ollama-is-running-independently">
+<h3>1. <strong>Pre-test:</strong> Ensure Ollama is running independently.<a class="headerlink" href="#pre-test-ensure-ollama-is-running-independently" title="Link to this heading"></a></h3>
+<ol class="arabic simple" start="2">
+<li><p>[ ] /ollama status (verify output reflects running state).</p></li>
+<li><p>[ ] /ollama stop (if micro_X started it, verify it stops. If external, verify message).</p></li>
+<li><p>[ ] /ollama status (verify output reflects stopped state if applicable).</p></li>
+<li><p>[ ] /ollama start (verify it attempts to start, check status again).</p></li>
+<li><p>[ ] /ollama restart (verify stop then start sequence).</p></li>
+<li><p>[ ] /ollama help (verify help message).</p></li>
+<li><p><strong>Test with Ollama initially stopped:</strong></p>
+<ul class="simple">
+<li><p>[ ] Manually stop Ollama service.</p></li>
+<li><p>[ ] Launch micro_X. Observe auto-start behavior (if enabled in config).</p></li>
+<li><p>[ ] /ollama status.</p></li>
+<li><p>[ ] /ollama start.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+</section>
+<section id="vi-miscellaneous">
+<h2><strong>VI. Miscellaneous:</strong><a class="headerlink" href="#vi-miscellaneous" title="Link to this heading"></a></h2>
+<section id="update-command">
+<h3>1. <strong>/update command:</strong><a class="headerlink" href="#update-command" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Run /update (requires git setup). Observe output.</p></li>
+<li><p>[ ] If changes are pulled, verify message about restarting and requirements.txt.</p></li>
+</ul>
+</section>
+<section id="utils-command">
+<h3>2. <strong>/utils command:</strong><a class="headerlink" href="#utils-command" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] /utils list (or /utils help).</p></li>
+<li><p>[ ] If generate_tree.py exists in utils, try /utils generate_tree. Verify output.</p></li>
+<li><p>[ ] Try /utils non_existent_script. Verify error.</p></li>
+</ul>
+</section>
+<section id="configuration-loading">
+<h3>3. <strong>Configuration Loading:</strong><a class="headerlink" href="#configuration-loading" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Verify fallback, default, and user configs are loaded as per logs.</p></li>
+<li><p>[ ] Try making a change in user_config.json (e.g., input_field_height) and restart to see if it takes effect.</p></li>
+</ul>
+</section>
+<section id="error-handling">
+<h3>4. <strong>Error Handling:</strong><a class="headerlink" href="#error-handling" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Try commands that produce errors (e.g., ls /nonexistent_path). Verify stderr is displayed.</p></li>
+<li><p>[ ] Try to break input parsing with unusual characters (though shlex should be robust).</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="micro_X_Code_Quality_Review.html" class="btn btn-neutral float-left" title="micro_X Code Quality Assessment for Testing Branch Promotion" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="review_of_micro_X_project.html" class="btn btn-neutral float-right" title="Expert Review of the micro_X Project" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, micro_X Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
