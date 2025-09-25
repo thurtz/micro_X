@@ -1,0 +1,503 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modules.category_manager &mdash; micro_X 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            micro_X
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/index.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../developer/index.html">Developer Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api_reference.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">micro_X</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modules.category_manager</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modules.category_manager</h1><div class="highlight"><pre>
+<span></span><span class="c1"># modules/category_manager.py</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shlex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="c1"># --- New Import ---</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modules</span><span class="w"> </span><span class="kn">import</span> <span class="n">config_handler</span>
+
+<span class="c1"># --- Module-specific logger ---</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># --- Module-level &quot;global&quot; variables (initialized via init_category_manager) ---</span>
+<span class="n">_SCRIPT_DIR_PATH</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">_CONFIG_DIR_NAME_CONST</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># e.g., &quot;config&quot;</span>
+<span class="n">_append_output_func_ref</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># Reference to main.append_output</span>
+
+<span class="c1"># --- Constants to be used by this module and potentially imported by main.py ---</span>
+<span class="n">DEFAULT_CATEGORY_FILENAME</span> <span class="o">=</span> <span class="s2">&quot;default_command_categories.json&quot;</span>
+<span class="n">USER_CATEGORY_FILENAME</span> <span class="o">=</span> <span class="s2">&quot;user_command_categories.json&quot;</span>
+<span class="n">UNKNOWN_CATEGORY_SENTINEL</span> <span class="o">=</span> <span class="s2">&quot;##UNKNOWN_CATEGORY##&quot;</span>
+
+<span class="c1"># --- Path variables, constructed during initialization ---</span>
+<span class="n">DEFAULT_CATEGORY_FILE_PATH</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">USER_CATEGORY_FILE_PATH</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="c1"># --- Core category data structures ---</span>
+<span class="c1"># These can be imported by main.py for display or logic if needed</span>
+<span class="n">CATEGORY_MAP</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;1&quot;</span><span class="p">:</span> <span class="s2">&quot;simple&quot;</span><span class="p">,</span> <span class="s2">&quot;2&quot;</span><span class="p">:</span> <span class="s2">&quot;semi_interactive&quot;</span><span class="p">,</span> <span class="s2">&quot;3&quot;</span><span class="p">:</span> <span class="s2">&quot;interactive_tui&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;simple&quot;</span><span class="p">:</span> <span class="s2">&quot;simple&quot;</span><span class="p">,</span> <span class="s2">&quot;semi_interactive&quot;</span><span class="p">:</span> <span class="s2">&quot;semi_interactive&quot;</span><span class="p">,</span> <span class="s2">&quot;interactive_tui&quot;</span><span class="p">:</span> <span class="s2">&quot;interactive_tui&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">CATEGORY_DESCRIPTIONS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;simple&quot;</span><span class="p">:</span> <span class="s2">&quot;Direct output in micro_X&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;semi_interactive&quot;</span><span class="p">:</span> <span class="s2">&quot;Output in micro_X after tmux run (may be interactive)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;interactive_tui&quot;</span><span class="p">:</span> <span class="s2">&quot;Full interactive tmux session&quot;</span>
+<span class="p">}</span>
+<span class="n">_CURRENTLY_LOADED_CATEGORIES</span> <span class="o">=</span> <span class="p">{}</span> <span class="c1"># Internal cache for merged categories</span>
+
+
+<div class="viewcode-block" id="init_category_manager">
+<a class="viewcode-back" href="../../api_reference.html#modules.category_manager.init_category_manager">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">init_category_manager</span><span class="p">(</span><span class="n">script_dir_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config_dir_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">append_output_func_ref</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Initializes the manager with necessary paths and the UI callback function.</span>
+
+<span class="sd">    Must be called once at startup from main.py before any other functions</span>
+<span class="sd">    in this module are used. It loads and merges the initial categories.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        script_dir_path: The absolute path to the main script&#39;s directory.</span>
+<span class="sd">        config_dir_name: The name of the configuration directory (e.g., &quot;config&quot;).</span>
+<span class="sd">        append_output_func_ref: A reference to UIManager.append_output</span>
+<span class="sd">                                           to display messages to the user.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_SCRIPT_DIR_PATH</span><span class="p">,</span> <span class="n">_CONFIG_DIR_NAME_CONST</span><span class="p">,</span> <span class="n">_append_output_func_ref</span>
+    <span class="k">global</span> <span class="n">DEFAULT_CATEGORY_FILE_PATH</span><span class="p">,</span> <span class="n">USER_CATEGORY_FILE_PATH</span>
+
+    <span class="n">_SCRIPT_DIR_PATH</span> <span class="o">=</span> <span class="n">script_dir_path</span>
+    <span class="n">_CONFIG_DIR_NAME_CONST</span> <span class="o">=</span> <span class="n">config_dir_name</span>
+    <span class="n">_append_output_func_ref</span> <span class="o">=</span> <span class="n">append_output_func_ref</span>
+
+    <span class="c1"># Construct full paths to category files</span>
+    <span class="n">config_path_base</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_SCRIPT_DIR_PATH</span><span class="p">,</span> <span class="n">_CONFIG_DIR_NAME_CONST</span><span class="p">)</span>
+    <span class="n">DEFAULT_CATEGORY_FILE_PATH</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config_path_base</span><span class="p">,</span> <span class="n">DEFAULT_CATEGORY_FILENAME</span><span class="p">)</span>
+    <span class="n">USER_CATEGORY_FILE_PATH</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config_path_base</span><span class="p">,</span> <span class="n">USER_CATEGORY_FILENAME</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Category manager initialized. Default categories: </span><span class="si">{</span><span class="n">DEFAULT_CATEGORY_FILE_PATH</span><span class="si">}</span><span class="s2">, User categories: </span><span class="si">{</span><span class="n">USER_CATEGORY_FILE_PATH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">load_and_merge_command_categories</span><span class="p">()</span> <span class="c1"># Perform initial load</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_single_category_file</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Loads a single category JSON file using the config_handler, ensuring structure.&quot;&quot;&quot;</span>
+    <span class="n">loaded_data</span> <span class="o">=</span> <span class="n">config_handler</span><span class="o">.</span><span class="n">load_jsonc_file</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">loaded_data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># If file doesn&#39;t exist or is invalid, return a default empty structure</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">cat_name</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">cat_name</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">CATEGORY_MAP</span><span class="o">.</span><span class="n">values</span><span class="p">())}</span>
+
+    <span class="n">categories</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="c1"># Ensure all defined categories in CATEGORY_MAP.values() exist as keys</span>
+    <span class="k">for</span> <span class="n">cat_name_key</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">CATEGORY_MAP</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+        <span class="k">if</span> <span class="n">cat_name_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">loaded_data</span><span class="p">:</span>
+            <span class="n">categories</span><span class="p">[</span><span class="n">cat_name_key</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span> <span class="c1"># Initialize if missing</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">loaded_data</span><span class="p">[</span><span class="n">cat_name_key</span><span class="p">],</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Category &#39;</span><span class="si">{</span><span class="n">cat_name_key</span><span class="si">}</span><span class="s2">&#39; in </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> is not a list. Resetting to empty list.&quot;</span><span class="p">)</span>
+            <span class="n">categories</span><span class="p">[</span><span class="n">cat_name_key</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Ensure all commands are strings</span>
+            <span class="n">categories</span><span class="p">[</span><span class="n">cat_name_key</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">cmd</span><span class="p">)</span> <span class="k">for</span> <span class="n">cmd</span> <span class="ow">in</span> <span class="n">loaded_data</span><span class="p">[</span><span class="n">cat_name_key</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="nb">str</span><span class="p">)]</span>
+            
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Successfully loaded and validated categories from </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">categories</span>
+
+
+<div class="viewcode-block" id="load_and_merge_command_categories">
+<a class="viewcode-back" href="../../api_reference.html#modules.category_manager.load_and_merge_command_categories">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_and_merge_command_categories</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Loads default and user categories, merges them, and updates the internal cache.&quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_CURRENTLY_LOADED_CATEGORIES</span>
+    <span class="k">if</span> <span class="n">DEFAULT_CATEGORY_FILE_PATH</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">USER_CATEGORY_FILE_PATH</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Category paths not initialized. Call init_category_manager first.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">default_categories</span> <span class="o">=</span> <span class="n">_load_single_category_file</span><span class="p">(</span><span class="n">DEFAULT_CATEGORY_FILE_PATH</span><span class="p">)</span>
+    
+    <span class="c1"># If default category file doesn&#39;t exist, try to create an empty one</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">DEFAULT_CATEGORY_FILE_PATH</span><span class="p">):</span> 
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">DEFAULT_CATEGORY_FILENAME</span><span class="si">}</span><span class="s2"> not found at </span><span class="si">{</span><span class="n">DEFAULT_CATEGORY_FILE_PATH</span><span class="si">}</span><span class="s2">. Attempting to create an empty one.&quot;</span><span class="p">)</span>
+        <span class="n">empty_data</span> <span class="o">=</span> <span class="p">{</span><span class="n">cat_name</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">cat_name</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">CATEGORY_MAP</span><span class="o">.</span><span class="n">values</span><span class="p">())}</span>
+        <span class="k">if</span> <span class="n">config_handler</span><span class="o">.</span><span class="n">save_json_file</span><span class="p">(</span><span class="n">DEFAULT_CATEGORY_FILE_PATH</span><span class="p">,</span> <span class="n">empty_data</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created empty default category file: </span><span class="si">{</span><span class="n">DEFAULT_CATEGORY_FILE_PATH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not create empty </span><span class="si">{</span><span class="n">DEFAULT_CATEGORY_FILENAME</span><span class="si">}</span><span class="s2"> at </span><span class="si">{</span><span class="n">DEFAULT_CATEGORY_FILE_PATH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">user_categories</span> <span class="o">=</span> <span class="n">_load_single_category_file</span><span class="p">(</span><span class="n">USER_CATEGORY_FILE_PATH</span><span class="p">)</span>
+    
+    <span class="c1"># Start with a deep copy of default categories</span>
+    <span class="n">merged_categories</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">default_categories</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span> 
+    
+    <span class="c1"># Merge user categories, ensuring user&#39;s choice overrides default and removes duplicates</span>
+    <span class="k">for</span> <span class="n">category_name</span><span class="p">,</span> <span class="n">user_cmds_in_category</span> <span class="ow">in</span> <span class="n">user_categories</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">category_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">merged_categories</span><span class="p">:</span>
+            <span class="n">merged_categories</span><span class="p">[</span><span class="n">category_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span> 
+        
+        <span class="k">for</span> <span class="n">user_cmd</span> <span class="ow">in</span> <span class="n">user_cmds_in_category</span><span class="p">:</span>
+            <span class="c1"># Remove command from any other category in merged_categories</span>
+            <span class="k">for</span> <span class="n">cat_list_to_check</span> <span class="ow">in</span> <span class="n">merged_categories</span><span class="o">.</span><span class="n">values</span><span class="p">():</span> 
+                <span class="k">if</span> <span class="n">user_cmd</span> <span class="ow">in</span> <span class="n">cat_list_to_check</span><span class="p">:</span>
+                    <span class="n">cat_list_to_check</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">user_cmd</span><span class="p">)</span>
+            
+            <span class="c1"># Add to the target category</span>
+            <span class="k">if</span> <span class="n">user_cmd</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">merged_categories</span><span class="p">[</span><span class="n">category_name</span><span class="p">]:</span> 
+                <span class="n">merged_categories</span><span class="p">[</span><span class="n">category_name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">user_cmd</span><span class="p">)</span>
+                
+    <span class="n">_CURRENTLY_LOADED_CATEGORIES</span> <span class="o">=</span> <span class="n">merged_categories</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Default and user command categories have been loaded and merged.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="classify_command">
+<a class="viewcode-back" href="../../api_reference.html#modules.category_manager.classify_command">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">classify_command</span><span class="p">(</span><span class="n">cmd</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Classifies a given command string based on the loaded categories.</span>
+
+<span class="sd">    Returns the category name (e.g., &quot;simple&quot;) if found, otherwise returns</span>
+<span class="sd">    the UNKNOWN_CATEGORY_SENTINEL.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        cmd: The full command string to classify.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The name of the category or the UNKNOWN_CATEGORY_SENTINEL constant.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_CURRENTLY_LOADED_CATEGORIES</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Categories not loaded. Attempting to load now.&quot;</span><span class="p">)</span>
+        <span class="n">load_and_merge_command_categories</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_CURRENTLY_LOADED_CATEGORIES</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Cannot classify command: categories are not loaded and path might be uninitialized.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">UNKNOWN_CATEGORY_SENTINEL</span>
+            
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cmd</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">UNKNOWN_CATEGORY_SENTINEL</span>
+        
+    <span class="k">for</span> <span class="n">category_name</span><span class="p">,</span> <span class="n">full_commands_in_category</span> <span class="ow">in</span> <span class="n">_CURRENTLY_LOADED_CATEGORIES</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">cmd</span> <span class="ow">in</span> <span class="n">full_commands_in_category</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">category_name</span>
+            
+    <span class="k">return</span> <span class="n">UNKNOWN_CATEGORY_SENTINEL</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_save_user_command_categories</span><span class="p">(</span><span class="n">user_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Saves data to the user command categories JSON file using config_handler.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">USER_CATEGORY_FILE_PATH</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;User category path not initialized. Cannot save.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">_append_output_func_ref</span><span class="p">:</span>
+            <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="s2">&quot;❌ Error: User category path not configured.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">config_handler</span><span class="o">.</span><span class="n">save_json_file</span><span class="p">(</span><span class="n">USER_CATEGORY_FILE_PATH</span><span class="p">,</span> <span class="n">user_data</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to save user categories to </span><span class="si">{</span><span class="n">USER_CATEGORY_FILE_PATH</span><span class="si">}</span><span class="s2"> via config_handler.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">_append_output_func_ref</span><span class="p">:</span>
+            <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="s2">&quot;❌ Error saving user categories.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User command categories saved to </span><span class="si">{</span><span class="n">USER_CATEGORY_FILE_PATH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="add_command_to_category">
+<a class="viewcode-back" href="../../api_reference.html#modules.category_manager.add_command_to_category">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">add_command_to_category</span><span class="p">(</span><span class="n">full_cmd_to_add</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">category_input</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Adds a command to a specified category in the user&#39;s configuration file.</span>
+
+<span class="sd">    This function handles saving the change to user_command_categories.json and</span>
+<span class="sd">    then re-merging all categories to reflect the change immediately.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        full_cmd_to_add: The command string to add or update.</span>
+<span class="sd">        category_input: The target category (e.g., &quot;simple&quot;, &quot;2&quot;).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_append_output_func_ref</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;append_output function not available for add_command_to_category status messages.&quot;</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">full_cmd_to_add</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">_append_output_func_ref</span><span class="p">:</span> <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="s2">&quot;⚠️ Cannot add empty command.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Attempted to add an empty command to categories.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> 
+
+    <span class="n">target_category_name</span> <span class="o">=</span> <span class="n">CATEGORY_MAP</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">category_input</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">target_category_name</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">_append_output_func_ref</span><span class="p">:</span> <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Invalid category: &#39;</span><span class="si">{</span><span class="n">category_input</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid category specified for adding command: </span><span class="si">{</span><span class="n">category_input</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> 
+
+    <span class="n">user_categories</span> <span class="o">=</span> <span class="n">_load_single_category_file</span><span class="p">(</span><span class="n">USER_CATEGORY_FILE_PATH</span><span class="p">)</span>
+    <span class="n">cmd_found_in_user_file_old_cat</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">for</span> <span class="n">cat_name</span><span class="p">,</span> <span class="n">cmds_list</span> <span class="ow">in</span> <span class="n">user_categories</span><span class="o">.</span><span class="n">items</span><span class="p">():</span> 
+        <span class="k">if</span> <span class="n">full_cmd_to_add</span> <span class="ow">in</span> <span class="n">cmds_list</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">cat_name</span> <span class="o">!=</span> <span class="n">target_category_name</span><span class="p">:</span>
+                <span class="n">cmds_list</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">full_cmd_to_add</span><span class="p">)</span>
+                <span class="n">cmd_found_in_user_file_old_cat</span> <span class="o">=</span> <span class="n">cat_name</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">_append_output_func_ref</span><span class="p">:</span> <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ℹ️ Command &#39;</span><span class="si">{</span><span class="n">full_cmd_to_add</span><span class="si">}</span><span class="s2">&#39; is already set as &#39;</span><span class="si">{</span><span class="n">target_category_name</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Command &#39;</span><span class="si">{</span><span class="n">full_cmd_to_add</span><span class="si">}</span><span class="s2">&#39; already in user category &#39;</span><span class="si">{</span><span class="n">target_category_name</span><span class="si">}</span><span class="s2">&#39;. No change needed.&quot;</span><span class="p">)</span>
+                <span class="k">return</span> 
+                
+    <span class="k">if</span> <span class="n">full_cmd_to_add</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">user_categories</span><span class="p">[</span><span class="n">target_category_name</span><span class="p">]:</span>
+        <span class="n">user_categories</span><span class="p">[</span><span class="n">target_category_name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">full_cmd_to_add</span><span class="p">)</span>
+    
+    <span class="n">_save_user_command_categories</span><span class="p">(</span><span class="n">user_categories</span><span class="p">)</span>
+    <span class="n">load_and_merge_command_categories</span><span class="p">()</span>
+    
+    <span class="k">if</span> <span class="n">_append_output_func_ref</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">cmd_found_in_user_file_old_cat</span><span class="p">:</span>
+            <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✅ Command &#39;</span><span class="si">{</span><span class="n">full_cmd_to_add</span><span class="si">}</span><span class="s2">&#39; moved from &#39;</span><span class="si">{</span><span class="n">cmd_found_in_user_file_old_cat</span><span class="si">}</span><span class="s2">&#39; to &#39;</span><span class="si">{</span><span class="n">target_category_name</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;success&#39;</span><span class="p">)</span> 
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✅ Command &#39;</span><span class="si">{</span><span class="n">full_cmd_to_add</span><span class="si">}</span><span class="s2">&#39; now set as &#39;</span><span class="si">{</span><span class="n">target_category_name</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;success&#39;</span><span class="p">)</span> 
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Command &#39;</span><span class="si">{</span><span class="n">full_cmd_to_add</span><span class="si">}</span><span class="s2">&#39; added/updated to category &#39;</span><span class="si">{</span><span class="n">target_category_name</span><span class="si">}</span><span class="s2">&#39; in user settings.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="remove_command_from_category">
+<a class="viewcode-back" href="../../api_reference.html#modules.category_manager.remove_command_from_category">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">remove_command_from_category</span><span class="p">(</span><span class="n">full_cmd_to_remove</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Removes a command from the user&#39;s explicit categorizations and reloads.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_append_output_func_ref</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;append_output function not available for remove_command_from_category status messages.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">full_cmd_to_remove</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">_append_output_func_ref</span><span class="p">:</span> <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="s2">&quot;⚠️ Cannot remove empty command.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Attempted to remove an empty command from categories.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> 
+
+    <span class="n">user_categories</span> <span class="o">=</span> <span class="n">_load_single_category_file</span><span class="p">(</span><span class="n">USER_CATEGORY_FILE_PATH</span><span class="p">)</span>
+    <span class="n">found_and_removed_from_user</span> <span class="o">=</span> <span class="kc">False</span>
+    
+    <span class="k">for</span> <span class="n">commands_in_category</span> <span class="ow">in</span> <span class="n">user_categories</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">full_cmd_to_remove</span> <span class="ow">in</span> <span class="n">commands_in_category</span><span class="p">:</span>
+            <span class="n">commands_in_category</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">full_cmd_to_remove</span><span class="p">)</span>
+            <span class="n">found_and_removed_from_user</span> <span class="o">=</span> <span class="kc">True</span>
+            
+    <span class="k">if</span> <span class="n">found_and_removed_from_user</span><span class="p">:</span>
+        <span class="n">_save_user_command_categories</span><span class="p">(</span><span class="n">user_categories</span><span class="p">)</span>
+        <span class="n">load_and_merge_command_categories</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">_append_output_func_ref</span><span class="p">:</span> <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🗑️ Command &#39;</span><span class="si">{</span><span class="n">full_cmd_to_remove</span><span class="si">}</span><span class="s2">&#39; removed from your user settings.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">)</span> 
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Command &#39;</span><span class="si">{</span><span class="n">full_cmd_to_remove</span><span class="si">}</span><span class="s2">&#39; removed from user categories.&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">_append_output_func_ref</span><span class="p">:</span> <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️ Command &#39;</span><span class="si">{</span><span class="n">full_cmd_to_remove</span><span class="si">}</span><span class="s2">&#39; not found in your user settings.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Command &#39;</span><span class="si">{</span><span class="n">full_cmd_to_remove</span><span class="si">}</span><span class="s2">&#39; not found in user categories for removal.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="list_categorized_commands">
+<a class="viewcode-back" href="../../api_reference.html#modules.category_manager.list_categorized_commands">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">list_categorized_commands</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Displays all categorized commands (merged view) using the append_output_func.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_append_output_func_ref</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;append_output function not available. Cannot list categories to UI.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_CURRENTLY_LOADED_CATEGORIES</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Categories not loaded. Attempting to load for listing.&quot;</span><span class="p">)</span>
+        <span class="n">load_and_merge_command_categories</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_CURRENTLY_LOADED_CATEGORIES</span><span class="p">:</span>
+            <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="s2">&quot;❌ Error: Categories could not be loaded for listing.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+    <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="s2">&quot;📄 Current command categories (defaults + user overrides):&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info-header&#39;</span><span class="p">)</span> 
+    
+    <span class="n">sorted_category_names</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">CATEGORY_MAP</span><span class="o">.</span><span class="n">values</span><span class="p">())))</span>
+
+    <span class="k">for</span> <span class="n">cat_name</span> <span class="ow">in</span> <span class="n">sorted_category_names</span><span class="p">:</span>
+        <span class="n">full_commands_in_cat</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">_CURRENTLY_LOADED_CATEGORIES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">cat_name</span><span class="p">,</span> <span class="p">[]))</span>
+        <span class="n">description</span> <span class="o">=</span> <span class="n">CATEGORY_DESCRIPTIONS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">cat_name</span><span class="p">,</span> <span class="s1">&#39;No description&#39;</span><span class="p">)</span>
+        <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">🔹 </span><span class="si">{</span><span class="n">cat_name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">description</span><span class="si">}</span><span class="s2">):&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info-subheader&#39;</span><span class="p">)</span> 
+        
+        <span class="k">if</span> <span class="n">full_commands_in_cat</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">cmd</span> <span class="ow">in</span> <span class="n">full_commands_in_cat</span><span class="p">:</span>
+                <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - </span><span class="si">{</span><span class="n">cmd</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info-item&#39;</span><span class="p">)</span> 
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="s2">&quot;  (No commands in this category)&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info-item-empty&#39;</span><span class="p">)</span> 
+    <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="move_command_category">
+<a class="viewcode-back" href="../../api_reference.html#modules.category_manager.move_command_category">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">move_command_category</span><span class="p">(</span><span class="n">full_cmd_to_move</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">new_category_input</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Moves a command to a new category in the user&#39;s settings. Essentially an alias for add.&quot;&quot;&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Moving command &#39;</span><span class="si">{</span><span class="n">full_cmd_to_move</span><span class="si">}</span><span class="s2">&#39; to category &#39;</span><span class="si">{</span><span class="n">new_category_input</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+    <span class="n">add_command_to_category</span><span class="p">(</span><span class="n">full_cmd_to_move</span><span class="p">,</span> <span class="n">new_category_input</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="handle_command_subsystem_input">
+<a class="viewcode-back" href="../../api_reference.html#modules.category_manager.handle_command_subsystem_input">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_command_subsystem_input</span><span class="p">(</span><span class="n">input_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parses and handles all &#39;/command&#39; subcommands (add, remove, list, move, run).</span>
+
+<span class="sd">    This function is the entry point for the `/command` built-in. It prints</span>
+<span class="sd">    help/lists directly to the UI. For the &#39;run&#39; action, it returns a</span>
+<span class="sd">    dictionary instructing the shell_engine to execute a command.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        input_str: The full user input string, starting with &quot;/command&quot;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A dictionary {&#39;action&#39;: &#39;force_run&#39;, ...} if the</span>
+<span class="sd">        subcommand was &#39;run&#39;. Returns None for all other cases.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_append_output_func_ref</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;append_output function not available for /command subsystem.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+        
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="n">shlex</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">input_str</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error parsing /command: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;shlex error for /command &#39;</span><span class="si">{</span><span class="n">input_str</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span> 
+
+    <span class="n">cmd_help</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ℹ️ /command usage:</span><span class="se">\n</span><span class="s2">&quot;</span> 
+                <span class="sa">f</span><span class="s2">&quot;  add </span><span class="se">\&quot;</span><span class="s2">&lt;cmd&gt;</span><span class="se">\&quot;</span><span class="s2"> &lt;cat&gt;          - Add command to a category.</span><span class="se">\n</span><span class="s2">&quot;</span> 
+                <span class="sa">f</span><span class="s2">&quot;  remove </span><span class="se">\&quot;</span><span class="s2">&lt;cmd&gt;</span><span class="se">\&quot;</span><span class="s2">             - Remove command from your settings.</span><span class="se">\n</span><span class="s2">&quot;</span> 
+                <span class="sa">f</span><span class="s2">&quot;  list                       - List all categorized commands.</span><span class="se">\n</span><span class="s2">&quot;</span> 
+                <span class="sa">f</span><span class="s2">&quot;  move </span><span class="se">\&quot;</span><span class="s2">&lt;cmd&gt;</span><span class="se">\&quot;</span><span class="s2"> &lt;new_cat&gt;     - Move command to a new category.</span><span class="se">\n</span><span class="s2">&quot;</span> 
+                <span class="sa">f</span><span class="s2">&quot;  run &lt;cat_num|cat_name&gt; </span><span class="se">\&quot;</span><span class="s2">&lt;cmd&gt;</span><span class="se">\&quot;</span><span class="s2"> - Force run command with category.</span><span class="se">\n</span><span class="s2">&quot;</span> 
+                <span class="sa">f</span><span class="s2">&quot;  help                       - Show this help message.</span><span class="se">\n</span><span class="s2">&quot;</span> 
+                <span class="sa">f</span><span class="s2">&quot;Categories: 1/simple, 2/semi_interactive, 3/interactive_tui&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;/command&quot;</span><span class="p">:</span>
+        <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Invalid /command structure.</span><span class="se">\n</span><span class="si">{</span><span class="n">cmd_help</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span> 
+        
+    <span class="n">subcmd</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> 
+    
+    <span class="k">if</span> <span class="n">subcmd</span> <span class="o">==</span> <span class="s2">&quot;add&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="n">add_command_to_category</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">parts</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Usage: /command add </span><span class="se">\&quot;</span><span class="s2">&lt;full_command_string&gt;</span><span class="se">\&quot;</span><span class="s2"> &lt;category&gt;&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span> 
+    <span class="k">elif</span> <span class="n">subcmd</span> <span class="o">==</span> <span class="s2">&quot;remove&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">remove_command_from_category</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Usage: /command remove </span><span class="se">\&quot;</span><span class="s2">&lt;full_command_string&gt;</span><span class="se">\&quot;</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span> 
+    <span class="k">elif</span> <span class="n">subcmd</span> <span class="o">==</span> <span class="s2">&quot;list&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">list_categorized_commands</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Usage: /command list&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span> 
+    <span class="k">elif</span> <span class="n">subcmd</span> <span class="o">==</span> <span class="s2">&quot;move&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="n">move_command_category</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">parts</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Usage: /command move </span><span class="se">\&quot;</span><span class="s2">&lt;full_command_string&gt;</span><span class="se">\&quot;</span><span class="s2"> &lt;new_category&gt;&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span> 
+    <span class="k">elif</span> <span class="n">subcmd</span> <span class="o">==</span> <span class="s2">&quot;run&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="n">category_input</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="n">command_to_run</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+            
+            <span class="n">resolved_category</span> <span class="o">=</span> <span class="n">CATEGORY_MAP</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">category_input</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">resolved_category</span><span class="p">:</span>
+                 <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Invalid category for &#39;run&#39;: &#39;</span><span class="si">{</span><span class="n">category_input</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+                 <span class="k">return</span> <span class="kc">None</span>
+            
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;/command run: category &#39;</span><span class="si">{</span><span class="n">resolved_category</span><span class="si">}</span><span class="s2">&#39;, command &#39;</span><span class="si">{</span><span class="n">command_to_run</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;action&#39;</span><span class="p">:</span> <span class="s1">&#39;force_run&#39;</span><span class="p">,</span> <span class="s1">&#39;command&#39;</span><span class="p">:</span> <span class="n">command_to_run</span><span class="p">,</span> <span class="s1">&#39;category&#39;</span><span class="p">:</span> <span class="n">resolved_category</span><span class="p">}</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Usage: /command run &lt;category&gt; </span><span class="se">\&quot;</span><span class="s2">&lt;full_command_string&gt;</span><span class="se">\&quot;</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">subcmd</span> <span class="o">==</span> <span class="s2">&quot;help&quot;</span><span class="p">:</span>
+        <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="n">cmd_help</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;help-base&#39;</span><span class="p">)</span> 
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_append_output_func_ref</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Unknown /command subcommand &#39;</span><span class="si">{</span><span class="n">subcmd</span><span class="si">}</span><span class="s2">&#39;.</span><span class="se">\n</span><span class="si">{</span><span class="n">cmd_help</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, micro_X Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

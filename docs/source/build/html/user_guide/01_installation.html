@@ -1,0 +1,158 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Installation and Setup &mdash; micro_X 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="2. Basic Usage" href="02_basic_usage.html" />
+    <link rel="prev" title="User Guide" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            micro_X
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">User Guide</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#"><strong>1. Installation and Setup</strong></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#step-1-general-setup-all-users"><strong>Step 1: General Setup (All Users)</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-2-activating-the-development-environment-optional"><strong>Step 2: Activating the Development Environment (Optional)</strong></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="02_basic_usage.html"><strong>2. Basic Usage</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_ai_features.html"><strong>3. AI Features</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_command_categorization.html"><strong>4. Command Categorization</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="05_management_and_utils.html"><strong>5. Management &amp; Utilities</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_developer_mode.html"><strong>6. Developer Mode &amp; Code Integrity</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="07_advanced_topics.html"><strong>7. Advanced Topics</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="08_troubleshooting.html"><strong>8. Troubleshooting</strong></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">micro_X</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">User Guide</a></li>
+      <li class="breadcrumb-item active"><strong>1. Installation and Setup</strong></li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/user_guide/01_installation.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="installation-and-setup">
+<h1><strong>1. Installation and Setup</strong><a class="headerlink" href="#installation-and-setup" title="Link to this heading"></a></h1>
+<p>Getting started with micro_X involves cloning the repository and running a unified setup script that handles dependencies for your specific operating system.</p>
+<section id="step-1-general-setup-all-users">
+<h2><strong>Step 1: General Setup (All Users)</strong><a class="headerlink" href="#step-1-general-setup-all-users" title="Link to this heading"></a></h2>
+<p>For the best experience, all users should start by installing the main branch. This provides the most stable foundation for using micro_X and for activating the development environment if desired.</p>
+<ol class="arabic">
+<li><p><strong>Clone the Repository</strong>:<br />
+git clone https://github.com/thurtz/micro_X.git<br />
+cd micro_X</p></li>
+<li><p><strong>Run the Setup Script</strong>:<br />
+chmod +x setup.sh<br />
+./setup.sh</p>
+<p>The script will guide you through installing all necessary dependencies for your operating system, including Python, tmux, and the required Ollama models.</p>
+</li>
+</ol>
+</section>
+<section id="step-2-activating-the-development-environment-optional">
+<h2><strong>Step 2: Activating the Development Environment (Optional)</strong><a class="headerlink" href="#step-2-activating-the-development-environment-optional" title="Link to this heading"></a></h2>
+<p>If you are a developer or want to test new features, you can easily set up the testing and dev branches from your stable main branch installation.</p>
+<ol class="arabic">
+<li><p><strong>Launch micro_X</strong>: Start the application from your main branch installation directory:<br />
+./micro_X.sh</p></li>
+<li><p><strong>Run the Activation Utility</strong>: Inside the running micro_X shell, type the following command:<br />
+/dev –activate</p>
+<p>This command will automatically:</p>
+<ul class="simple">
+<li><p>Clone the testing and dev branches into new subdirectories (micro_X-testing/ and micro_X-dev/).</p></li>
+<li><p>Run the complete setup process for each new installation.</p></li>
+</ul>
+</li>
+</ol>
+<p>You will now have three separate, managed installations of micro_X.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="User Guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="02_basic_usage.html" class="btn btn-neutral float-right" title="2. Basic Usage" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, micro_X Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
