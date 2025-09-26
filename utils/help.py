@@ -21,6 +21,8 @@ Common Commands:
   /config             - Opens a web UI to manage your configuration.
   /snapshot           - Creates a snapshot of the project for context sharing.
   /tree               - Generates a file showing the project structure.
+  /docs               - Opens the project documentation in a web browser.
+  /test               - Runs the project's test suite.
   /update             - Pulls the latest changes for micro_X.
   /list               - Lists available utility and user scripts.
   /ollama             - Manage the Ollama service.
@@ -64,8 +66,8 @@ Managing Aliases:
   micro_X uses the '/alias' command to manage your shortcuts.
 
   /alias --list              - Shows all currently active aliases (both default and user-defined).
-  /alias --add /a "b"      - Creates a new user alias. E.g., /alias --add /snap "/utils generate_snapshot"
-  /alias --remove /a         - Removes a user-defined alias.
+  /alias --add <alias> "<command>" - Creates a new user alias. E.g., /alias --add /snap "/utils generate_snapshot"
+  /alias --remove <alias>    - Removes a user-defined alias.
 
 Default vs. User Aliases:
   - Default aliases are built-in for convenience (e.g., /help, /command).
@@ -122,6 +124,7 @@ Keybindings for navigating the micro_X interface:
   Ctrl+C / D  - Exit micro_X or cancel an active interactive flow (like categorization or confirmation).
   Ctrl+N      - Insert a newline for multi-line commands.
   Up/Down     - Navigate through command history or move the cursor in a multi-line command.
+  Ctrl+Up/Down- Move cursor up/down in multi-line commands.
   Tab         - Attempt command completion or insert 4 spaces.
   PageUp      - Scroll the main output area up.
   PageDown    - Scroll the main output area down.
@@ -145,6 +148,7 @@ Configuration Files:
 Web-Based Configuration Manager:
   For an easy way to edit your user configuration files, run:
   /utils config_manager --start
+  /utils config_manager --stop
 """
 
 SECURITY_HELP = """

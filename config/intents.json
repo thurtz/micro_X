@@ -193,14 +193,18 @@
     ],
     "list_scripts": [
         "/list",
-        "list scripts",
-        "show available scripts",
-        "list utilities"
+        "list all scripts",
+        "show available scripts"
     ],
     "list_scripts_user": [
         "/list --type scripts",
         "list user scripts",
         "show user scripts"
+    ],
+    "list_scripts_utils": [
+        "/list --type utils",
+        "list utility scripts",
+        "show utility scripts"
     ],
     "list_scripts_help": [
         "/list --help",
@@ -242,5 +246,45 @@
         "/docs --lynx",
         "docs lynx",
         "open docs in lynx"
+    ],
+    "show_help_ai": [
+        "help for ai",
+        "ai help",
+        "how to use ai"
+    ],
+    "show_help_alias": [
+        "help for alias",
+        "alias help",
+        "how to use aliases"
+    ],
+    "show_help_command": [
+        "help for command",
+        "command help",
+        "how to use commands"
+    ],
+    "show_help_config": [
+        "help for config",
+        "config help",
+        "how to configure the shell"
+    ],
+    "show_help_dev": [
+        "help for dev",
+        "dev help",
+        "how to develop the shell"
+    ],
+    "show_help_keybindings": [
+        "help for keybindings",
+        "keybindings help",
+        "what are the keybindings"
+    ],
+    "show_help_security": [
+        "help for security",
+        "security help",
+        "what are the security features"
+    ],
+    "show_help_utilities": [
+        "help for utilities",
+        "utilities help",
+        "what are the utilities"
     ]
 }

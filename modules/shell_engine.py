@@ -617,6 +617,7 @@ class ShellEngine:
             "run_tests_help": ("/utils run_tests --help", False),
             "list_scripts": ("/utils list_scripts", False),
             "list_scripts_user": ("/utils list_scripts --type scripts", False),
+            "list_scripts_utils": ("/utils list_scripts --type utils", False),
             "list_scripts_help": ("/utils list_scripts --help", False),
             "install_dependencies_runtime": ("/utils install_requirements --runtime", False),
             "install_dependencies_dev": ("/utils install_requirements --dev", False),
@@ -626,6 +627,14 @@ class ShellEngine:
             "open_docs": ("/utils docs", False),
             "open_docs_help": ("/utils docs --help", False),
             "open_docs_lynx": ("python utils/docs.py --lynx", True),
+            "show_help_ai": ("/utils help ai", False),
+            "show_help_alias": ("/utils help alias", False),
+            "show_help_command": ("/utils help command", False),
+            "show_help_config": ("/utils help config", False),
+            "show_help_dev": ("/utils help dev", False),
+            "show_help_keybindings": ("/utils help keys", False),
+            "show_help_security": ("/utils help security", False),
+            "show_help_utilities": ("/utils help utils", False),
         }
 
         if self.embedding_manager_instance:
