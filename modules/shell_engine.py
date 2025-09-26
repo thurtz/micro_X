@@ -580,52 +580,52 @@ class ShellEngine:
 
         # --- INTENT CLASSIFICATION (NEW) ---
         INTENT_COMMAND_MAP = {
-            "show_help": "/utils help",
-            "ollama_start": "/utils ollama_cli start",
-            "ollama_stop": "/utils ollama_cli stop",
-            "ollama_restart": "/utils ollama_cli restart",
-            "ollama_status": "/utils ollama_cli status",
-            "ollama_help": "/utils ollama_cli help",
-            "command_list": "/utils command --list",
-            "command_help": "/utils command --help",
-            "config_start": "/utils config_manager --start",
-            "config_stop": "/utils config_manager --stop",
-            "config_help": "/utils config_manager --help",
-            "run_update": "/utils update",
-            "snapshot_create": "/utils generate_snapshot",
-            "snapshot_include_logs": "/utils generate_snapshot --include-logs",
-            "snapshot_summarize": "/utils generate_snapshot --summarize",
-            "snapshot_help": "/utils generate_snapshot --help",
-            "alias_list": "/utils alias --list",
-            "alias_help": "/utils alias --help",
-            "dev_activate": "/utils dev --activate",
-            "dev_update_all": "/utils dev --update-all",
-            "dev_update_testing": "/utils dev --update-testing",
-            "dev_update_dev": "/utils dev --update-dev",
-            "dev_snapshot_main": "/utils dev --snapshot-main",
-            "dev_snapshot_testing": "/utils dev --snapshot-testing",
-            "dev_snapshot_dev": "/utils dev --snapshot-dev",
-            "dev_snapshot_all": "/utils dev --snapshot-all",
-            "dev_run_tests_main": "/utils dev --run-tests-main",
-            "dev_run_tests_testing": "/utils dev --run-tests-testing",
-            "dev_run_tests_dev": "/utils dev --run-tests-dev",
-            "dev_run_tests_all": "/utils dev --run-tests-all",
-            "dev_help": "/utils dev --help",
-            "generate_project_tree": "/utils generate_tree",
-            "generate_project_tree_help": "/utils generate_tree --help",
-            "run_tests": "/utils run_tests",
-            "run_tests_help": "/utils run_tests --help",
-            "list_scripts": "/utils list_scripts",
-            "list_scripts_user": "/utils list_scripts --type scripts",
-            "list_scripts_help": "/utils list_scripts --help",
-            "install_dependencies_runtime": "/utils install_requirements --runtime",
-            "install_dependencies_dev": "/utils install_requirements --dev",
-            "install_dependencies_all": "/utils install_requirements --all",
-            "setup_dev_env": "/utils setup_dev_env",
-            "setup_dev_env_help": "/utils setup_dev_env --help",
-            "open_docs": "python utils/docs.py",
-            "open_docs_help": "python utils/docs.py --help",
-            "open_docs_lynx": "python utils/docs.py --lynx",
+            "show_help": ("/utils help", False),
+            "ollama_start": ("/utils ollama_cli start", False),
+            "ollama_stop": ("/utils ollama_cli stop", False),
+            "ollama_restart": ("/utils ollama_cli restart", False),
+            "ollama_status": ("/utils ollama_cli status", False),
+            "ollama_help": ("/utils ollama_cli help", False),
+            "command_list": ("/utils command --list", False),
+            "command_help": ("/utils command --help", False),
+            "config_start": ("/utils config_manager --start", False),
+            "config_stop": ("/utils config_manager --stop", False),
+            "config_help": ("/utils config_manager --help", False),
+            "run_update": ("/utils update", False),
+            "snapshot_create": ("/utils generate_snapshot", False),
+            "snapshot_include_logs": ("/utils generate_snapshot --include-logs", False),
+            "snapshot_summarize": ("/utils generate_snapshot --summarize", False),
+            "snapshot_help": ("/utils generate_snapshot --help", False),
+            "alias_list": ("/utils alias --list", False),
+            "alias_help": ("/utils alias --help", False),
+            "dev_activate": ("/utils dev --activate", False),
+            "dev_update_all": ("/utils dev --update-all", False),
+            "dev_update_testing": ("/utils dev --update-testing", False),
+            "dev_update_dev": ("/utils dev --update-dev", False),
+            "dev_snapshot_main": ("/utils dev --snapshot-main", False),
+            "dev_snapshot_testing": ("/utils dev --snapshot-testing", False),
+            "dev_snapshot_dev": ("/utils dev --snapshot-dev", False),
+            "dev_snapshot_all": ("/utils dev --snapshot-all", False),
+            "dev_run_tests_main": ("/utils dev --run-tests-main", False),
+            "dev_run_tests_testing": ("/utils dev --run-tests-testing", False),
+            "dev_run_tests_dev": ("/utils dev --run-tests-dev", False),
+            "dev_run_tests_all": ("/utils dev --run-tests-all", False),
+            "dev_help": ("/utils dev --help", False),
+            "generate_project_tree": ("/utils generate_tree", False),
+            "generate_project_tree_help": ("/utils generate_tree --help", False),
+            "run_tests": ("/utils run_tests", False),
+            "run_tests_help": ("/utils run_tests --help", False),
+            "list_scripts": ("/utils list_scripts", False),
+            "list_scripts_user": ("/utils list_scripts --type scripts", False),
+            "list_scripts_help": ("/utils list_scripts --help", False),
+            "install_dependencies_runtime": ("/utils install_requirements --runtime", False),
+            "install_dependencies_dev": ("/utils install_requirements --dev", False),
+            "install_dependencies_all": ("/utils install_requirements --all", False),
+            "setup_dev_env": ("/utils setup_dev_env", False),
+            "setup_dev_env_help": ("/utils setup_dev_env --help", False),
+            "open_docs": ("/utils docs", False),
+            "open_docs_help": ("/utils docs --help", False),
+            "open_docs_lynx": ("python utils/docs.py --lynx", True),
         }
 
         if self.embedding_manager_instance:
@@ -647,9 +647,13 @@ class ShellEngine:
                     return
 
                 elif intent in INTENT_COMMAND_MAP:
-                    command_to_run = INTENT_COMMAND_MAP[intent]
-                    # The built-in command handler correctly expands aliases and calls the appropriate script.
-                    await self.handle_built_in_command(command_to_run)
+                    command_to_run, needs_categorization = INTENT_COMMAND_MAP[intent]
+                    if needs_categorization:
+                        await self.process_command(command_to_run, command_to_run)
+                    else:
+                        # The built-in command handler correctly expands aliases and calls the appropriate script.
+                        await self.handle_built_in_command(command_to_run)
+                    
                     if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
                     return
         # --- END INTENT CLASSIFICATION ---
