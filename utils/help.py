@@ -105,6 +105,7 @@ Common Utilities & Their Aliases:
   /command
   /config
   /dev
+  /docs
   /snapshot
   /tree
   /list
@@ -147,8 +148,8 @@ Configuration Files:
 
 Web-Based Configuration Manager:
   For an easy way to edit your user configuration files, run:
-  /utils config_manager --start
-  /utils config_manager --stop
+  /config --start
+  /config --stop
 """
 
 SECURITY_HELP = """
