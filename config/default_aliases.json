@@ -7,7 +7,6 @@
   "/docs --help": "python utils/docs.py --help",
   "/docs --lynx": "python utils/docs.py --lynx",
   "/help": "/utils help",
-  "help": "/utils help",
   "/list": "/utils list_scripts",
   "/ollama": "/utils ollama_cli",
   "/snapshot": "/utils generate_snapshot",

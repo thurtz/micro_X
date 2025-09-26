@@ -218,9 +218,9 @@ def main():
         print(ALIAS_HELP)
     elif topic == 'command':
         print(COMMAND_HELP)
-    elif topic == 'utils':
+    elif topic == 'utilities':
         print(UTILS_HELP)
-    elif topic == 'keys':
+    elif topic == 'keybindings':
         print(KEYS_HELP)
     elif topic == 'config':
         print(CONFIG_HELP)

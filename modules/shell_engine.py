@@ -632,9 +632,9 @@ class ShellEngine:
             "show_help_command": ("/utils help command", False),
             "show_help_config": ("/utils help config", False),
             "show_help_dev": ("/utils help dev", False),
-            "show_help_keybindings": ("/utils help keys", False),
+            "show_help_keybindings": ("/utils help keybindings", False),
             "show_help_security": ("/utils help security", False),
-            "show_help_utilities": ("/utils help utils", False),
+            "show_help_utilities": ("/utils help utilities", False),
         }
 
         if self.embedding_manager_instance:
