@@ -223,6 +223,11 @@
         "/utils install_requirements --all",
         "install all dependencies"
     ],
+    "setup_brew_help": [
+        "/setup_brew --help",
+        "setup brew help",
+        "how to use setup brew"
+    ],
     "setup_dev_env": [
         "/utils setup_dev_env",
         "setup dev environment"
