@@ -223,6 +223,11 @@
         "/utils install_requirements --all",
         "install all dependencies"
     ],
+    "setup_brew_install": [
+        "/setup_brew --install",
+        "setup brew install",
+        "install homebrew"
+    ],
     "setup_brew_help": [
         "/setup_brew --help",
         "setup brew help",
@@ -281,7 +286,9 @@
         "help for keybindings",
         "keybindings help",
         "what are the keybindings",
-        "help keys"
+        "help keys",
+        "how to navigate",
+        "help navigation"
     ],
     "show_help_security": [
         "help for security",
