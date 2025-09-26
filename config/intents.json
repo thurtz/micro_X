@@ -275,7 +275,8 @@
     "show_help_keybindings": [
         "help for keybindings",
         "keybindings help",
-        "what are the keybindings"
+        "what are the keybindings",
+        "help keys"
     ],
     "show_help_security": [
         "help for security",
@@ -285,6 +286,7 @@
     "show_help_utilities": [
         "help for utilities",
         "utilities help",
-        "what are the utilities"
+        "what are the utilities",
+        "help utils"
     ]
 }
