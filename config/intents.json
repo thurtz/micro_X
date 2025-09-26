@@ -227,5 +227,20 @@
         "/utils setup_dev_env --help",
         "dev environment help",
         "how to use setup dev environment"
+    ],
+    "open_docs": [
+        "/docs",
+        "open the documentation",
+        "show the docs"
+    ],
+    "open_docs_help": [
+        "/docs --help",
+        "docs help",
+        "how to use the docs command"
+    ],
+    "open_docs_lynx": [
+        "/docs --lynx",
+        "docs lynx",
+        "open docs in lynx"
     ]
 }

@@ -623,6 +623,9 @@ class ShellEngine:
             "install_dependencies_all": "/utils install_requirements --all",
             "setup_dev_env": "/utils setup_dev_env",
             "setup_dev_env_help": "/utils setup_dev_env --help",
+            "open_docs": "python utils/docs.py",
+            "open_docs_help": "python utils/docs.py --help",
+            "open_docs_lynx": "python utils/docs.py --lynx",
         }
 
         if self.embedding_manager_instance:
