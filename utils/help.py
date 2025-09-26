@@ -129,6 +129,14 @@ Keybindings for navigating the micro_X interface:
   Tab         - Attempt command completion or insert 4 spaces.
   PageUp      - Scroll the main output area up.
   PageDown    - Scroll the main output area down.
+
+Tmux Window Management:
+  micro_X runs inside a tmux session, allowing for multiple windows.
+
+  Ctrl-b c    - Create a new window.
+  Ctrl-b n    - Navigate to the next window.
+  Ctrl-b p    - Navigate to the previous window.
+  Ctrl-b &    - Close the current window (will prompt for confirmation).
 """
 
 CONFIG_HELP = """

@@ -622,6 +622,7 @@ class ShellEngine:
             "install_dependencies_runtime": ("/utils install_requirements --runtime", False),
             "install_dependencies_dev": ("/utils install_requirements --dev", False),
             "install_dependencies_all": ("/utils install_requirements --all", False),
+            "setup_brew_install": ("python utils/setup_brew.py --install", True),
             "setup_brew_help": ("/setup_brew --help", False),
             "setup_dev_env": ("/utils setup_dev_env", False),
             "setup_dev_env_help": ("/utils setup_dev_env --help", False),
