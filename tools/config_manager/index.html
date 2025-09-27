@@ -647,6 +647,13 @@
                                         promptAccordionContent.appendChild(createFormElement('user_template', promptObject.user_template, [key, subKey], 'userConfig', `User prompt template for '${subKey}' AI role.`));
                                         const promptAccordion = createAccordionItem(subKey, promptAccordionContent, `prompts-accordion-${key}`, false);
                                         sectionContent.appendChild(promptAccordion);
+                                    } else if (key === 'ai_models' && typeof subValue === 'object' && subValue !== null) {
+                                        const modelObject = subValue;
+                                        const modelAccordionContent = document.createElement('div');
+                                        modelAccordionContent.classList.add('space-y-2', 'pl-2');
+                                        modelAccordionContent.appendChild(createFormElement('model', modelObject.model, [key, subKey], 'userConfig', `Model for '${subKey}' AI role.`));
+                                        const modelAccordion = createAccordionItem(subKey, modelAccordionContent, `ai_models-accordion-${key}`, true);
+                                        sectionContent.appendChild(modelAccordion);
                                     } else {
                                         sectionContent.appendChild(createFormElement(subKey, subValue, [key], 'userConfig', tooltip));
                                     }
