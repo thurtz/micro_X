@@ -14,6 +14,8 @@ from typing import Optional
 
 from modules.output_analyzer import is_tui_like_output
 
+from modules.router_agent import create_router_agent, run_router_agent
+
 logger = logging.getLogger(__name__)
 
 def _get_nested_config(config_dict, key_path):
@@ -82,6 +84,7 @@ class ShellEngine:
         self.is_developer_mode = is_developer_mode
         self.git_context_manager_instance = git_context_manager_instance
         self.embedding_manager_instance = None
+        self.router_agent_instance = create_router_agent(self.config)
 
         self.current_directory = os.getcwd()
         
@@ -594,7 +597,7 @@ class ShellEngine:
             "run_update": ("/utils update", False),
             "snapshot_create": ("/utils generate_snapshot", False),
             "snapshot_include_logs": ("/utils generate_snapshot --include-logs", False),
-            "snapshot_summarize": ("/utils generate_snapshot --summarize", False),
+            #"snapshot_summarize": ("/utils generate_snapshot --summarize", False),
             "snapshot_help": ("/utils generate_snapshot --help", False),
             "alias_list": ("/utils alias --list", False),
             "alias_help": ("/utils alias --help", False),
@@ -691,27 +694,42 @@ class ShellEngine:
         if category != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
             await self.process_command(user_input_stripped, user_input_stripped)
         else:
-            # This block handles commands not found in the category manager.
-            # The new approach is to treat them as potential natural language queries
-            # and let the LangGraph agent handle the validation and translation.
+            # This block handles commands not found by the embedding-based intent classifier.
+            # It now follows a new escalation path:
+            # 1. Try the Router Agent to see if the input matches a known tool.
+            # 2. If not, try the Translator Agent (`get_validated_ai_command`) to translate it to a shell command.
+            # 3. If that also fails, run the original input as a direct command.
+
             if user_input_stripped.startswith('/'):
                 self.ui_manager.append_output(f"❌ Unknown command: {user_input_stripped}", style_class='error')
                 return
 
             if not await self.ollama_manager_module.is_ollama_server_running():
-                # If Ollama isn't running, we can't use the AI. Execute directly.
                 await self.process_command(user_input_stripped, user_input_stripped)
                 return
 
-            self.ui_manager.append_output(f"🤔 '{user_input_stripped}' is not a known command. Trying with AI...", style_class='ai-thinking')
+            # --- 1. Try the Router Agent ---
+            self.ui_manager.append_output(f"✨ '{user_input_stripped}' is not a known command. Checking with Router AI...", style_class='ai-thinking')
+            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
+            
+            router_command = await run_router_agent(self.router_agent_instance, user_input_stripped)
+
+            if router_command:
+                # The router agent found a tool to use. The tool's output is the command to run.
+                # We can treat this as a built-in command and execute it directly.
+                await self.handle_built_in_command(router_command)
+                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                return
+
+            # --- 2. Fallback to Translator Agent ---
+            self.ui_manager.append_output(f"🤔 Router found no tool. Trying with Translator AI...", style_class='ai-thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
 
             linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(user_input_stripped, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
             
             if linux_command:
-                # The AI successfully returned a command.
                 await self.process_command(linux_command, f"'{user_input_stripped}'", ai_raw_candidate, user_input_stripped, is_ai_generated=True)
             else:
-                # The AI failed. As a last resort, try executing the original input directly.
-                self.ui_manager.append_output("🤔 AI failed. Trying original input as a direct command.", style_class='warning')
+                # --- 3. Final fallback ---
+                self.ui_manager.append_output("🤔 AI translation failed. Trying original input as a direct command.", style_class='warning')
                 await self.process_command(user_input_stripped, user_input_stripped, ai_raw_candidate)

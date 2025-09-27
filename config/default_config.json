@@ -9,6 +9,9 @@
     "validator": {
       "model": "herawen/lisa"
     },
+    "router": {
+      "model": "herawen/lisa"
+    },
     "explainer": {
       "model": "herawen/lisa"
     }
