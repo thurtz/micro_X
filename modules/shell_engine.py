@@ -691,22 +691,27 @@ class ShellEngine:
         if category != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
             await self.process_command(user_input_stripped, user_input_stripped)
         else:
+            # This block handles commands not found in the category manager.
+            # The new approach is to treat them as potential natural language queries
+            # and let the LangGraph agent handle the validation and translation.
             if user_input_stripped.startswith('/'):
                 self.ui_manager.append_output(f"❌ Unknown command: {user_input_stripped}", style_class='error')
                 return
+
             if not await self.ollama_manager_module.is_ollama_server_running():
-                await self.process_command(user_input_stripped, user_input_stripped); return
-            self.ui_manager.append_output(f"🔎 Validating '{user_input_stripped}' with AI...", style_class='info')
-            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
-            is_cmd_ai_says = await self.ai_handler_module.is_valid_linux_command_according_to_ai(user_input_stripped, self.config)
-            is_command_syntax_present = '--' in user_input_stripped or bool(re.search(r'(?:^|\s)-\w', user_input_stripped))
-            if is_cmd_ai_says is True and not (' ' in user_input_stripped and not is_command_syntax_present):
+                # If Ollama isn't running, we can't use the AI. Execute directly.
                 await self.process_command(user_input_stripped, user_input_stripped)
+                return
+
+            self.ui_manager.append_output(f"🤔 '{user_input_stripped}' is not a known command. Trying with AI...", style_class='ai-thinking')
+            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
+
+            linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(user_input_stripped, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
+            
+            if linux_command:
+                # The AI successfully returned a command.
+                await self.process_command(linux_command, f"'{user_input_stripped}'", ai_raw_candidate, user_input_stripped, is_ai_generated=True)
             else:
-                self.ui_manager.append_output("Trying as NL query...", style_class='ai-thinking')
-                linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(user_input_stripped, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
-                if linux_command:
-                    await self.process_command(linux_command, f"'{user_input_stripped}'", ai_raw_candidate, user_input_stripped, is_ai_generated=True)
-                else:
-                    self.ui_manager.append_output("🤔 AI failed. Trying original as direct command.", style_class='warning')
-                    await self.process_command(user_input_stripped, user_input_stripped, ai_raw_candidate)
+                # The AI failed. As a last resort, try executing the original input directly.
+                self.ui_manager.append_output("🤔 AI failed. Trying original input as a direct command.", style_class='warning')
+                await self.process_command(user_input_stripped, user_input_stripped, ai_raw_candidate)
