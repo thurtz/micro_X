@@ -50,6 +50,13 @@ def get_git_branch() -> str:
     return "/utils git_branch"
 
 
+@tool
+def add_command_to_category(command_name: str, category: str) -> str:
+    """Adds a new command to a specified category for the command categorization system."""
+    # Note: The command utility uses positional arguments for --add
+    return f'/utils command --add "{command_name}" {category}'
+
+
 # We can add more tools here over time, covering more intents.
 
 def get_all_tools():
@@ -61,4 +68,5 @@ def get_all_tools():
         show_help,
         update_system,
         get_git_branch,
+        add_command_to_category,
     ]
