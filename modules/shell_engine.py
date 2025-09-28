@@ -613,6 +613,14 @@ class ShellEngine:
             "open_docs": ("/utils docs", False),
             "open_docs_help": ("/utils docs --help", False),
             "open_docs_lynx": ("python utils/docs.py --lynx", True),
+            "show_help_ai": ("/utils help ai", False),
+            "show_help_alias": ("/utils help alias", False),
+            "show_help_command": ("/utils help command", False),
+            "show_help_config": ("/utils help config", False),
+            "show_help_dev": ("/utils help dev", False),
+            "show_help_keybindings": ("/utils help keybindings", False),
+            "show_help_security": ("/utils help security", False),
+            "show_help_utilities": ("/utils help utilities", False),
         }
 
         if self.embedding_manager_instance:

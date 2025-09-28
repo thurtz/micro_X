@@ -171,5 +171,49 @@
         "/docs --lynx",
         "docs lynx",
         "open docs in lynx"
+    ],
+    "show_help_ai": [
+        "help for ai",
+        "ai help",
+        "how to use ai"
+    ],
+    "show_help_alias": [
+        "help for alias",
+        "alias help",
+        "how to use aliases"
+    ],
+    "show_help_command": [
+        "help for command",
+        "command help",
+        "how to use commands"
+    ],
+    "show_help_config": [
+        "help for config",
+        "config help",
+        "how to configure the shell"
+    ],
+    "show_help_dev": [
+        "help for dev",
+        "dev help",
+        "how to develop the shell"
+    ],
+    "show_help_keybindings": [
+        "help for keybindings",
+        "keybindings help",
+        "what are the keybindings",
+        "help keys",
+        "how to navigate",
+        "help navigation"
+    ],
+    "show_help_security": [
+        "help for security",
+        "security help",
+        "what are the security features"
+    ],
+    "show_help_utilities": [
+        "help for utilities",
+        "utilities help",
+        "what are the utilities",
+        "help utils"
     ]
 }
