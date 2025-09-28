@@ -50,12 +50,6 @@ def get_git_branch() -> str:
     return "/utils git_branch"
 
 
-@tool
-def print_working_directory() -> str:
-    """Prints the current working directory, similar to the 'pwd' command."""
-    return "pwd"
-
-
 # We can add more tools here over time, covering more intents.
 
 def get_all_tools():
@@ -67,5 +61,4 @@ def get_all_tools():
         show_help,
         update_system,
         get_git_branch,
-        print_working_directory,
     ]
