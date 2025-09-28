@@ -1,7 +1,9 @@
 # modules/router_agent.py
 
 import logging
-from langchain.agents import AgentExecutor, create_react_agent
+import contextlib
+import io
+from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama
 
@@ -10,36 +12,23 @@ from modules.intent_tools import get_all_tools
 # --- Logging Setup ---
 logger = logging.getLogger(__name__)
 
-# This prompt is designed for a ReAct-style agent that thinks step-by-step.
-# It instructs the LLM to use the provided tools if they are appropriate.
-REACT_PROMPT = ChatPromptTemplate.from_template("""
-Answer the following questions as best you can. You have access to the following tools:
-
-{tools}
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take, should be one of [{tool_names}]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
-
-Begin!
-
-Question: {input}
-Thought:{agent_scratchpad}
-""")
+# This is a much simpler prompt designed for native tool-calling models.
+# It instructs the model that it has access to tools and should use them when appropriate.
+TOOL_CALLING_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", """You are a specialized assistant with one job: to select a tool to answer the user's question and output the result.
+- If a tool is used, your final answer MUST be only the direct output from that tool.
+- Do not add any conversation, explanation, or extra text.
+- If no tool is appropriate, you must output the phrase 'I am sorry, but I cannot answer that question.'"""),
+    ("user", "{input}"),
+    # This placeholder is where the agent will add its tool usage history.
+    ("placeholder", "{agent_scratchpad}"),
+])
 
 
 def create_router_agent(config: dict):
-    """Creates and returns a LangChain agent configured for routing intents to tools."""
-    logger.debug("Creating Router Agent.")
+    """Creates and returns a LangChain agent configured for native tool calling."""
+    logger.debug("Creating Tool-Calling Router Agent.")
     
-    # For now, we'll use the explainer model, but this could be a dedicated model.
     router_config = config.get('ai_models', {}).get('router', {})
     model_name = router_config.get('model') if isinstance(router_config, dict) else router_config
 
@@ -47,16 +36,20 @@ def create_router_agent(config: dict):
         logger.error("Model for Router Agent not configured. Agent will not work.")
         return None
 
+    # Llama 3 models are particularly good at tool calling.
     llm = ChatOllama(model=model_name, temperature=0)
     tools = get_all_tools()
     
-    agent = create_react_agent(llm, tools, REACT_PROMPT)
+    # This agent is designed to work with models that support native tool calling.
+    # It is more robust than the ReAct agent.
+    agent = create_tool_calling_agent(llm, tools, TOOL_CALLING_PROMPT)
     
     agent_executor = AgentExecutor(
         agent=agent,
         tools=tools,
-        verbose=False, # Set to True for debugging agent thoughts
-        handle_parsing_errors=True # Gracefully handle if the LLM messes up formatting
+        verbose=True, # Keep verbose for now to confirm it works
+        handle_parsing_errors=True,
+        return_intermediate_steps=True # This is the crucial change
     )
     
     return agent_executor
@@ -64,35 +57,40 @@ def create_router_agent(config: dict):
 async def run_router_agent(agent_executor, human_query: str) -> str | None:
     """ 
     Runs the router agent and returns the resulting command if a tool is used.
-    
-    Returns:
-        A string command if a tool was successfully used, otherwise None.
+    Redirects verbose stdout to the logger.
     """
     if not agent_executor:
         logger.warning("Router agent is not available.")
         return None
         
-    logger.info(f"Running router agent for query: '{human_query}'")
+    logger.info(f"Running tool-calling router agent for query: '{human_query}'")
     try:
-        # We are using ainvoke for the async call
-        result = await agent_executor.ainvoke({"input": human_query})
-        
-        # The output of our tools is the command string itself.
-        # If a tool was used, the 'output' key will contain that string.
-        # If no tool was used, the LLM might just answer directly.
-        # We check if the output is one of the commands our tools could have produced.
-        
-        # This is a simple way to check. A more robust way would be to have tools return
-        # a structured object, but for now, this works.
-        output = result.get("output", "")
-        if output.startswith("/"):
-            logger.info(f"Router agent decided to use a tool, resulting in command: {output}")
-            return output
-        else:
-            # This means the LLM decided not to use a tool and just answered the question.
-            # In our hybrid system, this is a signal to fall back to the next step.
-            logger.info("Router agent did not select a tool.")
-            return None
+        # Redirect the agent's verbose print output to the logger
+        f = io.StringIO()
+        with contextlib.redirect_stdout(f):
+            result = await agent_executor.ainvoke({"input": human_query})
+        agent_output_log = f.getvalue()
+        if agent_output_log:
+            logger.info(f"Router Agent Internal Steps:\n{agent_output_log}")
+
+        logger.debug(f"Full agent result: {result}")
+
+        # The robust way to get the tool's output is to parse the intermediate steps.
+        intermediate_steps = result.get("intermediate_steps", [])
+        if intermediate_steps:
+            logger.debug(f"Intermediate steps found: {intermediate_steps}")
+            # The last step contains the most recent tool call and its output.
+            last_step = intermediate_steps[-1]
+            action, tool_output = last_step
+            
+            # The output of our tools is the command string itself.
+            if isinstance(tool_output, str) and (tool_output.startswith("/") or tool_output == "pwd"):
+                logger.info(f"Router agent extracted command from tool output: {tool_output}")
+                return tool_output
+
+        # Fallback for safety, but the primary logic is above.
+        logger.warning(f"Could not extract command from intermediate steps. Final agent output: '{result.get('output')}'")
+        return None
             
     except Exception as e:
         logger.error(f"Error running router agent: {e}", exc_info=True)
