@@ -597,7 +597,7 @@ class ShellEngine:
             "run_update": ("/utils update", False),
             "snapshot_create": ("/utils generate_snapshot", False),
             "snapshot_include_logs": ("/utils generate_snapshot --include-logs", False),
-            #"snapshot_summarize": ("/utils generate_snapshot --summarize", False),
+            "snapshot_summarize": ("/utils generate_snapshot --summarize", False),
             "snapshot_help": ("/utils generate_snapshot --help", False),
             "alias_list": ("/utils alias --list", False),
             "alias_help": ("/utils alias --help", False),
