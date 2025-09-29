@@ -4,6 +4,25 @@ import os
 import sys
 import argparse
 
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: Command Aliases
+
+Aliases are shortcuts for longer or more complex commands. You can use them to save typing and streamline your workflow.
+
+Managing Aliases:
+  micro_X uses the '/alias' command to manage your shortcuts.
+
+  /alias --list              - Shows all currently active aliases (both default and user-defined).
+  /alias --add <alias> "<command>" - Creates a new user alias. E.g., /alias --add /snap "/utils generate_snapshot"
+  /alias --remove <alias>    - Removes a user-defined alias.
+
+Default vs. User Aliases:
+  - Default aliases are built-in for convenience (e.g., /help, /command).
+  - You can create your own in 'config/user_aliases.json' using the '/alias --add' command.
+  - Your user aliases will always override any default alias with the same name.
+"""
+
 # --- Path Setup ---
 # Add the utils directory to the Python path to allow importing from 'shared'
 try:
@@ -69,10 +88,19 @@ def handle_list_aliases(default_path, user_path):
 
 def main():
     """Main function to parse arguments and execute alias management."""
+    class HelpAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
+        def __call__(self, parser, namespace, values, option_string=None):
+            print(HELP_TEXT)
+            parser.exit()
+
     parser = argparse.ArgumentParser(
         description="Manage command aliases for micro_X.",
-        epilog="Use this utility to create shortcuts for longer or frequently used commands."
+        add_help=False
     )
+    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
+
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         '--add',
@@ -91,9 +119,12 @@ def main():
         help="List all currently active aliases (defaults and user)."
     )
 
+    # If no arguments are provided, print help text
+    if len(sys.argv) == 1:
+        print(HELP_TEXT)
+        sys.exit(0)
+
     args = parser.parse_args()
-
-
 
     project_root = get_project_root()
     config_dir = os.path.join(project_root, CONFIG_DIR_NAME)

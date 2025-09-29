@@ -9,6 +9,31 @@ import shutil
 import glob
 import json # Added for loading configuration
 
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: Developer & Contribution Guide
+
+This guide is for users interested in contributing to micro_X or understanding its development workflow.
+
+Branching Strategy & Integrity:
+  - main: The most stable branch. Enforces strict integrity checks at startup.
+  - testing: For release candidates. Also enforces strict integrity checks.
+  - dev: The main development branch. Integrity checks are informational and do not block execution, allowing for local changes.
+
+Setting up the Development Environment:
+  - To set up the development environment, run this command from the 'main' branch:
+    /dev --activate
+  - This command will clone the 'testing' and 'dev' branches into subdirectories ('micro_X-testing/' and 'micro_X-dev/') and set up their environments.
+
+Running Tests:
+  - The project includes a comprehensive test suite.
+  - To run tests for the current branch environment, use:
+    /utils run_tests
+
+Documentation:
+  - For more in-depth developer documentation, please see the files in the 'docs/developer/' directory of the project.
+"""
+
 # --- Configuration ---
 TESTING_BRANCH_DIR_NAME = "micro_X-testing"
 DEV_BRANCH_DIR_NAME = "micro_X-dev"
@@ -297,12 +322,21 @@ def run_tests_for_branch(project_root, branch_name, branch_project_root_path):
 
 def main():
     """Main function to parse arguments and execute logic."""
+    class HelpAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
+        def __call__(self, parser, namespace, values, option_string=None):
+            print(HELP_TEXT)
+            parser.exit()
+
     parser = argparse.ArgumentParser(
         description="Manage the micro_X multi-branch development environment.",
-        epilog="This utility is designed to be run from the 'main' branch of a micro_X installation."
+        add_help=False
     )
+    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
+
     # --- Group for exclusive actions ---
-    action_group = parser.add_mutually_exclusive_group(required=True)
+    action_group = parser.add_mutually_exclusive_group(required=False)
     action_group.add_argument(
         "--activate", action="store_true",
         help="Clones and sets up the 'testing' and 'dev' branches into subdirectories."
@@ -352,20 +386,14 @@ def main():
         help="Runs the test suites for the main, testing, and dev branches."
     )
 
+    # If no arguments are provided, print help text
+    if len(sys.argv) == 1:
+        print(HELP_TEXT)
+        sys.exit(0)
+
     args = parser.parse_args()
     project_root = get_project_root()
     
-    # Determine which action was taken
-    action_taken = False
-    for action in action_group._group_actions:
-        if getattr(args, action.dest, None) not in [None, False]:
-            action_taken = True
-            break
-            
-    if not action_taken:
-        parser.print_help(sys.stderr)
-        sys.exit(1)
-
     # Execute the chosen action
     if args.activate:
         activate_dev_environment(project_root)

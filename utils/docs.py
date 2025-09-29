@@ -6,6 +6,29 @@ import argparse
 import shutil
 import subprocess
 
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: Built-in Utilities
+
+micro_X comes with several utility scripts to help manage the shell and your project.
+While they can be run with '/utils <script_name>', it is recommended to use the shorter alias for them.
+
+Common Utilities & Their Aliases:
+  /alias
+  /command
+  /config
+  /dev
+  /docs
+  /snapshot
+  /tree
+  /list
+  /ollama
+  /update
+  /test             (full command: /utils run_tests)
+
+To see all available utility scripts, run '/list'.
+"""
+
 def main(args):
     """
     Finds and opens the local Sphinx documentation in a web browser.
@@ -43,13 +66,27 @@ def main(args):
         sys.exit(1)
 
 if __name__ == "__main__":
+    class HelpAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
+        def __call__(self, parser, namespace, values, option_string=None):
+            print(HELP_TEXT)
+            parser.exit()
+
     parser = argparse.ArgumentParser(
-        description="Finds and opens the local micro_X documentation in a web browser."
+        description="Finds and opens the local micro_X documentation in a web browser.",
+        add_help=False
     )
+    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
     parser.add_argument(
         '--lynx', 
         action='store_true', 
         help='Open documentation in the Lynx text-based browser.'
     )
-    args = parser.parse_args()
-    main(args)
+
+    # If no arguments are provided, print help text
+    if len(sys.argv) == 1:
+        main(parser.parse_args())
+    else:
+        args = parser.parse_args()
+        main(args)
