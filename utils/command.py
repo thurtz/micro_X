@@ -5,6 +5,26 @@ import sys
 import argparse
 import logging
 
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: Command Categorization
+
+micro_X categorizes commands to execute them in the most appropriate way. When you run an unknown command, you will be prompted to choose a category.
+
+Categories:
+  - simple: For quick commands with direct text output (e.g., ls, pwd, echo).
+  - semi_interactive: For commands that run longer or have a lot of output (e.g., apt update, ping). They run in a managed tmux window, with output shown upon completion.
+  - interactive_tui: For full-screen, interactive applications (e.g., nano, vim, htop, ssh). They take over the screen in a tmux window until you exit.
+
+/command <subcommand>
+  - The '/command' utility (an alias for '/utils command') allows you to manage your saved categorizations.
+  - Usage:
+    /command list                    - Shows all categorized commands.
+    /command add "<cmd>" <category>  - Adds or updates a command's category.
+    /command remove "<cmd>"          - Removes a command from your user settings.
+    /command move "<cmd>" <new_cat>  - Moves a command to a different category.
+"""
+
 # --- Path Setup ---
 # Add the project root to the Python path to allow importing from 'modules'
 try:
@@ -25,6 +45,13 @@ logger = logging.getLogger(__name__)
 # --- Main Logic ---
 def main():
     """Main function to parse arguments and execute command management."""
+    class HelpAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
+        def __call__(self, parser, namespace, values, option_string=None):
+            print(HELP_TEXT)
+            parser.exit()
+
     # Initialize the category manager to load categories and set up paths
     # This is crucial for all other functions in the module to work correctly.
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -32,16 +59,10 @@ def main():
 
     parser = argparse.ArgumentParser(
         description="Manage command categorizations for micro_X.",
-        formatter_class=argparse.RawTextHelpFormatter,
-        epilog=(
-            "Examples:\n"
-            "  command.py --add \"htop\" interactive_tui\n"
-            "  command.py --remove \"htop\"\n"
-            "  command.py --move \"ls -l\" simple\n"
-            "  command.py --list\n\n"
-            "Categories can be specified by name (simple, semi_interactive, interactive_tui) or by number (1, 2, 3)."
-        )
+        add_help=False
     )
+    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
+
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         '--add',
@@ -65,11 +86,13 @@ def main():
         action='store_true',
         help="List all currently known commands and their categories."
     )
-    # The 'run' subcommand is handled by ShellEngine, so it's not needed here.
+
+    # If no arguments are provided, print help text
+    if len(sys.argv) == 1:
+        print(HELP_TEXT)
+        sys.exit(0)
 
     args = parser.parse_args()
-
-
 
     try:
         if args.add:
