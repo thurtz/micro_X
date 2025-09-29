@@ -622,6 +622,7 @@ class ShellEngine:
             "show_help_security": ("/utils help security", False),
             "show_help_utilities": ("/utils help utilities", False),
             "show_help_snapshot": ("/utils generate_snapshot --help", False),
+            "list_utils": ("/utils list_scripts --type utils", False),
         }
 
         if self.embedding_manager_instance:

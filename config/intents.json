@@ -207,5 +207,10 @@
         "snapshot help",
         "help snapshot",
         "how to use snapshot"
+    ],
+    "list_utils": [
+        "/list --type utils",
+        "list utils",
+        "show utility scripts"
     ]
 }
