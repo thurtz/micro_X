@@ -205,6 +205,7 @@
     "show_help_snapshot": [
         "/snapshot --help",
         "snapshot help",
+        "help snapshot",
         "how to use snapshot"
     ]
 }
