@@ -201,5 +201,10 @@
         "/help utilities",
         "help utilities",
         "help utils"
+    ],
+    "show_help_snapshot": [
+        "/snapshot --help",
+        "snapshot help",
+        "how to use snapshot"
     ]
 }

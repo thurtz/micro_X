@@ -621,6 +621,7 @@ class ShellEngine:
             "show_help_keybindings": ("/utils help keybindings", False),
             "show_help_security": ("/utils help security", False),
             "show_help_utilities": ("/utils help utilities", False),
+            "show_help_snapshot": ("/utils generate_snapshot --help", False),
         }
 
         if self.embedding_manager_instance:
