@@ -248,9 +248,7 @@ if __name__ == "__main__":
                "or directly for development purposes. It expects pytest to be installed in the '.venv' "
                "of the project root."
     )
-    # This script doesn't take functional arguments other than -h/--help for now.
-    # If arguments were to be added (e.g., to pass to pytest), they'd be defined here.
-    # parser.add_argument("--pytest-args", help="Additional arguments to pass to pytest", nargs=argparse.REMAINDER)
+
     
     args = parser.parse_args() # Handles -h/--help
 

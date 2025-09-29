@@ -11,6 +11,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+!docs/source/build/
 develop-eggs/
 dist/
 downloads/
@@ -70,8 +71,6 @@ instance/
 # Scrapy stuff:
 .scrapy
 
-# Sphinx documentation
-docs/_build/
 
 # PyBuilder
 .pybuilder/
@@ -194,6 +193,6 @@ pytest_results/pytest_results_*.txt
 # Development environment directories created by utils/dev.py
 micro_X-testing/
 micro_X-dev/
-development_directives.md
+
 *.code-workspace
 gemini_startup_prompt.txt

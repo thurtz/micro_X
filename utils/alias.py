@@ -2,56 +2,41 @@
 
 import os
 import sys
-import json
 import argparse
-import logging
+
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: Command Aliases
+
+Aliases are shortcuts for longer or more complex commands. You can use them to save typing and streamline your workflow.
+
+Managing Aliases:
+  micro_X uses the '/alias' command to manage your shortcuts.
+
+  /alias --list              - Shows all currently active aliases (both default and user-defined).
+  /alias --add <alias> "<command>" - Creates a new user alias. E.g., /alias --add /snap "/utils generate_snapshot"
+  /alias --remove <alias>    - Removes a user-defined alias.
+
+Default vs. User Aliases:
+  - Default aliases are built-in for convenience (e.g., /help, /command).
+  - You can create your own in 'config/user_aliases.json' using the '/alias --add' command.
+  - Your user aliases will always override any default alias with the same name.
+"""
 
 # --- Path Setup ---
-# Add the project root to the Python path to allow importing from 'modules'
+# Add the utils directory to the Python path to allow importing from 'shared'
 try:
     script_path = os.path.abspath(__file__)
-    project_root = os.path.dirname(os.path.dirname(script_path))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-    # Now we can safely import from modules
-    from modules import config_handler
+    utils_dir = os.path.dirname(script_path)
+    if utils_dir not in sys.path:
+        sys.path.insert(0, utils_dir)
+    # Now we can safely import from shared
+    from shared.helpers import get_project_root, load_json_file, save_json_file, logger, format_aliases_list
+    from shared.consts import *
 except ImportError as e:
-    print(f"❌ Error: Could not import the config_handler module. Ensure this script is run from within the micro_X project structure.", file=sys.stderr)
+    print(f"❌ Error: Could not import the shared module. Ensure this script is run from within the micro_X project structure.", file=sys.stderr)
     print(f"   Details: {e}", file=sys.stderr)
     sys.exit(1)
-
-# --- Configuration ---
-DEFAULT_ALIASES_FILENAME = "default_aliases.json"
-USER_ALIASES_FILENAME = "user_aliases.json"
-CONFIG_DIR_NAME = "config"
-RESERVED_COMMAND_NAMES = [
-    "/ai", "/command", "/ollama", "/utils", "/update", "/help",
-    "exit", "quit", "/exit", "/quit"
-]
-
-# --- Logging ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-# --- Helper Functions ---
-def get_project_root():
-    """Determines the project root directory."""
-    script_path = os.path.abspath(__file__)
-    return os.path.dirname(os.path.dirname(script_path))
-
-def load_aliases(aliases_path):
-    """Loads an alias file using the centralized config handler."""
-    aliases = config_handler.load_jsonc_file(aliases_path)
-    if aliases is None:
-        return {}  # Return an empty dict if file doesn't exist or is invalid
-    if not isinstance(aliases, dict):
-        logger.warning(f"Alias file at {aliases_path} is not a valid dictionary. Ignoring.")
-        return {}
-    return aliases
-
-def save_user_aliases(aliases_path, aliases_data):
-    """Saves user aliases using the centralized config handler."""
-    return config_handler.save_json_file(aliases_path, aliases_data)
 
 def handle_add_alias(args, user_aliases_path):
     """Handles the --add alias command, modifying only the user aliases."""
@@ -70,10 +55,10 @@ def handle_add_alias(args, user_aliases_path):
         print("❌ Error: The command for the alias cannot be empty.", file=sys.stderr)
         return
 
-    user_aliases = load_aliases(user_aliases_path)
+    user_aliases = load_json_file(user_aliases_path)
     
     user_aliases[alias_name] = command
-    if save_user_aliases(user_aliases_path, user_aliases):
+    if save_json_file(user_aliases_path, user_aliases):
         print(f"✅ User alias '{alias_name}' successfully mapped to '{command}'.")
 
 def handle_remove_alias(args, user_aliases_path):
@@ -84,11 +69,11 @@ def handle_remove_alias(args, user_aliases_path):
         print("❌ Error: Alias name must begin with a forward slash '/'.", file=sys.stderr)
         return
 
-    user_aliases = load_aliases(user_aliases_path)
+    user_aliases = load_json_file(user_aliases_path)
 
     if alias_name in user_aliases:
         del user_aliases[alias_name]
-        if save_user_aliases(user_aliases_path, user_aliases):
+        if save_json_file(user_aliases_path, user_aliases):
             print(f"🗑️ User alias '{alias_name}' successfully removed.")
             print("   (If a default alias with the same name exists, it will now be active).")
     else:
@@ -96,26 +81,26 @@ def handle_remove_alias(args, user_aliases_path):
 
 def handle_list_aliases(default_path, user_path):
     """Handles the --list alias command, showing merged results."""
-    default_aliases = load_aliases(default_path)
-    user_aliases = load_aliases(user_path)
+    default_aliases = load_json_file(default_path)
+    user_aliases = load_json_file(user_path)
     merged_aliases = {**default_aliases, **user_aliases}
-
-    if not merged_aliases:
-        print("No aliases defined.")
-        return
-
-    print("📄 Current Aliases (User aliases override defaults):")
-    max_alias_len = max(len(alias) for alias in merged_aliases.keys()) if merged_aliases else 0
-    for alias, command in sorted(merged_aliases.items()):
-        source = " (user)" if alias in user_aliases else "(default)"
-        print(f"  {alias:<{max_alias_len}}  ->  {command}  {source}")
+    print(format_aliases_list(merged_aliases, user_aliases))
 
 def main():
     """Main function to parse arguments and execute alias management."""
+    class HelpAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
+        def __call__(self, parser, namespace, values, option_string=None):
+            print(HELP_TEXT)
+            parser.exit()
+
     parser = argparse.ArgumentParser(
         description="Manage command aliases for micro_X.",
-        epilog="Use this utility to create shortcuts for longer or frequently used commands."
+        add_help=False
     )
+    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
+
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         '--add',
@@ -133,6 +118,11 @@ def main():
         action='store_true',
         help="List all currently active aliases (defaults and user)."
     )
+
+    # If no arguments are provided, print help text
+    if len(sys.argv) == 1:
+        print(HELP_TEXT)
+        sys.exit(0)
 
     args = parser.parse_args()
 

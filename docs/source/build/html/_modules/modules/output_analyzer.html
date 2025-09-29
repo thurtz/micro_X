@@ -1,0 +1,334 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modules.output_analyzer &mdash; micro_X 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            micro_X
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/index.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../developer/index.html">Developer Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api_reference.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">micro_X</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modules.output_analyzer</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modules.output_analyzer</h1><div class="highlight"><pre>
+<span></span><span class="c1"># --- API DOCUMENTATION for modules/output_analyzer.py ---</span>
+<span class="c1">#</span>
+<span class="c1"># **Purpose:** Analyzes command output to detect TUI-like content by measuring the</span>
+<span class="c1"># density of ANSI escape codes. This helps prevent garbled text from being</span>
+<span class="c1"># printed to the main output area for commands that should be fully interactive.</span>
+<span class="c1">#</span>
+<span class="c1"># **Public Functions:**</span>
+<span class="c1">#</span>
+<span class="c1"># def is_tui_like_output(text_content: str, line_threshold_pct: float, char_threshold_pct: float) -&gt; bool:</span>
+<span class="c1">#     &quot;&quot;&quot;</span>
+<span class="c1">#     Analyzes text to determine if it&#39;s likely TUI-specific output.</span>
+<span class="c1">#</span>
+<span class="c1">#     It checks if the percentage of lines containing ANSI codes or the percentage</span>
+<span class="c1">#     of total characters that are part of ANSI codes exceeds given thresholds.</span>
+<span class="c1">#</span>
+<span class="c1">#     Args:</span>
+<span class="c1">#         text_content (str): The string content captured from a command&#39;s output.</span>
+<span class="c1">#         line_threshold_pct (float): The minimum percentage of lines that must</span>
+<span class="c1">#                                     contain ANSI codes to be flagged as TUI-like.</span>
+<span class="c1">#         char_threshold_pct (float): The minimum percentage of total characters</span>
+<span class="c1">#                                     that must be part of ANSI codes to be flagged.</span>
+<span class="c1">#</span>
+<span class="c1">#     Returns:</span>
+<span class="c1">#         bool: True if the output is determined to be TUI-like, False otherwise.</span>
+<span class="c1">#     &quot;&quot;&quot;</span>
+<span class="c1">#</span>
+<span class="c1"># **Key Global Constants/Variables:**</span>
+<span class="c1">#   (None intended for direct external use)</span>
+<span class="c1">#</span>
+<span class="c1"># --- END API DOCUMENTATION ---</span>
+
+<span class="c1">#!/usr/bin/env python</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="c1"># Module-specific logger</span>
+<span class="c1"># To see these logs when running the main micro_X application,</span>
+<span class="c1"># the main application&#39;s logging configuration would need to allow logs from this logger name.</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># Regex for common ANSI CSI (Control Sequence Introducer) patterns.</span>
+<span class="c1"># ESC ( \x1B or \033 ) followed by &#39;[&#39; then any number of parameters (digits and semicolons)</span>
+<span class="c1"># ending with a single letter (e.g., m, K, J, H, A, B, C, D).</span>
+<span class="c1"># This pattern is a good starting point for detecting screen manipulation codes.</span>
+<span class="n">ANSI_ESCAPE_PATTERN</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\x1B\[[0-9;]*[a-zA-Z]&#39;</span><span class="p">)</span>
+
+<span class="c1"># Default thresholds for detection. These might require tuning based on testing.</span>
+<span class="c1"># If these percentages are met or exceeded, the output is considered TUI-like.</span>
+<span class="n">DEFAULT_LINE_THRESHOLD_PERCENT</span> <span class="o">=</span> <span class="mf">30.0</span>  <span class="c1"># Percentage of lines containing ANSI codes.</span>
+<span class="n">DEFAULT_CHAR_THRESHOLD_PERCENT</span> <span class="o">=</span> <span class="mf">3.0</span>   <span class="c1"># Percentage of total characters that are part of ANSI codes.</span>
+
+<div class="viewcode-block" id="is_tui_like_output">
+<a class="viewcode-back" href="../../api_reference.html#modules.output_analyzer.is_tui_like_output">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_tui_like_output</span><span class="p">(</span>
+    <span class="n">text_content</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">line_threshold_pct</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_LINE_THRESHOLD_PERCENT</span><span class="p">,</span>
+    <span class="n">char_threshold_pct</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_CHAR_THRESHOLD_PERCENT</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Analyzes text to determine if it&#39;s likely TUI-specific output.</span>
+
+<span class="sd">    It checks if the percentage of lines containing ANSI codes or the percentage</span>
+<span class="sd">    of total characters that are part of ANSI codes exceeds given thresholds.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        text_content: The string content captured from a command&#39;s output.</span>
+<span class="sd">        line_threshold_pct: The minimum percentage of lines that must</span>
+<span class="sd">            contain ANSI codes to be flagged as TUI-like.</span>
+<span class="sd">        char_threshold_pct: The minimum percentage of total characters</span>
+<span class="sd">            that must be part of ANSI codes to be flagged.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        True if the output is determined to be TUI-like, False otherwise.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">text_content</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;is_tui_like_output: Received empty content. Returning False.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">lines</span> <span class="o">=</span> <span class="n">text_content</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">lines</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;is_tui_like_output: Content split into zero lines. Returning False.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">num_lines</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span>
+    <span class="n">ansi_lines_count</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># Number of lines that contain at least one ANSI sequence</span>
+    <span class="n">total_ansi_chars_count</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># Total number of characters that are part of ANSI sequences</span>
+    <span class="n">total_chars_in_content</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">text_content</span><span class="p">)</span> <span class="c1"># Total characters in the original string</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;is_tui_like_output: Analyzing </span><span class="si">{</span><span class="n">num_lines</span><span class="si">}</span><span class="s2"> lines, </span><span class="si">{</span><span class="n">total_chars_in_content</span><span class="si">}</span><span class="s2"> total characters.&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">line_num</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">lines</span><span class="p">):</span>
+        <span class="c1"># Find all ANSI sequences in the current line</span>
+        <span class="n">found_sequences</span> <span class="o">=</span> <span class="n">ANSI_ESCAPE_PATTERN</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">found_sequences</span><span class="p">:</span>
+            <span class="n">ansi_lines_count</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">for</span> <span class="n">seq</span> <span class="ow">in</span> <span class="n">found_sequences</span><span class="p">:</span>
+                <span class="n">total_ansi_chars_count</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">seq</span><span class="p">)</span>
+            <span class="c1"># Uncomment for very detailed logging of sequences found per line:</span>
+            <span class="c1"># logger.debug(f&quot;Line {line_num+1}/{num_lines} contains ANSI sequences: {found_sequences}&quot;)</span>
+
+    <span class="c1"># Heuristic 1: Based on the percentage of lines containing ANSI codes</span>
+    <span class="k">if</span> <span class="n">num_lines</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="c1"># Ensure no division by zero</span>
+        <span class="n">percentage_of_ansi_lines</span> <span class="o">=</span> <span class="p">(</span><span class="n">ansi_lines_count</span> <span class="o">/</span> <span class="n">num_lines</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;is_tui_like_output: ANSI lines: </span><span class="si">{</span><span class="n">ansi_lines_count</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">num_lines</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">percentage_of_ansi_lines</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%)&quot;</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">percentage_of_ansi_lines</span> <span class="o">&gt;=</span> <span class="n">line_threshold_pct</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;TUI-like output DETECTED based on line threshold: &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">percentage_of_ansi_lines</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% &gt;= </span><span class="si">{</span><span class="n">line_threshold_pct</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">percentage_of_ansi_lines</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+    <span class="c1"># Heuristic 2: Based on the percentage of total characters that are part of ANSI codes</span>
+    <span class="k">if</span> <span class="n">total_chars_in_content</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="c1"># Ensure no division by zero</span>
+        <span class="n">percentage_of_ansi_chars</span> <span class="o">=</span> <span class="p">(</span><span class="n">total_ansi_chars_count</span> <span class="o">/</span> <span class="n">total_chars_in_content</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;is_tui_like_output: ANSI characters: </span><span class="si">{</span><span class="n">total_ansi_chars_count</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total_chars_in_content</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">percentage_of_ansi_chars</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%)&quot;</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">percentage_of_ansi_chars</span> <span class="o">&gt;=</span> <span class="n">char_threshold_pct</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;TUI-like output DETECTED based on character threshold: &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">percentage_of_ansi_chars</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% &gt;= </span><span class="si">{</span><span class="n">char_threshold_pct</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">percentage_of_ansi_chars</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Output NOT considered TUI-like. Line %%: </span><span class="si">{</span><span class="n">percentage_of_ansi_lines</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;Char %%: </span><span class="si">{</span><span class="n">percentage_of_ansi_chars</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<span class="c1"># This block allows for direct testing of the module if run as a script.</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="c1"># Configure basic logging for direct script execution testing</span>
+    <span class="c1"># This will show logs from this module (e.g., &quot;output_analyzer&quot;)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
+        <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span>
+        <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># --- Test Cases ---</span>
+    <span class="n">sample_clean_output</span> <span class="o">=</span> <span class="s2">&quot;This is a normal line of text.</span><span class="se">\n</span><span class="s2">Another normal line.</span><span class="se">\n</span><span class="s2">Error: something happened.&quot;</span>
+    
+    <span class="n">sample_colored_output</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[31mError:</span><span class="se">\x1B</span><span class="s2">[0m Something went wrong.</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[32mSuccess:</span><span class="se">\x1B</span><span class="s2">[0m Operation completed.</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;This is just a normal line with no color.&quot;</span>
+    <span class="p">)</span>
+    
+    <span class="c1"># A more realistic, dense TUI-like output snippet</span>
+    <span class="n">sample_htop_like_output_dense</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[H</span><span class="se">\x1B</span><span class="s2">[2J</span><span class="se">\x1B</span><span class="s2">[1;1HCPU[</span><span class="se">\x1B</span><span class="s2">[32m|||||     </span><span class="se">\x1B</span><span class="s2">[0m25%] </span><span class="se">\x1B</span><span class="s2">[1;20HMem[</span><span class="se">\x1B</span><span class="s2">[32m||||||||||</span><span class="se">\x1B</span><span class="s2">[0m50%]</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[2;1H</span><span class="se">\x1B</span><span class="s2">[7m PID USER      PRI  NI  VIRT   RES   SHR S CPU% MEM%   TIME+  Command</span><span class="se">\x1B</span><span class="s2">[0m</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[3;1H 123 root       20   0  1.2G  500M  100M R  12.0  5.0  1:23.45 /usr/bin/someprocess</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[4;1H 456 user       20   0  500M  100M   50M S   2.0  1.0  0:10.00 /usr/bin/another</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[5;1H</span><span class="se">\x1B</span><span class="s2">[KRandom text here to fill space and test non-ANSI parts.</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[6;1H</span><span class="se">\x1B</span><span class="s2">[44mStatus Bar - Press F10 to quit</span><span class="se">\x1B</span><span class="s2">[49m</span><span class="se">\x1B</span><span class="s2">[K</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[3;30H</span><span class="se">\x1B</span><span class="s2">[31mAlert!</span><span class="se">\x1B</span><span class="s2">[0m</span><span class="se">\n</span><span class="s2">&quot;</span>
+    <span class="p">)</span> <span class="o">*</span> <span class="mi">3</span> <span class="c1"># Repeat to make it more substantial for testing character percentages</span>
+
+    <span class="n">sample_mixed_output_borderline</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;Starting process...</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[34mINFO:</span><span class="se">\x1B</span><span class="s2">[0m Process ID 1234 started.</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="c1"># ANSI line</span>
+        <span class="s2">&quot;Output line 1.</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[1A</span><span class="se">\x1B</span><span class="s2">[KUpdating status: </span><span class="se">\x1B</span><span class="s2">[32mOK</span><span class="se">\x1B</span><span class="s2">[0m</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="c1"># ANSI line (cursor up, erase, color)</span>
+        <span class="s2">&quot;Output line 2.</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;Finalizing...</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[31mWARN:</span><span class="se">\x1B</span><span class="s2">[0m Checksum mismatch on file X.</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="c1"># ANSI line</span>
+        <span class="s2">&quot;This is a very long line with no ANSI codes at all, just to dilute the character percentage.&quot;</span>
+        <span class="s2">&quot;This is another very long line with no ANSI codes at all, just to dilute the character percentage.&quot;</span>
+    <span class="p">)</span>
+
+    <span class="n">git_log_colored_example</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;</span><span class="se">\x1b</span><span class="s2">[33mcommit c9b8f7a6d5e4c3b2a1f0e9d8c7b6a5f4d3e2c1b0</span><span class="se">\x1b</span><span class="s2">[m</span><span class="se">\x1b</span><span class="s2">[33m (HEAD -&gt; main, origin/main)</span><span class="se">\x1b</span><span class="s2">[m</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;Author: Test User &lt;test@example.com&gt;</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;Date:   Tue May 14 10:00:00 2024 -0700</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;    Some commit message explaining things</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\x1b</span><span class="s2">[33mcommit a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0</span><span class="se">\x1b</span><span class="s2">[m</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;Author: Another User &lt;another@example.com&gt;</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;Date:   Mon May 13 15:30:00 2024 -0700</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;    Previous commit message with details</span><span class="se">\n</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Test cases</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--- Testing with clean output ---&quot;</span><span class="p">)</span>
+    <span class="n">result_clean</span> <span class="o">=</span> <span class="n">is_tui_like_output</span><span class="p">(</span><span class="n">sample_clean_output</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Clean output TUI-like: </span><span class="si">{</span><span class="n">result_clean</span><span class="si">}</span><span class="s2"> (Expected: False)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--- Testing with standard colored output ---&quot;</span><span class="p">)</span>
+    <span class="n">result_colored</span> <span class="o">=</span> <span class="n">is_tui_like_output</span><span class="p">(</span><span class="n">sample_colored_output</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Colored output TUI-like: </span><span class="si">{</span><span class="n">result_colored</span><span class="si">}</span><span class="s2"> (Expected: False with default thresholds)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--- Testing with dense htop-like output ---&quot;</span><span class="p">)</span>
+    <span class="n">result_htop</span> <span class="o">=</span> <span class="n">is_tui_like_output</span><span class="p">(</span><span class="n">sample_htop_like_output_dense</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;htop-like output TUI-like: </span><span class="si">{</span><span class="n">result_htop</span><span class="si">}</span><span class="s2"> (Expected: True)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--- Testing with mixed output (borderline) using default thresholds ---&quot;</span><span class="p">)</span>
+    <span class="n">result_mixed_default</span> <span class="o">=</span> <span class="n">is_tui_like_output</span><span class="p">(</span><span class="n">sample_mixed_output_borderline</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mixed output (default thresholds) TUI-like: </span><span class="si">{</span><span class="n">result_mixed_default</span><span class="si">}</span><span class="s2"> (Expected: depends on defaults, likely False)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--- Testing with mixed output (borderline) using lower thresholds ---&quot;</span><span class="p">)</span>
+    <span class="n">result_mixed_lower</span> <span class="o">=</span> <span class="n">is_tui_like_output</span><span class="p">(</span><span class="n">sample_mixed_output_borderline</span><span class="p">,</span> <span class="n">line_threshold_pct</span><span class="o">=</span><span class="mf">20.0</span><span class="p">,</span> <span class="n">char_threshold_pct</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mixed output (lower thresholds) TUI-like: </span><span class="si">{</span><span class="n">result_mixed_lower</span><span class="si">}</span><span class="s2"> (Expected: more likely True)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--- Testing with git log (colored) using default thresholds ---&quot;</span><span class="p">)</span>
+    <span class="n">result_git_default</span> <span class="o">=</span> <span class="n">is_tui_like_output</span><span class="p">(</span><span class="n">git_log_colored_example</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Git log (default thresholds) TUI-like: </span><span class="si">{</span><span class="n">result_git_default</span><span class="si">}</span><span class="s2"> (Expected: False)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--- Testing with git log (colored) using very sensitive thresholds ---&quot;</span><span class="p">)</span>
+    <span class="n">result_git_sensitive</span> <span class="o">=</span> <span class="n">is_tui_like_output</span><span class="p">(</span><span class="n">git_log_colored_example</span><span class="p">,</span> <span class="n">line_threshold_pct</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">char_threshold_pct</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Git log (sensitive thresholds) TUI-like: </span><span class="si">{</span><span class="n">result_git_sensitive</span><span class="si">}</span><span class="s2"> (Expected: might become True, shows sensitivity)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--- Testing with empty string ---&quot;</span><span class="p">)</span>
+    <span class="n">result_empty</span> <span class="o">=</span> <span class="n">is_tui_like_output</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Empty string TUI-like: </span><span class="si">{</span><span class="n">result_empty</span><span class="si">}</span><span class="s2"> (Expected: False)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--- Testing with only ANSI codes ---&quot;</span><span class="p">)</span>
+    <span class="n">only_ansi</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[1m</span><span class="se">\x1B</span><span class="s2">[31m</span><span class="se">\x1B</span><span class="s2">[4m&quot;</span>
+    <span class="n">result_only_ansi</span> <span class="o">=</span> <span class="n">is_tui_like_output</span><span class="p">(</span><span class="n">only_ansi</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Only ANSI codes TUI-like: </span><span class="si">{</span><span class="n">result_only_ansi</span><span class="si">}</span><span class="s2"> (Expected: True)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, micro_X Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

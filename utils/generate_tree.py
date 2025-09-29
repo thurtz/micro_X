@@ -129,10 +129,7 @@ if __name__ == "__main__":
         description="Generate a directory tree structure for the micro_X project.",
         epilog="This script is typically run from the '/utils list' or '/utils generate_tree' command within the micro_X shell."
     )
-    # Add a dummy argument if you want to allow -h/--help but not other args
-    # Or, if you plan to add arguments later, define them here.
-    # For now, just having argparse will enable -h/--help.
-    # parser.add_argument("--output", default="project_tree.txt", help="Output filename (default: project_tree.txt)")
+
     
     args = parser.parse_args() # This will handle -h/--help
 

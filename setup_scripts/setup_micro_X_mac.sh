@@ -108,8 +108,8 @@ echo "--- Installing Ollama Models (Requires Ollama application to be running) -
 if command_exists ollama; then
     MODELS=(
         "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
-        "vitali87/shell-commands-qwen2-1.5b-extended"
         "herawen/lisa"
+        "nomic-embed-text"
     )
     echo "Note: Pulling models can take a significant amount of time and storage."
     read -p "Do you want to proceed with pulling these models now? (y/N) " pull_models_choice
@@ -164,6 +164,7 @@ if [ ! -f "$REQUIREMENTS_FILE" ]; then
 
 prompt_toolkit>=3.0.0
 ollama>=0.1.0
+numpy>=1.20.0
 EOF
     echo "$REQUIREMENTS_FILE created."
 else

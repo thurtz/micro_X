@@ -235,7 +235,7 @@
             let defaultGeneralConfigData = null;
             let defaultCommandCategoriesData = null;
 
-            // --- FULL PRELOADED DATA OBJECTS ---
+            // --- DYNAMIC DATA LOADING ---
             const configUpdateTips = {
                 'ai_models.primary_translator': "Main AI for NL to command. E.g., 'llama3.2:3b'.",
                 'ai_models.direct_translator': "Secondary AI for direct command generation. E.g., 'vitali87/shell-commands-qwen2-1.5b'.",
@@ -274,120 +274,42 @@
                 'security.dangerous_patterns': "A list of regex patterns for commands that will be blocked from running.",
                 'security.warn_on_commands': "A list of command names (e.g., 'dd', 'fdisk') that will trigger an extra 'Are you sure?' confirmation prompt before execution."
             };
-            const PRELOADED_DEFAULT_CONFIG = {
-              "ai_models": {
-                "primary_translator": {
-                  "model": "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
-                },
-                "direct_translator": {
-                  "model": "vitali87/shell-commands-qwen2-1.5b-extended"
-                },
-                "validator": {
-                  "model": "herawen/lisa"
-                },
-                "explainer": {
-                  "model": "herawen/lisa"
+
+            async function loadInitialDefaults() {
+                try {
+                    const [configResponse, categoriesResponse] = await Promise.all([
+                        fetch('../../config/default_config.json'),
+                        fetch('../../config/default_command_categories.json')
+                    ]);
+
+                    if (!configResponse.ok) {
+                        throw new Error(`Failed to load default_config.json: ${configResponse.statusText}`);
+                    }
+                    if (!categoriesResponse.ok) {
+                        throw new Error(`Failed to load default_command_categories.json: ${categoriesResponse.statusText}`);
+                    }
+
+                    defaultGeneralConfigData = await configResponse.json();
+                    defaultCommandCategoriesData = await categoriesResponse.json();
+                    
+                    showMessage('Successfully loaded default configurations from project files.', 'success');
+                    
+                    // Once loaded, we can display them.
+                    renderJsonViewer(defaultConfigViewer, defaultGeneralConfigData);
+                    renderJsonViewer(defaultCategoriesViewer, defaultCommandCategoriesData);
+
+                } catch (error) {
+                    console.error("Error loading default configurations:", error);
+                    showMessage(`Error loading default configurations: ${error.message}`, 'error');
+                    // Populate with empty objects as a fallback
+                    defaultGeneralConfigData = {};
+                    defaultCommandCategoriesData = {};
                 }
-              },
-              "timeouts": {
-                "tmux_poll_seconds": 300,
-                "tmux_semi_interactive_sleep_seconds": 1,
-                "git_fetch_timeout": 10
-              },
-              "behavior": {
-                "input_field_height": 4,
-                "default_category_for_unclassified": "semi_interactive",
-                "validator_ai_attempts": 3,
-                "translation_validation_cycles": 3,
-                "ai_retry_delay_seconds": 1,
-                "ollama_api_call_retries": 2,
-                "tui_detection_line_threshold_pct": 30,
-                "tui_detection_char_threshold_pct": 3,
-                "use_strict_extraction_for_primary_translator": false
-              },
-              "ui": {
-                "max_prompt_length": 20,
-                "enable_output_separator": true,
-                "output_separator_character": "─",
-                "output_separator_length": 30,
-                "enable_startup_separator": true,
-                "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n",
-                "enable_mouse_support": false,
-                "ui_backend": "prompt_toolkit"
-              },
-              "paths": {
-                "tmux_log_base_path": "/tmp"
-              },
-              "prompts": {
-                "validator": {
-                  "system": "You are a Linux command validation assistant. Your task is to determine if a given string is likely a valid Linux command. If the string looks like a phrase rather than a linux command then the answer is no. If the string looks like a Linux command rather than a phrase then the answer is yes. Answer only with 'yes' or 'no'.",
-                  "user_template": "Is the following string likely a Linux command: '{command_text}'"
-                },
-                "primary_translator": {
-                  "system": "Translate the following user request into a single Linux command. Output only the command. Do not include any other text, explanations, or markdown formatting.",
-                  "user_template": "Translate to a single Linux command: \"{human_input}\"."
-                },
-                "direct_translator": {
-                  "system": "Translate the following user request into a single Linux command. Output only the command. Do not include any other text, explanations, or markdown formatting.",
-                  "user_template": "Translate to a single Linux command: \"{human_input}\"."
-                },
-                "explainer": {
-                  "system": "You are a helpful assistant that explains Linux commands in simple, clear terms. Describe what the command does, its main arguments/options shown, and any significant side effects or risks. Be concise. If the command is trivial, a very short explanation is fine. If it seems dangerous or complex, highlight that and possibly suggest an alternative command.",
-                  "user_template": "Explain the following Linux command: '{command_text}'"
-                }
-              },
-              "ollama_service": {
-                "executable_path": null,
-                "auto_start_serve": true,
-                "startup_wait_seconds": 10,
-                "server_check_retries": 5,
-                "server_check_interval_seconds": 2
-              },
-              "integrity_check": {
-                "protected_branches": [
-                  "main",
-                  "testing"
-                ],
-                "developer_branch": "dev",
-                "halt_on_integrity_failure": true,
-                "allow_run_if_behind_remote": true,
-                "dev_activation_allowed_branches": [
-                    "main"
-                ]
-              },
-              "security": {
-                "dangerous_patterns": [
-                  "\\brm\\s+(?:-[a-zA-Z0-9]*f[a-zA-Z0-9]*|-f[a-zA-Z0-9]*)\\s+/(?!(?:tmp|var/tmp)\\b)\\S*",
-                  "\\brm\\s+(?:-[a-zA-Z0-9]*f[a-zA-Z0-9]*|-f[a-zA-Z0-9]*)\\s+/\\s*(?:$|\\.\\.?\\s*$|\\*(?:\\s.*|$))",
-                  "\\bmkfs\\b",
-                  "\\bdd\\b\\s+if=/dev/random",
-                  "\\bdd\\b\\s+if=/dev/zero",
-                  "\\b(shutdown|reboot|halt|poweroff)\\b",
-                  ">\\s*/dev/sd[a-z]+",
-                  ":\\(\\)\\{:|:&\\};:",
-                  "\\b(wget|curl)\\s+.*\\s*\\|\\s*(sh|bash|python|perl)\\b"
-                ],
-                "warn_on_commands": [
-                  "dd",
-                  "fdisk",
-                  "cfdisk",
-                  "parted",
-                  "iptables",
-                  "ufw",
-                  "firewall-cmd",
-                  "visudo"
-                ]
-              }
-            };
-            const PRELOADED_DEFAULT_CATEGORIES = {
-                "simple": ["ls", "ls -lA", "ls -l", "ls -la", "pwd", "echo", "date", "echo $SHELL", "echo $PWD", "uname", "uname -a", "uname -m", "uname -s", "uname -r", "clear", "which", "which tmux", "cat /etc/os-release", "cat /etc/debian_version", "cat /etc/redhat-release", "ls -a", "ls -al", "echo \"hello\"; echo \"world\"", "mkdir new_directory", "mkdir -p path/to/new_directory", "touch new_file.txt", "cp source.txt destination.txt", "cp -r source_dir/ destination_dir/", "mv old_name.txt new_name.txt", "mv file.txt existing_dir/", "rm some_file.txt", "rm -f some_file.txt", "rmdir empty_directory", "df", "df -h", "df -i", "du -sh .", "du -sh /some/path", "free", "free -h", "free -m", "id", "whoami", "hostname", "uptime", "head somefile.txt", "head -n 5 somefile.txt", "tail -n 20 somefile.txt", "wc somefile.txt", "wc -l somefile.txt", "ps", "ps aux", "ps -ef", "pgrep processname", "pkill processname", "killall processname", "stat somefile.txt", "file somefile.txt", "basename /path/to/file.txt", "dirname /path/to/file.txt", "readlink -f some_link", "ln -s target_file link_name", "groups", "users", "w", "last -n 5", "history | tail -n 10", "getenforce", "sestatus", "systemctl is-active servicename", "systemctl is-enabled servicename", "systemctl list-units --type=service --state=running", "sudo ufw status", "sudo firewall-cmd --state", "sudo firewall-cmd --get-active-zones", "lsof -i :80", "lsof -p 1234", "dpkg -l packagename", "rpm -q packagename"],
-                "semi_interactive": ["less", "more", "tail", "tail micro_X.sh", "grep pattern file.txt", "grep -r pattern .", "nmap", "timedatectl list-timezones", "cat /proc/cpuinfo | grep 'model name'", "cat /proc/meminfo", "cat /proc/partitions", "ifconfig", "ip addr show", "ip route show", "ip link show", "netstat -an", "netstat -tulnp", "ss -tulnp", "lsb_release -a", "sudo apt update", "sudo apt list --upgradable", "sudo apt search packagename", "sudo apt show packagename", "sudo dnf check-update", "sudo dnf list --upgrades", "sudo dnf search packagename", "sudo dnf info packagename", "sudo yum check-update", "sudo yum list updates", "sudo yum search packagename", "sudo yum info packagename", "cat /boot/version", "cat /proc/version", "ls;pwd", "find . -name '*.py'", "find /var/log -name '*.log' -mtime -7", "ping google.com -c 4", "man ls", "git status", "git diff", "git diff --staged", "git log --oneline -n 10", "git branch", "git remote -v", "docker ps", "docker images", "docker logs container_name", "systemctl status sshd", "systemctl list-unit-files --type=service", "systemctl list-dependencies servicename", "journalctl -n 20", "journalctl -u servicename -n 50", "journalctl --since \"1 hour ago\"", "sudo ufw status numbered", "sudo firewall-cmd --list-all", "sudo firewall-cmd --list-services", "sudo firewall-cmd --list-ports", "fdisk -l", "lsblk", "blkid", "mount", "dpkg -L packagename", "rpm -ql packagename", "ls --help", "cp --help", "mv --help", "mkdir --help", "rm --help", "rmdir --help", "grep --help", "find --help", "awk --help", "sed --help", "tar --help", "gzip --help", "gunzip --help", "zip --help", "unzip --help", "head --help", "tail --help", "cat --help", "less --help", "more --help", "man --help", "pwd --help", "date --help", "clear --help", "which --help", "df --help", "du --help", "free --help", "ps --help", "kill --help", "pgrep --help", "pkill --help", "killall --help", "ping --help", "ifconfig --help", "ip --help", "netstat --help", "ss --help", "ssh --help", "scp --help", "rsync --help", "chmod --help", "chown --help", "sudo --help", "apt --help", "apt-get --help", "dpkg --help", "dnf --help", "yum --help", "rpm --help", "systemctl --help", "journalctl --help", "firewall-cmd --help", "ufw --help", "fdisk --help", "mkfs --help", "mount --help", "umount --help", "useradd --help", "usermod --help", "userdel --help", "groupadd --help", "docker --help", "git --help", "nmap --help", "nmap -sS -Pn 192.168.254.0/24", "nmap -sP 192.168.0.0/24 --script='http-server'", "nmap -sT -p80,443 192.168.0.0/24", "nmap -sT -p80,443 192.168.1.0/24", "nmap -sT 192.168.1.0/24", "nmap -sT -p80 192.168.254.0/24", "nmap -sP 192.168.1.0/24", "nmap -sT --open -Pn 192.168.1.0/24", "tar -cvf archive.tar /path/to/directory", "tar -xvf archive.tar", "zip -r archive.zip directory_to_zip", "unzip archive.zip", "make", "make --help", "gcc --help", "g++ --help", "python --help", "pip --help", "npm --help", "node --help"],
-                "interactive_tui": ["nano", "vim", "vi", "emacs -nw", "top", "htop", "ollama", "tail -f logs/micro_x.log", "ollama serve", "ssh user@hostname", "mc", "nmap -sT -P0 192.168.1.0/24", "nano config/command_categories.json", "ls && nano", "git commit", "git rebase -i HEAD~3", "sudo visudo", "alsamixer", "watch -n 1 'df -h'", "less +F /var/log/syslog", "sudo apt upgrade", "sudo apt full-upgrade", "sudo dnf upgrade", "sudo yum upgrade", "sudo fdisk /dev/sda", "sudo cfdisk /dev/sda", "sudo parted /dev/sda", "sudo ufw enable", "sudo ufw default deny incoming", "sudo systemctl edit servicename"]
-            };
-            // --- END OF FULL PRELOADED DATA OBJECTS ---
+            }
+            // --- END OF DYNAMIC DATA LOADING ---
 
 
-            function showMessage(message, type = 'info', duration = 5000) { /* ... (same as v4) ... */
+            function showMessage(message, type = 'info', duration = 5000) { 
                 const toast = document.createElement('div');
                 toast.textContent = message;
 
@@ -421,7 +343,7 @@
                 }, duration);
             }
 
-            function setButtonLoading(buttonElement, isLoading, defaultText = "Save to Project") { /* ... (same as v4) ... */
+            function setButtonLoading(buttonElement, isLoading, defaultText = "Save to Project") { 
                 const textSpan = buttonElement.querySelector('.button-text');
                 const loaderSpan = buttonElement.querySelector('.button-loader');
 
@@ -435,7 +357,7 @@
                     buttonElement.disabled = false;
                 }
             }
-            function getDeepData(dataObject, pathArray, key) { /* ... (same as v4) ... */
+            function getDeepData(dataObject, pathArray, key) { 
                 let target = dataObject;
                 for (const segment of pathArray) {
                     if (target && typeof target === 'object' && target.hasOwnProperty(segment)) {
@@ -446,7 +368,7 @@
                 }
                 return target && typeof target === 'object' && target.hasOwnProperty(key) ? target[key] : undefined;
             }
-            function setDeepData(dataObject, pathArray, key, value) { /* ... (same as v4) ... */
+            function setDeepData(dataObject, pathArray, key, value) { 
                 if (!dataObject) return;
                 let target = dataObject;
                 for (const segment of pathArray) {
@@ -458,7 +380,7 @@
                 target[key] = value;
                 console.log(`Updated userConfigData.${pathArray.join('.')}${pathArray.length > 0 ? '.' : ''}${key} = `, value);
             }
-            function handleFileUpload(fileInput, dataStoreSetter, editorElement, downloadButton, saveToProjectButton, configType, isDefaultViewer = false) { /* ... (same as v4, uses new showMessage) ... */
+            function handleFileUpload(fileInput, dataStoreSetter, editorElement, downloadButton, saveToProjectButton, configType, isDefaultViewer = false) { 
                  fileInput.addEventListener('change', (event) => {
                     const file = event.target.files[0];
                     if (file) {
@@ -494,10 +416,10 @@
                     }
                 });
             }
-            function renderJsonViewer(element, data) { /* ... (same as v4) ... */
+            function renderJsonViewer(element, data) { 
                 element.innerHTML = `<pre class="text-xs text-gray-300 whitespace-pre-wrap break-all p-2 bg-gray-600 rounded">${JSON.stringify(data, null, 2)}</pre>`;
             }
-            function createAccordionItem(title, contentElement, parentElementId, isOpen = false) { /* ... (same as v4) ... */
+            function createAccordionItem(title, contentElement, parentElementId, isOpen = false) { 
                 const accordionId = `accordion-${parentElementId}-${title.replace(/\s+/g, '-')}`;
                 const headerId = `header-${accordionId}`;
                 const contentId = `content-${accordionId}`;
@@ -538,7 +460,7 @@
                 });
                 return item;
             }
-            function createFormElement(key, value, path, configType, tooltipText = null) {
+            function createFormElement(key, value, path, configType, tooltipText = null) { 
                 const elementId = `${configType}-${path.join('-')}${path.length > 0 ? '-' : ''}${key}`;
                 const div = document.createElement('div');
                 div.classList.add('mb-3', 'p-3', 'border-l-4', 'border-blue-600', 'bg-gray-750', 'rounded-r-md');
@@ -553,7 +475,7 @@
                     tooltipIcon.classList.add('ml-2', 'text-gray-400', 'cursor-help', 'relative');
                     tooltipIcon.innerHTML = `
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg>
-                        <span class="tooltip">${tooltipText}</span>`; // Flowbite might need data-tooltip-target and data-tooltip-placement on the icon
+                        <span class="tooltip">${tooltipText}</span>`; 
                     label.appendChild(tooltipIcon);
                 }
                 div.appendChild(label);
@@ -594,7 +516,7 @@
                 } else if (configType === 'userConfig' && (key === 'protected_branches' || key === 'dev_activation_allowed_branches' || key === 'dangerous_patterns' || key === 'warn_on_commands') && Array.isArray(value) && value.every(item => typeof item === 'string')) {
                     const arrayEditorContainer = createArrayEditor(key, value, path, configType, 'Remove', 'Add');
                     div.appendChild(arrayEditorContainer);
-                    input = null; // No single input element, handled by the array editor
+                    input = null; 
                 } else if (typeof value === 'string') {
                     input = document.createElement('input');
                     input.type = 'text';
@@ -640,7 +562,7 @@
                 }
                 return div;
             }
-            function createArrayEditor(key, arrayValue, path, configType, removeItemLabel, addItemLabel) { /* ... (same as v4) ... */
+            function createArrayEditor(key, arrayValue, path, configType, removeItemLabel, addItemLabel) { 
                 const container = document.createElement('div');
                 container.id = `array-editor-${configType}-${path.join('-')}-${key}`;
                 container.classList.add('space-y-2', 'p-2', 'bg-gray-600', 'rounded');
@@ -696,7 +618,7 @@
                 renderListItems();
                 return container;
             }
-            function renderUserConfigEditor(element, data) {
+            function renderUserConfigEditor(element, data) { 
                 element.innerHTML = '';
                 const definedOrder = ['ai_models', 'timeouts', 'behavior', 'ui', 'paths', 'prompts', 'ollama_service', 'integrity_check', 'security'];
                 const allKeys = Object.keys(data);
@@ -725,6 +647,13 @@
                                         promptAccordionContent.appendChild(createFormElement('user_template', promptObject.user_template, [key, subKey], 'userConfig', `User prompt template for '${subKey}' AI role.`));
                                         const promptAccordion = createAccordionItem(subKey, promptAccordionContent, `prompts-accordion-${key}`, false);
                                         sectionContent.appendChild(promptAccordion);
+                                    } else if (key === 'ai_models' && typeof subValue === 'object' && subValue !== null) {
+                                        const modelObject = subValue;
+                                        const modelAccordionContent = document.createElement('div');
+                                        modelAccordionContent.classList.add('space-y-2', 'pl-2');
+                                        modelAccordionContent.appendChild(createFormElement('model', modelObject.model, [key, subKey], 'userConfig', `Model for '${subKey}' AI role.`));
+                                        const modelAccordion = createAccordionItem(subKey, modelAccordionContent, `ai_models-accordion-${key}`, true);
+                                        sectionContent.appendChild(modelAccordion);
                                     } else {
                                         sectionContent.appendChild(createFormElement(subKey, subValue, [key], 'userConfig', tooltip));
                                     }
@@ -741,7 +670,7 @@
                     initFlowbite();
                 }
             }
-            function renderUserCommandCategoriesEditor(element, data) { /* ... (uses new showMessage, same as v4 otherwise) ... */
+            function renderUserCommandCategoriesEditor(element, data) { 
                 element.innerHTML = '';
                 const categoryOrder = ['simple', 'semi_interactive', 'interactive_tui'];
 
@@ -823,7 +752,7 @@
                     }
                 });
             }
-            function updateCommandCategory(action, category, command) { /* ... (uses new showMessage, same as v4 otherwise) ... */
+            function updateCommandCategory(action, category, command) { 
                 if (!userCategoriesData) {
                     userCategoriesData = { 'simple': [], 'semi_interactive': [], 'interactive_tui': [] };
                 }
@@ -861,21 +790,27 @@
             }
 
             // --- Event Listeners ---
+            loadInitialDefaults(); // Load default configs on page load.
+
             handleFileUpload(userConfigFileInput, (data) => userConfigData = data, userConfigEditor, downloadUserConfigBtn, saveUserConfigToProjectBtn, 'userConfig');
             handleFileUpload(userCategoriesFileInput, (data) => userCategoriesData = data, userCategoriesEditor, downloadUserCategoriesBtn, saveUserCategoriesToProjectBtn, 'userCategories');
             handleFileUpload(defaultConfigFileInput, (data) => defaultGeneralConfigData = data, defaultConfigViewer, null, null, 'defaultConfig', true);
             handleFileUpload(defaultCategoriesFileInput, (data) => defaultCommandCategoriesData = data, defaultCategoriesViewer, null, null, 'defaultCategories', true);
 
-            generateNewUserConfigBtn.addEventListener('click', () => { /* ... (uses new showMessage) ... */
+            generateNewUserConfigBtn.addEventListener('click', () => { 
                 console.log("Generate New User Config button clicked.");
-                userConfigData = JSON.parse(JSON.stringify(PRELOADED_DEFAULT_CONFIG));
-                renderUserConfigEditor(userConfigEditor, userConfigData);
-                downloadUserConfigBtn.disabled = false;
-                saveUserConfigToProjectBtn.disabled = false;
-                showMessage('New user_config.json template generated from defaults.', 'success');
+                if (defaultGeneralConfigData) {
+                    userConfigData = JSON.parse(JSON.stringify(defaultGeneralConfigData));
+                    renderUserConfigEditor(userConfigEditor, userConfigData);
+                    downloadUserConfigBtn.disabled = false;
+                    saveUserConfigToProjectBtn.disabled = false;
+                    showMessage('New user_config.json template generated from defaults.', 'success');
+                } else {
+                    showMessage('Default configuration not loaded yet. Please wait or try reloading.', 'error');
+                }
             });
 
-            generateNewUserCategoriesBtn.addEventListener('click', () => { /* ... (uses new showMessage) ... */
+            generateNewUserCategoriesBtn.addEventListener('click', () => { 
                 console.log("Generate New User Categories button clicked.");
                 userCategoriesData = { "simple": [], "semi_interactive": [], "interactive_tui": [] };
                 renderUserCommandCategoriesEditor(userCategoriesEditor, userCategoriesData);
@@ -884,7 +819,7 @@
                 showMessage('New empty user_command_categories.json template generated.', 'success');
             });
 
-            autoLoadBtn.addEventListener('click', async () => { /* Uses more robust error display in .catch */
+            autoLoadBtn.addEventListener('click', async () => { 
                 console.log("Auto-Load button clicked");
                 showMessage('Attempting to auto-load configurations from ../../config/ ...', 'info');
 
@@ -947,7 +882,7 @@
                 if (typeof initFlowbite === 'function') { initFlowbite(); }
             });
 
-            saveUserConfigToProjectBtn.addEventListener('click', async () => { /* ... (same as v4, uses new showMessage & setButtonLoading) ... */
+            saveUserConfigToProjectBtn.addEventListener('click', async () => { 
                 if (!userConfigData) {
                     showMessage('No user config data to save.', 'warning');
                     return;
@@ -974,7 +909,7 @@
                 }
             });
 
-            saveUserCategoriesToProjectBtn.addEventListener('click', async () => { /* ... (same as v4, uses new showMessage & setButtonLoading) ... */
+            saveUserCategoriesToProjectBtn.addEventListener('click', async () => { 
                 if (!userCategoriesData) {
                     showMessage('No user categories data to save.', 'warning');
                     return;
@@ -1001,7 +936,7 @@
                 }
             });
 
-            downloadUserConfigBtn.addEventListener('click', () => { /* ... (same as v4, uses new showMessage) ... */
+            downloadUserConfigBtn.addEventListener('click', () => { 
                 if (userConfigData) {
                     const jsonDataStr = JSON.stringify(userConfigData, null, 2);
                     const blob = new Blob([jsonDataStr], { type: 'application/json' });
@@ -1019,7 +954,7 @@
                 }
             });
 
-            downloadUserCategoriesBtn.addEventListener('click', () => { /* ... (same as v4, uses new showMessage) ... */
+            downloadUserCategoriesBtn.addEventListener('click', () => { 
                 if (userCategoriesData) {
                     const jsonDataStr = JSON.stringify(userCategoriesData, null, 2);
                     const blob = new Blob([jsonDataStr], { type: 'application/json' });
@@ -1037,7 +972,7 @@
                 }
             });
 
-            resetAllBtn.addEventListener('click', () => { /* ... (same as v4, uses new showMessage) ... */
+            resetAllBtn.addEventListener('click', () => { 
                 console.log("Reset All button clicked.");
                 userConfigData = null;
                 userCategoriesData = null;
@@ -1061,12 +996,14 @@
                 showMessage('All configurations cleared from the UI.', 'info');
             });
 
-            loadDefaultsBtn.addEventListener('click', () => { /* ... (same as v4, uses new showMessage) ... */
-                defaultGeneralConfigData = JSON.parse(JSON.stringify(PRELOADED_DEFAULT_CONFIG));
-                defaultCommandCategoriesData = JSON.parse(JSON.stringify(PRELOADED_DEFAULT_CATEGORIES));
-                renderJsonViewer(defaultConfigViewer, defaultGeneralConfigData);
-                renderJsonViewer(defaultCategoriesViewer, defaultCommandCategoriesData);
-                showMessage('Pre-loaded default configurations displayed for reference.', 'success');
+            loadDefaultsBtn.addEventListener('click', () => {
+                if (defaultGeneralConfigData && defaultCommandCategoriesData) {
+                    renderJsonViewer(defaultConfigViewer, defaultGeneralConfigData);
+                    renderJsonViewer(defaultCategoriesViewer, defaultCommandCategoriesData);
+                    showMessage('Default configurations loaded from project files.', 'success');
+                } else {
+                    showMessage('Default configurations are still loading or failed to load. Please wait or try reloading.', 'error');
+                }
             });
 
             if (typeof initFlowbite === 'function') {

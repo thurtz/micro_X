@@ -1,76 +1,3 @@
-# --- API DOCUMENTATION for modules/category_manager.py ---
-#
-# **Purpose:** Manages the classification of shell commands into execution categories
-# (simple, semi_interactive, interactive_tui) by merging default and user configurations.
-#
-# **Public Functions:**
-#
-# def init_category_manager(script_dir_path: str, config_dir_name: str, append_output_func_ref: callable):
-#     """
-#     Initializes the manager with necessary paths and the UI callback function.
-#
-#     Must be called once at startup from main.py before any other functions
-#     in this module are used. It loads and merges the initial categories.
-#
-#     Args:
-#         script_dir_path (str): The absolute path to the main script's directory.
-#         config_dir_name (str): The name of the configuration directory (e.g., "config").
-#         append_output_func_ref (callable): A reference to UIManager.append_output
-#                                            to display messages to the user.
-#     """
-#
-# def classify_command(cmd: str) -> str:
-#     """
-#     Classifies a given command string based on the loaded categories.
-#
-#     Returns the category name (e.g., "simple") if found, otherwise returns
-#     the UNKNOWN_CATEGORY_SENTINEL.
-#
-#     Args:
-#         cmd (str): The full command string to classify.
-#
-#     Returns:
-#         str: The name of the category or the UNKNOWN_CATEGORY_SENTINEL constant.
-#     """
-#
-# def add_command_to_category(full_cmd_to_add: str, category_input: str):
-#     """
-#     Adds a command to a specified category in the user's configuration file.
-#
-#     This function handles saving the change to user_command_categories.json and
-#     then re-merging all categories to reflect the change immediately.
-#
-#     Args:
-#         full_cmd_to_add (str): The command string to add or update.
-#         category_input (str): The target category (e.g., "simple", "2").
-#     """
-#
-# def handle_command_subsystem_input(input_str: str) -> dict | None:
-#     """
-#     Parses and handles all '/command' subcommands (add, remove, list, move, run).
-#
-#     This function is the entry point for the `/command` built-in. It prints
-#     help/lists directly to the UI. For the 'run' action, it returns a
-#     dictionary instructing the shell_engine to execute a command.
-#
-#     Args:
-#         input_str (str): The full user input string, starting with "/command".
-#
-#     Returns:
-#         dict | None: Returns a dictionary {'action': 'force_run', ...} if the
-#                      subcommand was 'run'. Returns None for all other cases.
-#     """
-#
-# **Key Global Constants/Variables:**
-# - UNKNOWN_CATEGORY_SENTINEL: A string constant ("##UNKNOWN_CATEGORY##") returned by
-#                            classify_command when a command is not found.
-# - CATEGORY_MAP: A dictionary mapping user-friendly inputs (e.g., "1") to
-#                 category names ("simple"). Used by main.py for UI prompts.
-# - CATEGORY_DESCRIPTIONS: A dictionary with descriptions for each category name.
-#                          Used by main.py for UI prompts.
-#
-# --- END API DOCUMENTATION ---
-
 # modules/category_manager.py
 
 import os
@@ -114,9 +41,16 @@ _CURRENTLY_LOADED_CATEGORIES = {} # Internal cache for merged categories
 
 
 def init_category_manager(script_dir_path: str, config_dir_name: str, append_output_func_ref):
-    """
-    Initializes the category manager with necessary paths and callback functions.
-    This must be called once from main.py at startup.
+    """Initializes the manager with necessary paths and the UI callback function.
+
+    Must be called once at startup from main.py before any other functions
+    in this module are used. It loads and merges the initial categories.
+
+    Args:
+        script_dir_path: The absolute path to the main script's directory.
+        config_dir_name: The name of the configuration directory (e.g., "config").
+        append_output_func_ref: A reference to UIManager.append_output
+                                           to display messages to the user.
     """
     global _SCRIPT_DIR_PATH, _CONFIG_DIR_NAME_CONST, _append_output_func_ref
     global DEFAULT_CATEGORY_FILE_PATH, USER_CATEGORY_FILE_PATH
@@ -201,7 +135,17 @@ def load_and_merge_command_categories():
 
 
 def classify_command(cmd: str) -> str:
-    """Checks the loaded & merged categories to find the classification for a command."""
+    """Classifies a given command string based on the loaded categories.
+
+    Returns the category name (e.g., "simple") if found, otherwise returns
+    the UNKNOWN_CATEGORY_SENTINEL.
+
+    Args:
+        cmd: The full command string to classify.
+
+    Returns:
+        The name of the category or the UNKNOWN_CATEGORY_SENTINEL constant.
+    """
     if not _CURRENTLY_LOADED_CATEGORIES:
         logger.warning("Categories not loaded. Attempting to load now.")
         load_and_merge_command_categories()
@@ -236,7 +180,15 @@ def _save_user_command_categories(user_data: dict):
 
 
 def add_command_to_category(full_cmd_to_add: str, category_input: str):
-    """Adds or updates a command's category in the USER FILE and reloads categories."""
+    """Adds a command to a specified category in the user's configuration file.
+
+    This function handles saving the change to user_command_categories.json and
+    then re-merging all categories to reflect the change immediately.
+
+    Args:
+        full_cmd_to_add: The command string to add or update.
+        category_input: The target category (e.g., "simple", "2").
+    """
     if not _append_output_func_ref:
         logger.warning("append_output function not available for add_command_to_category status messages.")
     
@@ -342,10 +294,19 @@ def move_command_category(full_cmd_to_move: str, new_category_input: str):
     add_command_to_category(full_cmd_to_move, new_category_input)
 
 
-def handle_command_subsystem_input(input_str: str):
-    """
-    Parses and handles '/command' subcommands.
-    Returns a dictionary for 'run' action, None otherwise.
+def handle_command_subsystem_input(input_str: str) -> dict | None:
+    """Parses and handles all '/command' subcommands (add, remove, list, move, run).
+
+    This function is the entry point for the `/command` built-in. It prints
+    help/lists directly to the UI. For the 'run' action, it returns a
+    dictionary instructing the shell_engine to execute a command.
+
+    Args:
+        input_str: The full user input string, starting with "/command".
+
+    Returns:
+        A dictionary {'action': 'force_run', ...} if the
+        subcommand was 'run'. Returns None for all other cases.
     """
     if not _append_output_func_ref:
         logger.error("append_output function not available for /command subsystem.")
@@ -359,19 +320,19 @@ def handle_command_subsystem_input(input_str: str):
         return None 
 
     cmd_help = (f"ℹ️ /command usage:\n" 
-                f"  add \"<cmd>\" <cat>          - Add command to a category.\n"
-                f"  remove \"<cmd>\"             - Remove command from your settings.\n"
-                f"  list                       - List all categorized commands.\n"
-                f"  move \"<cmd>\" <new_cat>     - Move command to a new category.\n"
-                f"  run <cat_num|cat_name> \"<cmd>\" - Force run command with category.\n"
-                f"  help                       - Show this help message.\n"
+                f"  add \"<cmd>\" <cat>          - Add command to a category.\n" 
+                f"  remove \"<cmd>\"             - Remove command from your settings.\n" 
+                f"  list                       - List all categorized commands.\n" 
+                f"  move \"<cmd>\" <new_cat>     - Move command to a new category.\n" 
+                f"  run <cat_num|cat_name> \"<cmd>\" - Force run command with category.\n" 
+                f"  help                       - Show this help message.\n" 
                 f"Categories: 1/simple, 2/semi_interactive, 3/interactive_tui")
 
     if len(parts) < 2 or parts[0] != "/command":
         _append_output_func_ref(f"❌ Invalid /command structure.\n{cmd_help}", style_class='error')
         return None 
         
-    subcmd = parts[1].lower()
+    subcmd = parts[1].lower() 
     
     if subcmd == "add":
         if len(parts) == 4:

@@ -31,6 +31,7 @@ from modules.category_manager import (
 )
 from modules.ui_manager import UIManager
 from modules.curses_ui_manager import CursesUIManager
+from modules.embedding_manager import EmbeddingManager
 
 LOG_DIR = "logs"
 CONFIG_DIR = "config"
@@ -61,10 +62,14 @@ ui_manager_instance = None
 shell_engine_instance = None
 git_context_manager_instance = None
 
-# --- FIX: Define a custom exception for integrity check failures ---
+# --- Process Management & Concurrency Control ---
+input_lock = asyncio.Lock()
+
 class StartupIntegrityError(Exception):
     """Custom exception to signal a fatal integrity check failure during startup."""
-    pass
+    def __init__(self, message, details=None):
+        super().__init__(message)
+        self.details = details
 
 def merge_configs(base, override):
     """ Helper function to recursively merge dictionaries. """
@@ -86,7 +91,6 @@ def load_configuration():
     default_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, DEFAULT_CONFIG_FILENAME)
     user_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, USER_CONFIG_FILENAME)
 
-    # Step 1: Load the mandatory default configuration file.
     base_config = modules.config_handler.load_jsonc_file(default_config_path)
     if base_config is None:
         error_msg = f"CRITICAL ERROR: Default configuration file not found or failed to parse at '{default_config_path}'. Application cannot start."
@@ -96,7 +100,6 @@ def load_configuration():
     logger.info(f"Successfully loaded base configuration from {default_config_path}")
     config = base_config
 
-    # Step 2: Load optional user configuration and merge it.
     user_settings = modules.config_handler.load_jsonc_file(user_config_path)
     if user_settings:
         config = merge_configs(config, user_settings)
@@ -108,61 +111,59 @@ def load_configuration():
 load_configuration() # Load config at startup
 
 def normal_input_accept_handler(buff):
-    """
-    Handles normal user input submission from the prompt_toolkit input field. This is the default handler for the input field.
-    It's also used when submitting an edited command after choosing 'Modify' in AI confirmation.
+    """Universal handler for input submission from both prompt_toolkit and Curses UI."""
+    global shell_engine_instance, ui_manager_instance, config
 
-    This function is a universal handler for both prompt_toolkit's buffer object and the raw
-    string passed from CursesUIManager, ensuring compatibility across both UI backends.
-    """
-    global shell_engine_instance, ui_manager_instance # These are globals
-
-    # Check if the input is a raw string (from the Curses UI) or a buffer (from prompt_toolkit)
-    if isinstance(buff, str):
-        user_input_stripped = buff.strip()
-    else:
-        # Assume it's a prompt_toolkit buffer-like object
-        user_input_stripped = buff.text.strip()
-
+    user_input_stripped = buff.strip() if isinstance(buff, str) else buff.text.strip()
     logger.info(f"normal_input_accept_handler received: '{user_input_stripped}'")
 
-    # FIX: Explicitly clear the CursesUIManager's input buffer to prevent the visual bug
-    # where the text remains on screen while the asynchronous processing runs.
     if isinstance(ui_manager_instance, CursesUIManager):
         ui_manager_instance.input_text = ""
 
-    was_in_edit_mode = False
-    if ui_manager_instance:
-        was_in_edit_mode = ui_manager_instance.is_in_edit_mode
-        if was_in_edit_mode:
-            logger.info("Input submission is from edit mode context.")
+    was_in_edit_mode = ui_manager_instance.is_in_edit_mode if ui_manager_instance else False
+    if was_in_edit_mode:
+        logger.info("Input submission is from edit mode context.")
 
     async def _handle_input():
+        command_lock_timeout = config.get('timeouts', {}).get('command_lock_timeout_seconds', 15.0)
+        
         try:
-            # --- START OF CHANGE ---
-            # This logic ensures that the separator is added after built-in commands like /help.
+            await asyncio.wait_for(input_lock.acquire(), timeout=command_lock_timeout)
+        except asyncio.TimeoutError:
+            logger.error(f"Could not acquire input lock within {command_lock_timeout}s. A previous command may be stuck.")
+            if ui_manager_instance and shell_engine_instance:
+                hung_task_result = await ui_manager_instance.prompt_for_hung_task(shell_engine_instance.current_process_command)
+                action = hung_task_result.get('action')
+                if action == 'kill':
+                    await shell_engine_instance.kill_current_process()
+                    # After killing, we can now re-acquire the lock and proceed with the new command.
+                    # The lock should have been released by the finally block of the killed task's execution wrapper.
+                    # To be safe, we can try to acquire it again here.
+                    if not input_lock.locked():
+                         asyncio.create_task(_handle_input()) # Retry the original input
+                    else:
+                        ui_manager_instance.append_output("⚠️ Lock still held after kill signal. Please restart.", style_class='error')
+                elif action == 'ignore':
+                    ui_manager_instance.append_output("ℹ️ Ignoring hung task. Your new command is queued.", style_class='info')
+                    asyncio.create_task(_handle_input()) # Re-queue the current command
+            return
+
+        try:
             was_handled_as_builtin = await shell_engine_instance.handle_built_in_command(user_input_stripped)
 
             if not was_handled_as_builtin:
-                # If it wasn't a built-in, process it as a normal command.
-                # The separator logic for this path is handled within ShellEngine.process_command.
                 await shell_engine_instance.submit_user_input(user_input_stripped, from_edit_mode=was_in_edit_mode)
             else:
-                # If a built-in command was handled (and it wasn't an exit command, which would have
-                # terminated the process), we need to manually restore the input handler to ensure
-                # the UI state is correct and the separator is added.
-                # We skip this if we were in edit mode, as the 'finally' block below will handle it.
-                if not was_in_edit_mode:
-                    if shell_engine_instance and shell_engine_instance.main_restore_normal_input_ref:
-                        shell_engine_instance.main_restore_normal_input_ref()
-            # --- END OF CHANGE ---
+                if not was_in_edit_mode and shell_engine_instance and shell_engine_instance.main_restore_normal_input_ref:
+                    shell_engine_instance.main_restore_normal_input_ref()
         finally:
+            if input_lock.locked():
+                input_lock.release()
+            
             if was_in_edit_mode:
                 logger.debug("Input was from edit mode; explicitly calling restore_normal_input_handler.")
                 if ui_manager_instance:
-                    logger.debug(f"Before calling restore_normal_input_handler, ui_manager.is_in_edit_mode was {ui_manager_instance.is_in_edit_mode}. Resetting to False.")
                     ui_manager_instance.is_in_edit_mode = False
-
                 if shell_engine_instance and shell_engine_instance.main_restore_normal_input_ref:
                     shell_engine_instance.main_restore_normal_input_ref()
                 else:
@@ -199,11 +200,6 @@ def _exit_app_main():
     """Triggers a clean exit of the application by raising SystemExit."""
     logger.info("Exit requested by a component. Raising SystemExit(0) to terminate.")
     sys.exit(0)
-
-
-
-# --- FIX: Removed the _exit_app_main() function.
-# Its logic is now handled by the SystemExit exception raised directly by sys.exit().
 
 async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
     """
@@ -252,11 +248,11 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
         if not is_clean:
             status_output_tuple = await git_context_manager_instance._run_git_command(["status", "--porcelain"])
             status_output_details = status_output_tuple[1] if status_output_tuple[0] else "Could not get detailed status."
-            error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Uncommitted local changes or untracked files detected."
-            detail_msg = f"   Git status details:\n{status_output_details}"
-            ui_manager_instance.append_output(error_msg, style_class='error')
-            ui_manager_instance.append_output(detail_msg, style_class='error')
+            error_msg = f"Integrity Check Failed (Branch: {current_branch}): Uncommitted local changes or untracked files detected."
+            detail_msg = f"Git status details:\n{status_output_details}"
             logger.critical(f"{error_msg}\n{detail_msg}")
+            if halt_on_failure:
+                raise StartupIntegrityError(error_msg, details=detail_msg)
             integrity_ok = False
         else:
             ui_manager_instance.append_output(f"✅ Working directory is clean for branch '{current_branch}'.", style_class='info')
@@ -278,44 +274,47 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
                     status_description = comparison_status
                     if comparison_status == "behind" and not allow_run_if_behind:
                         status_description = "behind (and configuration disallows running)"
-                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Local branch has '{status_description}' from 'origin/{current_branch}'."
-                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
-                    ui_manager_instance.append_output(error_msg, style_class='error')
-                    ui_manager_instance.append_output(detail_msg, style_class='error')
+                    error_msg = f"Integrity Check Failed (Branch: {current_branch}): Local branch has '{status_description}' from 'origin/{current_branch}'."
+                    detail_msg = f"Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
                     logger.critical(f"{error_msg} {detail_msg}")
+                    if halt_on_failure:
+                        raise StartupIntegrityError(error_msg, details=detail_msg)
                     integrity_ok = False
                 else:
-                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): Cannot reliably compare with remote after successful fetch. Status: {comparison_status}."
-                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
-                    ui_manager_instance.append_output(error_msg, style_class='error')
-                    ui_manager_instance.append_output(detail_msg, style_class='error')
+                    error_msg = f"Integrity Check Failed (Branch: {current_branch}): Cannot reliably compare with remote after successful fetch. Status: {comparison_status}."
+                    detail_msg = f"Local: {local_h[:7] if local_h else 'N/A'}, Remote: {remote_h[:7] if remote_h else 'N/A'}"
                     logger.critical(f"{error_msg} {detail_msg}")
+                    if halt_on_failure:
+                        raise StartupIntegrityError(error_msg, details=detail_msg)
                     integrity_ok = False
             elif fetch_status in ["timeout", "offline_or_unreachable"]:
                 ui_manager_instance.append_output(f"⚠️ Could not contact remote for branch '{current_branch}' (Reason: {fetch_status}). Comparing against local cache.", style_class='warning')
                 if comparison_status == "synced_local_cache" or comparison_status == "behind_local_cache":
                     ui_manager_instance.append_output(f"ℹ️ Branch '{current_branch}' is consistent with the last known state of 'origin/{current_branch}'. Running in offline-verified mode.", style_class='info')
                 elif comparison_status == "ahead_local_cache" or comparison_status == "diverged_local_cache":
-                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): Local branch has unpushed changes or diverged from the last known remote state. Status: {comparison_status}"
-                    detail_msg = f"   Local: {local_h[:7] if local_h else 'N/A'}, Last Known Remote: {remote_h[:7] if remote_h else 'N/A'}"
-                    ui_manager_instance.append_output(error_msg, style_class='error')
-                    ui_manager_instance.append_output(detail_msg, style_class='error')
+                    error_msg = f"Integrity Check Failed (Branch: {current_branch}, Offline): Local branch has unpushed changes or diverged from the last known remote state. Status: {comparison_status}"
+                    detail_msg = f"Local: {local_h[:7] if local_h else 'N/A'}, Last Known Remote: {remote_h[:7] if remote_h else 'N/A'}"
                     logger.critical(f"{error_msg} {detail_msg}")
+                    if halt_on_failure:
+                        raise StartupIntegrityError(error_msg, details=detail_msg)
                     integrity_ok = False
                 elif comparison_status == "no_upstream_info_locally":
-                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): No local information about the remote tracking branch. Cannot verify integrity."
-                    ui_manager_instance.append_output(error_msg, style_class='error')
+                    error_msg = f"Integrity Check Failed (Branch: {current_branch}, Offline): No local information about the remote tracking branch. Cannot verify integrity."
                     logger.critical(error_msg)
+                    if halt_on_failure:
+                        raise StartupIntegrityError(error_msg)
                     integrity_ok = False
                 else:
-                    error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}, Offline): Error comparing with local cache. Status: {comparison_status}"
-                    ui_manager_instance.append_output(error_msg, style_class='error')
+                    error_msg = f"Integrity Check Failed (Branch: {current_branch}, Offline): Error comparing with local cache. Status: {comparison_status}"
                     logger.critical(error_msg)
+                    if halt_on_failure:
+                        raise StartupIntegrityError(error_msg)
                     integrity_ok = False
             elif fetch_status == "other_error":
-                error_msg = f"❌ Integrity Check Failed (Branch: {current_branch}): A non-network error occurred during 'git fetch'."
-                ui_manager_instance.append_output(error_msg, style_class='error')
+                error_msg = f"Integrity Check Failed (Branch: {current_branch}): A non-network error occurred during 'git fetch'."
                 logger.critical(f"{error_msg} - Check git fetch logs or permissions.")
+                if halt_on_failure:
+                    raise StartupIntegrityError(error_msg, details="Check git fetch logs or permissions.")
                 integrity_ok = False
 
         if integrity_ok:
@@ -384,8 +383,11 @@ async def main_async_runner():
     halt_on_failure = integrity_config.get("halt_on_integrity_failure", True)
 
     if not is_developer_mode and not integrity_checks_passed and halt_on_failure:
+        # This block is now primarily for logging, the exception is the key signal
         logger.critical("Halting micro_X due to failed integrity checks on a protected branch.")
-        raise StartupIntegrityError("Failed integrity checks on a protected branch.")
+        # The actual error with details should have already been raised by a sub-check.
+        # This is a fallback to ensure halting if a sub-check returns False instead of raising.
+        raise StartupIntegrityError("Failed integrity checks on a protected branch.", details="Halting as per configuration.")
 
     ui_manager_instance.main_exit_app_ref = _exit_app_main
     ui_manager_instance.main_restore_normal_input_ref = restore_normal_input_handler
@@ -398,6 +400,9 @@ async def main_async_runner():
     else:
         ui_manager_instance.append_output("✅ Ollama service is active and ready.", style_class='success')
         logger.info("Ollama service is active.")
+        embedding_manager_instance = EmbeddingManager(config)
+        embedding_manager_instance.initialize()
+        shell_engine_instance.embedding_manager_instance = embedding_manager_instance
 
 
     init_category_manager(SCRIPT_DIR, CONFIG_DIR, ui_manager_instance.append_output)
@@ -409,8 +414,8 @@ async def main_async_runner():
     current_dir_for_prompt = shell_engine_instance.current_directory
     if current_dir_for_prompt == home_dir: initial_prompt_dir = "~"
     elif current_dir_for_prompt.startswith(home_dir + os.sep):
-        rel_path = current_dir_for_prompt[len(home_dir)+1:]; full_rel_prompt = "~/" + rel_path
-        initial_prompt_dir = full_rel_prompt if len(full_rel_prompt) <= max_prompt_len else "~/" + "..." + rel_path[-(max_prompt_len - 5):] if (max_prompt_len - 5) > 0 else "~/... "
+        rel_path = current_dir_for_prompt[len(home_dir)+1:]; full_rel_prompt = "~/"; full_rel_prompt += rel_path
+        initial_prompt_dir = full_rel_prompt if len(full_rel_prompt) <= max_prompt_len else "~/"; initial_prompt_dir += "..." + rel_path[-(max_prompt_len - 5):] if (max_prompt_len - 5) > 0 else "~/... "
     else:
         base_name = os.path.basename(current_dir_for_prompt)
         initial_prompt_dir = base_name if len(base_name) <= max_prompt_len else "..." + base_name[-(max_prompt_len - 3):] if (max_prompt_len - 3) > 0 else "..."
@@ -497,8 +502,10 @@ def run_shell():
         asyncio.run(main_async_runner())
     except StartupIntegrityError as e:
         print(f"\nFATAL STARTUP ERROR: {e}")
-        print("Please resolve the Git integrity issues before running on this protected branch.")
-        logger.critical(f"Application halting due to fatal integrity error: {e}")
+        if e.details:
+            print(f"\n{e.details}")
+        print("\nPlease resolve the Git integrity issues before running on this protected branch.")
+        logger.critical(f"Application halting due to fatal integrity error: {e}", exc_info=True)
     except (FileNotFoundError, ValueError, IOError) as e:
         print(f"\nFATAL STARTUP ERROR: {e}")
         print(f"Please ensure 'config/default_config.json' exists and is a valid JSON file.")

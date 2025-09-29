@@ -1,76 +1,3 @@
-# --- API DOCUMENTATION for modules/ui_manager.py ---
-#
-# **Purpose:** Manages the entire `prompt_toolkit` Text User Interface (TUI),
-# including input/output fields, keybindings, styling, and coordinating complex,
-# multi-step interactive user flows like command categorization and confirmation.
-#
-# **Public Classes:**
-#
-# class UIManager:
-#     """The main class for managing the application's UI."""
-#
-#     def __init__(self, config: dict):
-#         """
-#         Initializes the UIManager with the application configuration.
-#
-#         The Application instance itself is set later via `ui_manager_instance.app = app_instance`.
-#         """
-#
-#     def initialize_ui_elements(self, initial_prompt_text: str, history: FileHistory, output_buffer_main: list) -> Layout:
-#         """
-#         Creates all the prompt_toolkit widgets and constructs the main UI layout.
-#
-#         Args:
-#             initial_prompt_text (str): The text for the very first input prompt.
-#             history (FileHistory): The history object for the input field.
-#             output_buffer_main (list): A list of (style, text) tuples for initial output.
-#
-#         Returns:
-#             Layout: The main prompt_toolkit Layout object for the application.
-#         """
-#
-#     def get_key_bindings(self) -> KeyBindings:
-#         """Returns the configured keybindings for the application."""
-#
-#     def append_output(self, text: str, style_class: str = 'default', internal_call: bool = False):
-#         """The primary method for adding text to the main output field."""
-#
-#     def update_input_prompt(self, current_directory_path: str):
-#         """Updates the text of the input prompt, typically with the current directory."""
-#
-#     async def start_categorization_flow(self, command_initially_proposed: str, ...) -> dict:
-#         """
-#         Initiates the interactive flow for categorizing an unknown command.
-#         This is an async method that awaits user input through the UI.
-#
-#         Returns:
-#             dict: A dictionary containing the result, e.g.,
-#                   {'action': 'categorize_and_execute', 'command': '...', 'category': '...'}.
-#         """
-#
-#     async def prompt_for_command_confirmation(self, command_to_confirm: str, ...) -> dict:
-#         """
-#         Initiates the interactive flow for confirming an AI-generated command.
-#         This is an async method that awaits user input.
-#
-#         Returns:
-#             dict: A dictionary with the user's choice, e.g., {'action': 'execute'}.
-#         """
-#
-#     def set_normal_input_mode(self, accept_handler_func: callable, current_directory_path: str):
-#         """Resets the UI to the default state for normal command input."""
-#
-#     def set_flow_input_mode(self, prompt_text: str, accept_handler_func: callable, ...):
-#         """Sets the UI for a special input flow (categorization or confirmation)."""
-#
-#     def set_edit_mode(self, accept_handler_func: callable, command_to_edit: str):
-#         """Sets the UI to allow editing a command, populating the input field."""
-#
-# **Key Global Constants/Variables:**
-#   (None intended for direct external use)
-#
-# --- END API DOCUMENTATION ---
-
 # modules/ui_manager.py
 import logging
 import os
@@ -92,7 +19,20 @@ from modules.ai_handler import explain_linux_command_with_ai
 logger = logging.getLogger(__name__)
 
 class UIManager:
-    def __init__(self, config):
+    """The main class for managing the application's UI.
+    
+    Manages the entire `prompt_toolkit` Text User Interface (TUI),
+    including input/output fields, keybindings, styling, and coordinating complex,
+    multi-step interactive user flows like command categorization and confirmation.
+    """
+    def __init__(self, config: dict):
+        """Initializes the UIManager with the application configuration.
+
+        The Application instance itself is set later via `ui_manager_instance.app = app_instance`.
+        
+        Args:
+            config: The application configuration.
+        """
         self.config = config
         self.app = None # This will be set by main.py
         self.output_field = None
@@ -110,6 +50,9 @@ class UIManager:
 
         self.confirmation_flow_active = False
         self.confirmation_flow_state = {}
+
+        self.hung_task_flow_active = False
+        self.hung_task_flow_state = {}
 
         self.is_in_edit_mode = False
 
@@ -131,18 +74,18 @@ class UIManager:
         @self.kb.add('c-c')
         @self.kb.add('c-d')
         def _handle_exit_or_cancel(event):
-            # This handler's responsibility is to cancel any active flow by resolving its future.
-            # The responsibility to restore the UI to normal mode lies with the caller of the flow
-            # (e.g., ShellEngine.process_command), which will do so in its 'finally' block
-            # after the flow's future has been resolved. This prevents race conditions.
-            if self.categorization_flow_active:
+            if self.hung_task_flow_active:
+                self.append_output("\n⚠️ Hung task prompt cancelled.", style_class='warning')
+                if 'future' in self.hung_task_flow_state and not self.hung_task_flow_state['future'].done():
+                    self.hung_task_flow_state['future'].set_result({'action': 'cancel'})
+                event.app.invalidate()
+            elif self.categorization_flow_active:
                 self.append_output("\n⚠️ Categorization cancelled by user.", style_class='warning')
                 logger.info("Categorization flow cancelled by Ctrl+C/D.")
                 if 'future' in self.categorization_flow_state and \
                    self.categorization_flow_state.get('future') and \
                    not self.categorization_flow_state['future'].done():
                     self.categorization_flow_state['future'].set_result({'action': 'cancel_execution'})
-                # The call to restore normal input is intentionally removed from here.
                 event.app.invalidate()
             elif self.confirmation_flow_active:
                 self.append_output("\n⚠️ Command confirmation cancelled by user.", style_class='warning')
@@ -151,15 +94,11 @@ class UIManager:
                    self.confirmation_flow_state.get('future') and \
                    not self.confirmation_flow_state['future'].done():
                     self.confirmation_flow_state['future'].set_result({'action': 'cancel'})
-                # The call to restore normal input is intentionally removed from here.
                 event.app.invalidate()
             elif self.is_in_edit_mode:
                 self.append_output("\n⌨️ Command editing cancelled.", style_class='info')
                 logger.info("Command edit mode cancelled by Ctrl+C/D.")
                 self.is_in_edit_mode = False
-                # If edit mode was entered from a flow, that flow is already complete.
-                # Restoring the normal input handler is the correct action here, as it's
-                # the end of a self-contained "edit" operation.
                 if self.main_restore_normal_input_ref:
                     self.main_restore_normal_input_ref()
                 event.app.invalidate()
@@ -248,14 +187,66 @@ class UIManager:
         logger.debug("UIManager: Keybindings registered.")
 
     def get_key_bindings(self) -> KeyBindings:
+        """Returns the configured keybindings for the application."""
         return self.kb
 
-    # --- NEW: Caution Confirmation Flow ---
+    def exit(self):
+        """Tells the prompt_toolkit application to exit gracefully."""
+        if self.app and hasattr(self.app, 'exit'):
+            logger.info("UIManager: Calling app.exit() to terminate prompt_toolkit loop.")
+            self.app.exit()
+        else:
+            logger.warning("UIManager: exit() called, but self.app is not set or has no exit method.")
+
+    # --- Hung Task Flow ---
+    async def prompt_for_hung_task(self, hung_command: str) -> dict:
+        """Initiates a flow to ask the user how to handle a hung command."""
+        logger.info(f"UIManager: Starting hung task flow for command: '{hung_command}'")
+        self.hung_task_flow_active = True
+        self.hung_task_flow_state = {
+            'future': asyncio.Future()
+        }
+
+        self._ask_hung_task_choice(hung_command)
+
+        try:
+            result = await self.hung_task_flow_state['future']
+            return result
+        finally:
+            self.hung_task_flow_active = False
+            logger.info("UIManager: Hung task flow ended.")
+
+    def _ask_hung_task_choice(self, hung_command: str):
+        self.append_output(f"\n⚠️ The command '{hung_command}' is taking a long time.", style_class='warning')
+        self.append_output("   What would you like to do?", style_class='categorize-prompt')
+        self.append_output("   [K]ill the command | [I]gnore and continue waiting | [C]ancel your new command", style_class='categorize-prompt')
+        self.set_flow_input_mode(
+            prompt_text="[Hung Task] Choice (K/I/C): ",
+            accept_handler_func=self._handle_hung_task_response,
+            is_confirmation=True # Re-use confirmation flag to lock scrolling etc.
+        )
+
+    def _handle_hung_task_response(self, buff):
+        response = buff.text.strip().lower()
+        future = self.hung_task_flow_state.get('future')
+        if not future or future.done():
+            return
+
+        if response in ['k', 'kill']:
+            future.set_result({'action': 'kill'})
+        elif response in ['i', 'ignore']:
+            future.set_result({'action': 'ignore'})
+        elif response in ['c', 'cancel']:
+            future.set_result({'action': 'cancel'})
+        else:
+            self.append_output("Invalid choice. Please enter K, I, or C.", style_class='error')
+            # No need to re-ask here, the prompt is still visible. The handler will just be called again.
+
+    # --- Caution Confirmation Flow ---
     async def prompt_for_caution_confirmation(self, command_to_confirm: str) -> dict:
         """Initiates a simple Yes/No confirmation for potentially sensitive commands."""
         logger.info(f"UIManager: Starting caution confirmation for '{command_to_confirm}'.")
-        # Use existing flow flags to manage UI state, but with a unique state dict
-        self.confirmation_flow_active = True # Re-use this flag to lock scrolling etc.
+        self.confirmation_flow_active = True
         self.confirmation_flow_state = {
             'command_to_confirm': command_to_confirm,
             'future': asyncio.Future()
@@ -291,7 +282,6 @@ class UIManager:
             future_to_set.set_result({'proceed': False})
         else:
             self.append_output("Invalid choice. Please enter 'yes' or 'no'.", style_class='error')
-            # Re-ask the question
             self.set_flow_input_mode(
                 prompt_text="[Confirm Execution] (yes/no): ",
                 accept_handler_func=self._handle_caution_confirmation_response,
@@ -303,6 +293,18 @@ class UIManager:
                                         ai_raw_candidate: str | None,
                                         original_direct_input: str | None
                                         ):
+        """Initiates the interactive flow for categorizing an unknown command.
+
+        This is an async method that awaits user input through the UI.
+
+        Args:
+            command_initially_proposed: The command string to be categorized.
+            ai_raw_candidate: The raw output from the AI.
+            original_direct_input: The original user input if it was different.
+
+        Returns:
+            A dictionary containing the result, e.g.,
+            {'action': 'categorize_and_execute', 'command': '...', 'category': '...'}. """
         self.categorization_flow_active = True
         self.confirmation_flow_active = False
         self.is_in_edit_mode = False
@@ -505,6 +507,17 @@ class UIManager:
 
     # --- Command Confirmation Flow Methods ---
     async def prompt_for_command_confirmation(self, command_to_confirm: str, display_source: str, normal_input_accept_handler_ref) -> dict:
+        """Initiates the interactive flow for confirming an AI-generated command.
+
+        This is an async method that awaits user input.
+
+        Args:
+            command_to_confirm: The command string to be confirmed.
+            display_source: The source of the command (e.g., '/ai query').
+            normal_input_accept_handler_ref: A reference to the normal input handler.
+
+        Returns:
+            A dictionary with the user's choice, e.g., {'action': 'execute'}. """
         logger.info(f"UIManager: Starting command confirmation flow for '{command_to_confirm}' from '{display_source}'.")
         self.confirmation_flow_active = True
         self.categorization_flow_active = False
@@ -679,7 +692,16 @@ class UIManager:
     def _get_current_prompt(self) -> str:
         return self.current_prompt_text
 
-    def initialize_ui_elements(self, initial_prompt_text: str, history: FileHistory, output_buffer_main: list):
+    def initialize_ui_elements(self, initial_prompt_text: str, history: FileHistory, output_buffer_main: list) -> Layout:
+        """Creates all the prompt_toolkit widgets and constructs the main UI layout.
+
+        Args:
+            initial_prompt_text: The text for the very first input prompt.
+            history: The history object for the input field.
+            output_buffer_main: A list of (style, text) tuples for initial output.
+
+        Returns:
+            The main prompt_toolkit Layout object for the application. """
         logger.info("UIManager: Initializing UI elements...")
         key_help_text_content = "Ctrl+N: Newline | Enter: Submit | Ctrl+C/D: Exit/Cancel | Tab: Complete/Indent | ↑/↓: History/Lines | PgUp/PgDn: Scroll"
         self.style = Style.from_dict({
@@ -758,6 +780,7 @@ class UIManager:
             if not self.auto_scroll: self.auto_scroll = True
 
     def append_output(self, text: str, style_class: str = 'default', internal_call: bool = False):
+        """The primary method for adding text to the main output field."""
         # Log the text that is about to be appended to the UI output field
         # Strip trailing newline for cleaner logs, as append_output ensures it later.
         logger.info(f"UI_OUTPUT: {text.rstrip()}")
@@ -870,6 +893,7 @@ class UIManager:
 
 
     def update_input_prompt(self, current_directory_path: str):
+        """Updates the text of the input prompt, typically with the current directory."""
         if not self.input_field: return
         home_dir = os.path.expanduser("~")
         max_prompt_len = self.config.get('ui', {}).get('max_prompt_length', 20)
@@ -893,7 +917,8 @@ class UIManager:
             if self.layout and self.input_field: self.app.layout.focus(self.input_field)
             self.app.invalidate()
 
-    def set_normal_input_mode(self, accept_handler_func, current_directory_path: str):
+    def set_normal_input_mode(self, accept_handler_func: callable, current_directory_path: str):
+        """Resets the UI to the default state for normal command input."""
         logger.debug("UIManager: Setting normal input mode.")
         self.categorization_flow_active = False
         self.confirmation_flow_active = False
@@ -907,7 +932,8 @@ class UIManager:
                 if self.layout: self.app.layout.focus(self.input_field)
                 self.app.invalidate()
 
-    def set_flow_input_mode(self, prompt_text: str, accept_handler_func, is_categorization: bool = False, is_confirmation: bool = False):
+    def set_flow_input_mode(self, prompt_text: str, accept_handler_func: callable, is_categorization: bool = False, is_confirmation: bool = False):
+        """Sets the UI for a special input flow (categorization or confirmation)."""
         logger.debug(f"UIManager: Setting flow input mode. Prompt: '{prompt_text}'")
         if is_categorization:
             self.categorization_flow_active = True
@@ -929,7 +955,8 @@ class UIManager:
                 if self.layout: self.app.layout.focus(self.input_field)
                 self.app.invalidate()
 
-    def set_edit_mode(self, accept_handler_func, command_to_edit: str):
+    def set_edit_mode(self, accept_handler_func: callable, command_to_edit: str):
+        """Sets the UI to allow editing a command, populating the input field."""
         logger.debug(f"UIManager: Setting edit mode. Command: '{command_to_edit}'")
         self.categorization_flow_active = False
         self.confirmation_flow_active = False

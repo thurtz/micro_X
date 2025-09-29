@@ -5,6 +5,8 @@ import sys
 import os
 import logging
 
+import argparse
+
 # Basic logger for this utility script
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -17,6 +19,12 @@ def main():
     Runs the main install_requirements.py script with flags to install
     all developer (and by implication, runtime) dependencies.
     """
+    parser = argparse.ArgumentParser(
+        description='Set up the development environment by installing all dependencies.',
+        epilog='This script calls install_requirements.py with the --all flag.'
+    )
+    args = parser.parse_args()
+
     logger.info("Initiating developer environment setup...")
     try:
         # Determine the project root assuming this script is in project_root/utils/
