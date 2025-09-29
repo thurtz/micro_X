@@ -107,6 +107,38 @@
         "dev help",
         "how to use dev manager"
     ],
+    "dev_snapshot_main": [
+        "/dev --snapshot-main",
+        "dev snapshot main"
+    ],
+    "dev_snapshot_testing": [
+        "/dev --snapshot-testing",
+        "dev snapshot testing"
+    ],
+    "dev_snapshot_dev": [
+        "/dev --snapshot-dev",
+        "dev snapshot dev"
+    ],
+    "dev_snapshot_all": [
+        "/dev --snapshot-all",
+        "dev snapshot all"
+    ],
+    "dev_run_tests_main": [
+        "/dev --run-tests-main",
+        "dev run tests main"
+    ],
+    "dev_run_tests_testing": [
+        "/dev --run-tests-testing",
+        "dev run tests testing"
+    ],
+    "dev_run_tests_dev": [
+        "/dev --run-tests-dev",
+        "dev run tests dev"
+    ],
+    "dev_run_tests_all": [
+        "/dev --run-tests-all",
+        "dev run tests all"
+    ],
     "generate_project_tree": [
         "/tree",
         "tree",
