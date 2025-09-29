@@ -31,33 +31,31 @@
     ],
     "ollama_start": [
         "/ollama start",
-        "start ollama",
-        "start the ai service"
+        "ollama start",
+        "start ollama"
     ],
     "ollama_stop": [
         "/ollama stop",
-        "stop ollama",
-        "stop the ai service"
+        "ollama stop",
+        "stop ollama"
     ],
     "ollama_restart": [
         "/ollama restart",
-        "restart ollama",
-        "restart the ai service"
+        "ollama restart",
+        "restart ollama"
     ],
     "ollama_status": [
         "/ollama status",
-        "is ollama running",
-        "get ollama status"
+        "ollama status",
+        "status ollama"
     ],
     "ollama_help": [
         "/ollama help",
-        "ollama help",
-        "how to use ollama cli"
+        "ollama help"
     ],
     "command_list": [
         "/command list",
-        "list commands",
-        "show all commands"
+        "command list"
     ],
     "command_help": [
         "/command --help",
@@ -66,13 +64,13 @@
     ],
     "config_start": [
         "/config --start",
-        "start config server",
-        "open config ui"
+        "config start",
+        "start config"
     ],
     "config_stop": [
         "/config --stop",
-        "stop config server",
-        "close config ui"
+        "config stop",
+        "stop config"
     ],
     "config_help": [
         "/config --help",
@@ -81,8 +79,7 @@
     ],
     "alias_list": [
         "/alias --list",
-        "list aliases",
-        "show all aliases"
+        "alias list"
     ],
     "alias_help": [
         "/alias --help",
@@ -91,19 +88,19 @@
     ],
     "dev_activate": [
         "/dev --activate",
-        "activate dev environment"
+        "dev activate"
     ],
     "dev_update_all": [
         "/dev --update-all",
-        "update all dev branches"
+        "dev update all branches"
     ],
     "dev_update_testing": [
         "/dev --update-testing",
-        "update testing branch"
+        "dev update testing branch"
     ],
     "dev_update_dev": [
         "/dev --update-dev",
-        "update dev branch"
+        "dev update dev branch"
     ],
     "dev_help": [
         "/dev --help",
@@ -112,49 +109,48 @@
     ],
     "generate_project_tree": [
         "/tree",
-        "generate project tree",
-        "show project structure"
+        "tree",
+        "generate project tree"
     ],
     "generate_project_tree_help": [
         "/tree --help",
-        "project tree help",
+        "tree help",
         "how to use project tree generator"
     ],
     "install_dependencies_runtime": [
         "/utils install_requirements --runtime",
-        "install runtime dependencies"
+        "install_requirements runtime"
     ],
     "install_dependencies_dev": [
         "/utils install_requirements --dev",
-        "install dev dependencies"
+        "install_requirements dev"
     ],
     "install_dependencies_all": [
         "/utils install_requirements --all",
-        "install all dependencies"
+        "install_requirements all"
     ],
     "setup_brew_install": [
         "/setup_brew --install",
-        "setup brew install",
-        "install homebrew"
+        "setup_brew install"
     ],
     "setup_brew_help": [
         "/setup_brew --help",
-        "setup brew help",
-        "how to use setup brew"
+        "setup_brew help"
     ],
     "setup_dev_env": [
         "/utils setup_dev_env",
+        "setup_dev_env",
         "setup dev environment"
     ],
     "setup_dev_env_help": [
         "/utils setup_dev_env --help",
-        "dev environment help",
+        "setup_dev_env help",
+        "setup dev environment help",
         "how to use setup dev environment"
     ],
     "open_docs": [
         "/docs",
-        "open the documentation",
-        "show the docs"
+        "docs"
     ],
     "open_docs_help": [
         "/docs --help",
@@ -164,50 +160,46 @@
     "open_docs_lynx": [
         "/docs --lynx",
         "docs lynx",
-        "open docs in lynx"
+        "open the docs in lynx"
     ],
     "show_help_ai": [
-        "help for ai",
-        "ai help",
-        "how to use ai"
+        "/help ai",
+        "help ai"
     ],
     "show_help_alias": [
-        "help for alias",
-        "alias help",
+        "/help alias",
         "how to use aliases"
     ],
     "show_help_command": [
-        "help for command",
-        "command help",
-        "how to use commands"
+        "/help command",
+        "help command"
     ],
     "show_help_config": [
-        "help for config",
-        "config help",
+        "/help config",
+        "help config",
         "how to configure the shell"
     ],
     "show_help_dev": [
-        "help for dev",
-        "dev help",
+        "/help dev",
+        "help dev",
         "how to develop the shell"
     ],
     "show_help_keybindings": [
-        "help for keybindings",
-        "keybindings help",
+        "/help keybindings",
+        "help keybindings",
         "what are the keybindings",
         "help keys",
         "how to navigate",
         "help navigation"
     ],
     "show_help_security": [
-        "help for security",
-        "security help",
+        "/help security",
+        "help security",
         "what are the security features"
     ],
     "show_help_utilities": [
-        "help for utilities",
-        "utilities help",
-        "what are the utilities",
+        "/help utilities",
+        "help utilities",
         "help utils"
     ]
 }
