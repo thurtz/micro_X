@@ -7,6 +7,26 @@ import sys # For using sys.executable
 import argparse # For command-line arguments
 import re # For log parsing
 
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: Snapshot Generation
+
+This utility creates a comprehensive snapshot of the current project state, which is useful for sharing context, debugging, or providing information to the AI.
+
+Usage:
+  /snapshot [options]
+
+Options:
+  -s, --summary <message>   - Add a summary message to the snapshot.
+  --include-logs            - Include the latest log session in the snapshot.
+  --summarize               - Summarize module files using their API documentation blocks.
+  --include-full-module <name> - Specify a module to include in full, even when --summarize is active.
+
+Examples:
+  /snapshot -s "Initial project state"
+  /snapshot --include-logs
+"""
+
 # --- Configuration ---
 # Files and directories to include in the snapshot.
 # Paths are relative to the project root (where this script's parent directory is).

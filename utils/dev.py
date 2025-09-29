@@ -13,25 +13,30 @@ import json # Added for loading configuration
 HELP_TEXT = """
 micro_X Help: Developer & Contribution Guide
 
-This guide is for users interested in contributing to micro_X or understanding its development workflow.
+This utility manages the multi-branch development environment, allowing you to run commands across the main, testing, and dev branches.
 
-Branching Strategy & Integrity:
-  - main: The most stable branch. Enforces strict integrity checks at startup.
-  - testing: For release candidates. Also enforces strict integrity checks.
-  - dev: The main development branch. Integrity checks are informational and do not block execution, allowing for local changes.
+Usage:
+  /dev <option>
 
-Setting up the Development Environment:
-  - To set up the development environment, run this command from the 'main' branch:
-    /dev --activate
-  - This command will clone the 'testing' and 'dev' branches into subdirectories ('micro_X-testing/' and 'micro_X-dev/') and set up their environments.
+Environment Setup:
+  --activate              - Clones and sets up the 'testing' and 'dev' branches into subdirectories.
+
+Updating Branches:
+  --update-all            - Pulls the latest changes for both the 'testing' and 'dev' branches.
+  --update-testing        - Pulls the latest changes for only the 'testing' branch.
+  --update-dev            - Pulls the latest changes for only the 'dev' branch.
+
+Snapshot Generation:
+  --snapshot-main [args]  - Generates a snapshot from the main branch.
+  --snapshot-testing [args] - Generates a snapshot from the testing branch.
+  --snapshot-dev [args]   - Generates a snapshot from the dev branch.
+  --snapshot-all [args]   - Generates snapshots for all three branches.
 
 Running Tests:
-  - The project includes a comprehensive test suite.
-  - To run tests for the current branch environment, use:
-    /utils run_tests
-
-Documentation:
-  - For more in-depth developer documentation, please see the files in the 'docs/developer/' directory of the project.
+  --run-tests-main        - Runs the test suite in the main branch environment.
+  --run-tests-testing     - Runs the test suite in the testing branch environment.
+  --run-tests-dev         - Runs the test suite in the dev branch environment.
+  --run-tests-all         - Runs the test suites for all three branches.
 """
 
 # --- Configuration ---
