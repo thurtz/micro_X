@@ -632,6 +632,7 @@ class ShellEngine:
             "show_help_install": ("/help install_requirements", False),
             "list_help": ("/list --help", False),
             "list_utils": ("/list --type utils", False),
+            "update_system": ("/update", False),
         }
 
         if self.embedding_manager_instance:
