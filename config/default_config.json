@@ -10,7 +10,7 @@
       "model": "herawen/lisa"
     },
     "router": {
-      "model": "herawen/lisa"
+      "model": "qwen3:0.6b"
     },
     "explainer": {
       "model": "herawen/lisa"

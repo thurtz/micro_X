@@ -115,12 +115,12 @@ echo ""
 # --- 2. Install Required Ollama Models ---
 echo "--- Installing Ollama Models ---"
 if command_exists ollama; then
-    MODELS=(
-        "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
-        "vitali87/shell-commands-qwen2-1.5b-extended"
-        "herawen/lisa"
-    )
-    for model in "${MODELS[@]}"; do
+required_models=(
+    "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
+    "herawen/lisa"
+    "nomic-embed-text"
+    "qwen3:0.6b"
+)    for model in "${MODELS[@]}"; do
         echo "Pulling Ollama model: $model ..."
         ollama pull "$model"
         if ollama list | grep -q "${model%%:*}"; then
