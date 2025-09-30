@@ -93,18 +93,13 @@ echo ""
 # --- 3. Ollama Model Pulling - Instructions ---
 echo "--- Ollama Model Pulling (Instructions for Windows Host) ---"
 echo "The following Ollama models are required by micro_X:"
-MODELS=(
+required_models=(
     "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
-    "vitali87/shell-commands-qwen2-1.5b-extended"
     "herawen/lisa"
+    "nomic-embed-text"
+    "qwen3:0.6b"
 )
-echo "- ${MODELS[0]}"
-echo "- ${MODELS[1]}"
-echo "- ${MODELS[2]}"
-echo ""
-echo "You need to pull these models using the Ollama CLI on your WINDOWS host."
-echo "Open PowerShell or Command Prompt on Windows and run:"
-for model in "${MODELS[@]}"; do
+for model in "${required_models[@]}"; do
     echo "  ollama pull $model"
 done
 echo ""

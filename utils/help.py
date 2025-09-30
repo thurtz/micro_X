@@ -44,7 +44,7 @@ Common Commands:
 
 For more details on a specific feature, use '/help <topic>'.
 Available Topics:
-  ai, alias, command, config, dev, keybindings, security, utilities
+  ai, alias, command, config, dev, install_requirements, keybindings, list, security, snapshot, utilities
 """
 
 AI_HELP = """
@@ -130,13 +130,16 @@ def main():
         print(GENERAL_HELP)
     elif topic == 'ai':
         print(AI_HELP)
-    elif topic in ('alias', 'command', 'config', 'dev', 'docs', 'utilities'):
+    elif topic in ('alias', 'command', 'config', 'dev', 'docs', 'install_requirements', 'list', 'snapshot', 'utilities'):
         module_name = {
             'alias': 'alias.py',
             'command': 'command.py',
             'config': 'config_manager.py',
             'dev': 'dev.py',
             'docs': 'docs.py',
+            'install_requirements': 'install_requirements.py',
+            'list': 'list_scripts.py',
+            'snapshot': 'generate_snapshot.py',
             'utilities': 'docs.py'
         }[topic]
         utils_dir = os.path.dirname(os.path.abspath(__file__))

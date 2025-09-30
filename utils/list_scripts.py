@@ -19,6 +19,26 @@ except ImportError as e:
     print(f"   Details: {e}", file=sys.stderr)
     sys.exit(1)
 
+HELP_TEXT = """
+micro_X Help: List Scripts & Aliases
+
+This utility lists all available built-in utilities, custom user scripts, and aliases.
+
+Usage:
+  /list [options]
+
+Options:
+  --type <type>   - Filter by type. Available types: all, scripts, utils, aliases.
+                    Defaults to 'all'.
+  --name <name>   - Filter by name (case-insensitive substring match).
+
+Examples:
+  /list
+  /list --type scripts
+  /list --type utils --name git
+  /list --type aliases
+"""
+
 def get_scripts_from_directory(directory_path):
     """Scans a directory for .py files and returns their base names."""
     if not os.path.isdir(directory_path):

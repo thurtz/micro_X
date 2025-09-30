@@ -92,16 +92,13 @@ echo ""
 # --- 3. Install Required Ollama Models ---
 echo "--- Installing Ollama Models (Requires Ollama server to be running) ---"
 if command_exists ollama; then
-    MODELS=(
-        "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
-        "vitali87/shell-commands-qwen2-1.5b-extended"
-        "herawen/lisa"
-    )
-    echo "Note: Pulling models can take a significant amount of time and storage."
-    echo "The models needed can total approximately 5GB."
-    read -p "Do you want to proceed with pulling these models now? (y/N) " pull_models_choice
-    if [[ "$pull_models_choice" =~ ^[Yy]$ ]]; then
-        for model in "${MODELS[@]}"; do
+required_models=(
+    "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
+    "herawen/lisa"
+    "nomic-embed-text"
+    "qwen3:0.6b"
+)
+for model in "${required_models[@]}"; do
             echo "Pulling Ollama model: $model ..."
             ollama pull "$model"
             # Basic check
