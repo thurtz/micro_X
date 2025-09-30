@@ -9,6 +9,25 @@ import argparse # Using argparse for cleaner argument handling
 # --- Module-specific logger ---
 logger = logging.getLogger(__name__)
 
+HELP_TEXT = """
+micro_X Help: Install Requirements
+
+This utility installs Python dependencies for the micro_X project.
+
+Usage:
+  /install_requirements [options]
+
+Options:
+  --runtime   - Install runtime dependencies from requirements.txt (default if no other type specified).
+  --dev       - Install development dependencies from requirements-dev.txt.
+  --all       - Install both runtime and development dependencies.
+
+Examples:
+  /install_requirements --runtime
+  /install_requirements --dev
+  /install_requirements --all
+"""
+
 def install_requirements(
     project_root: str,
     append_output_func,
