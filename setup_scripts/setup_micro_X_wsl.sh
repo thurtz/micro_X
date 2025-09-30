@@ -99,13 +99,7 @@ required_models=(
     "nomic-embed-text"
     "qwen3:0.6b"
 )
-echo "- ${MODELS[0]}"
-echo "- ${MODELS[1]}"
-echo "- ${MODELS[2]}"
-echo ""
-echo "You need to pull these models using the Ollama CLI on your WINDOWS host."
-echo "Open PowerShell or Command Prompt on Windows and run:"
-for model in "${MODELS[@]}"; do
+for model in "${required_models[@]}"; do
     echo "  ollama pull $model"
 done
 echo ""

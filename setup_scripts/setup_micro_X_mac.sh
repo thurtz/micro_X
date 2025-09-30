@@ -112,10 +112,7 @@ required_models=(
     "nomic-embed-text"
     "qwen3:0.6b"
 )
-    echo "Note: Pulling models can take a significant amount of time and storage."
-    read -p "Do you want to proceed with pulling these models now? (y/N) " pull_models_choice
-    if [[ "$pull_models_choice" =~ ^[Yy]$ ]]; then
-        for model in "${MODELS[@]}"; do
+for model in "${required_models[@]}"; do
             echo "Pulling Ollama model: $model ..."
             ollama pull "$model"
             if ollama list | grep -q "${model%%:*}"; then

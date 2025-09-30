@@ -120,7 +120,8 @@ required_models=(
     "herawen/lisa"
     "nomic-embed-text"
     "qwen3:0.6b"
-)    for model in "${MODELS[@]}"; do
+)
+for model in "${required_models[@]}"; do
         echo "Pulling Ollama model: $model ..."
         ollama pull "$model"
         if ollama list | grep -q "${model%%:*}"; then
