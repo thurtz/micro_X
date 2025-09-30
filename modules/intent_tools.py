@@ -15,15 +15,39 @@ def run_tests(branch: Literal["main", "testing", "dev", "all"] = "dev") -> str:
     return f"/utils dev --run-tests-{branch}"
 
 @tool
-def generate_snapshot(branch: Literal["main", "testing", "dev", "all"] = "dev", include_logs: bool = False, summarize: bool = False) -> str:
-    """Creates a snapshot of a specified project branch. Defaults to the 'dev' branch.
-    Can optionally include logs or summarize the snapshot."""
-    command = f"/utils dev --snapshot-{branch}"
+def generate_snapshot(
+    branch: Literal["main", "testing", "dev", "all"] = "dev",
+    summary: str = None,
+    include_logs: bool = False,
+    summarize_modules: bool = False
+) -> str:
+    """
+    Creates a snapshot of a specified project branch. Defaults to the 'dev' branch.
+    Can optionally include a summary, include logs, or summarize modules.
+    If 'branch' is 'all', snapshots are generated for main, testing, and dev branches.
+    The 'snapshot' command is an alias for 'generate_snapshot'.
+    """
+    # Determine the base command based on whether it's a multi-branch dev command or a single project snapshot
+    if branch in ["main", "testing", "dev", "all"]:
+        # The 'dev' utility handles the multi-branch logic
+        base_command = f"/dev --snapshot-{branch}"
+    else:
+        # Fallback or direct snapshot for the current project context
+        base_command = "/snapshot"
+
+    args = []
+    if summary:
+        # Use quotes to handle summaries with spaces
+        args.append(f'--summary "{summary}"')
     if include_logs:
-        command += " --include-logs"
-    if summarize:
-        command += " --summarize"
-    return command
+        args.append("--include-logs")
+    if summarize_modules:
+        args.append("--summarize")
+
+    # Join the arguments with spaces
+    if args:
+        return f"{base_command} {' '.join(args)}"
+    return base_command
 
 @tool
 def list_scripts(script_type: Literal["all", "user", "utils"] = "all") -> str:
@@ -36,8 +60,8 @@ def list_scripts(script_type: Literal["all", "user", "utils"] = "all") -> str:
 def show_help(topic: str = "") -> str:
     """Shows help for a specific topic or the general help message."""
     if topic:
-        return f"/utils help {topic}"
-    return "/utils help"
+        return f"/help {topic}"
+    return "/help"
 
 @tool
 def update_system() -> str:
@@ -76,24 +100,10 @@ def add_alias(alias_name: str, command: str) -> str:
 
 
 @tool
-def generate_dev_snapshot(branch: Literal["main", "dev", "testing"], summary: str) -> str:
-    """Generates a snapshot from a specific development branch (main, dev, or testing) with a summary message."""
-    return f'/utils dev --snapshot-{branch} "{summary}"'
-
-
-@tool
-def generate_project_snapshot(summary: str) -> str:
-    """Generates a snapshot of the current project state with a summary message."""
-    return f'/utils generate_snapshot --summary "{summary}"'
-
-
-@tool
 def remove_alias(alias_name: str) -> str:
     """Removes a user-specific command alias."""
     return f'/utils alias --remove {alias_name}'
 
-
-# We can add more tools here over time, covering more intents.
 
 def get_all_tools():
     """Returns a list of all defined intent tools."""
@@ -108,7 +118,5 @@ def get_all_tools():
         remove_command_from_category,
         move_command_to_category,
         add_alias,
-        generate_dev_snapshot,
-        generate_project_snapshot,
         remove_alias,
     ]

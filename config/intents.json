@@ -161,6 +161,15 @@
         "/utils install_requirements --all",
         "install_requirements all"
     ],
+    "install_requirements_help": [
+        "/install_requirements --help",
+        "install_requirements --help",
+        "how to use install_requirements"
+    ],
+    "show_help_install": [
+        "/help install_requirements",
+        "help install_requirements"
+    ],
     "setup_brew_install": [
         "/setup_brew --install",
         "setup_brew install"
@@ -168,17 +177,6 @@
     "setup_brew_help": [
         "/setup_brew --help",
         "setup_brew help"
-    ],
-    "setup_dev_env": [
-        "/utils setup_dev_env",
-        "setup_dev_env",
-        "setup dev environment"
-    ],
-    "setup_dev_env_help": [
-        "/utils setup_dev_env --help",
-        "setup_dev_env help",
-        "setup dev environment help",
-        "how to use setup dev environment"
     ],
     "open_docs": [
         "/docs",
@@ -244,5 +242,10 @@
         "/list --type utils",
         "list utils",
         "show utility scripts"
+    ],
+    "list_help": [
+        "/list --help",
+        "list help",
+        "how to use list"
     ]
 }
