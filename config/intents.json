@@ -247,5 +247,11 @@
         "/list --help",
         "list help",
         "how to use list"
+    ],
+    "update_system": [
+        "/update",
+        "update",
+        "update system",
+        "update micro_x"
     ]
 }
