@@ -2,7 +2,7 @@
   "/alias": "/utils alias",
   "/command": "/utils command",
   "/config": "/utils config_manager",
-  "/dev": "python utils/dev.py",
+  "/dev": "/utils dev",
   "/docs": "python utils/docs.py",
   "/docs --help": "python utils/docs.py --help",
   "/docs --lynx": "python utils/docs.py --lynx",
