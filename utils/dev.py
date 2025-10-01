@@ -55,11 +55,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def get_project_root():
-    """Determines the project root directory."""
-    script_path = os.path.abspath(__file__)
-    # Assumes this script is in project_root/utils/
-    return os.path.dirname(os.path.dirname(script_path))
+def find_environment_root():
+    """
+    Determines the root of the multi-branch environment by traversing upwards
+    from the current script's location. The root is the directory that IS the main
+    branch and CONTAINS the testing and dev branch directories.
+    """
+    current_path = os.path.abspath(os.path.dirname(__file__))
+    # Limit upward traversal to prevent infinite loops in unexpected structures
+    for _ in range(5):
+        # A directory is the environment root if it has its own main.py
+        # and contains the testing and dev subdirectories.
+        main_py_path = os.path.join(current_path, "main.py")
+        testing_dir_path = os.path.join(current_path, TESTING_BRANCH_DIR_NAME)
+        dev_dir_path = os.path.join(current_path, DEV_BRANCH_DIR_NAME)
+
+        if os.path.isfile(main_py_path) and os.path.isdir(testing_dir_path) and os.path.isdir(dev_dir_path):
+            return current_path
+
+        parent_path = os.path.dirname(current_path)
+        if parent_path == current_path:  # Reached the filesystem root
+            return None
+        current_path = parent_path
+    return None
 
 # --- START: Added configuration loading functions ---
 def merge_configs(base, override):
@@ -239,10 +257,10 @@ def activate_dev_environment(project_root):
     print(f"  - {DEV_BRANCH_DIR_NAME}/ (dev branch)")
     print("\nYou can now use '/utils dev --update-all' or '/utils dev --snapshot-dev'.")
 
-def update_single_branch(project_root, branch_name, branch_dir_name):
+def update_single_branch(environment_root, branch_name, branch_dir_name):
     """Pulls the latest changes for a single specified branch installation."""
     print(f"\n--- Updating '{branch_name}' branch ---")
-    target_dir = os.path.join(project_root, branch_dir_name)
+    target_dir = os.path.join(environment_root, branch_dir_name)
     if not os.path.isdir(target_dir):
         print(f"--> Directory '{branch_dir_name}' not found. Skipping update.")
         return
@@ -250,7 +268,7 @@ def update_single_branch(project_root, branch_name, branch_dir_name):
     pull_command = ['git', 'pull', 'origin', branch_name]
     run_command(pull_command, target_dir, f"Pulling updates for {branch_name}")
 
-def snapshot_for_branch(project_root, branch_name, branch_project_root_path, extra_args):
+def snapshot_for_branch(environment_root, branch_name, branch_project_root_path, extra_args):
     """Generates a snapshot from a specified branch, passing along extra arguments."""
     branch_dir_name = os.path.basename(branch_project_root_path)
     print(f"📸 Generating snapshot from the '{branch_dir_name}' environment...")
@@ -291,18 +309,18 @@ def snapshot_for_branch(project_root, branch_name, branch_project_root_path, ext
         print("❌ Could not determine the created snapshot filename from the script output.")
         return
 
-    snapshot_sub_dir = os.path.join(project_root, 'snapshots', branch_name)
+    snapshot_sub_dir = os.path.join(environment_root, 'snapshots', branch_name)
     os.makedirs(snapshot_sub_dir, exist_ok=True)
     
     try:
         shutil.move(created_file_path, snapshot_sub_dir)
         final_path = os.path.join(snapshot_sub_dir, os.path.basename(created_file_path))
-        print("\n✅ Snapshot successfully generated and moved to the main project's snapshot directory.")
+        print(f"\n✅ Snapshot successfully generated and moved to the main project's snapshot directory.")
         print(f"   File: {final_path}")
     except Exception as e:
         print(f"❌ Error moving snapshot file: {e}")
 
-def run_tests_for_branch(project_root, branch_name, branch_project_root_path):
+def run_tests_for_branch(environment_root, branch_name, branch_project_root_path):
     """Runs the test suite for a specified branch installation."""
     branch_dir_name = os.path.basename(branch_project_root_path)
     print(f"🧪 Running test suite for the '{branch_name}' environment...")
@@ -397,43 +415,58 @@ def main():
         sys.exit(0)
 
     args = parser.parse_args()
-    project_root = get_project_root()
     
+    environment_root = find_environment_root()
+    if environment_root is None:
+        # Fallback for when the script is run from a non-activated environment
+        # This allows --activate to still work
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if args.activate:
+             activate_dev_environment(project_root)
+             return
+        print("❌ Error: Could not find the micro_X multi-branch environment root.")
+        print("   Ensure you are running this from within an activated environment, or run '/dev --activate' from the main branch.")
+        sys.exit(1)
+
+    # Get the name of the main branch directory, which might be different from the env root basename
+    main_branch_dir = os.path.join(environment_root)
+
     # Execute the chosen action
     if args.activate:
-        activate_dev_environment(project_root)
+        # The activate command should be run from the main branch directory
+        activate_dev_environment(main_branch_dir)
     elif args.update_all:
         print("🔄 Updating all development environment branches...")
-        update_single_branch(project_root, "testing", TESTING_BRANCH_DIR_NAME)
-        update_single_branch(project_root, "dev", DEV_BRANCH_DIR_NAME)
+        update_single_branch(environment_root, "testing", TESTING_BRANCH_DIR_NAME)
+        update_single_branch(environment_root, "dev", DEV_BRANCH_DIR_NAME)
         print("\n✅ All development branches have been updated.")
     elif args.update_testing:
-        update_single_branch(project_root, "testing", TESTING_BRANCH_DIR_NAME)
+        update_single_branch(environment_root, "testing", TESTING_BRANCH_DIR_NAME)
     elif args.update_dev:
-        update_single_branch(project_root, "dev", DEV_BRANCH_DIR_NAME)
+        update_single_branch(environment_root, "dev", DEV_BRANCH_DIR_NAME)
     elif args.snapshot_main is not None:
-        snapshot_for_branch(project_root, "main", project_root, args.snapshot_main)
+        snapshot_for_branch(environment_root, "main", main_branch_dir, args.snapshot_main)
     elif args.snapshot_testing is not None:
-        snapshot_for_branch(project_root, "testing", os.path.join(project_root, TESTING_BRANCH_DIR_NAME), args.snapshot_testing)
+        snapshot_for_branch(environment_root, "testing", os.path.join(environment_root, TESTING_BRANCH_DIR_NAME), args.snapshot_testing)
     elif args.snapshot_dev is not None:
-        snapshot_for_branch(project_root, "dev", os.path.join(project_root, DEV_BRANCH_DIR_NAME), args.snapshot_dev)
+        snapshot_for_branch(environment_root, "dev", os.path.join(environment_root, DEV_BRANCH_DIR_NAME), args.snapshot_dev)
     elif args.snapshot_all is not None:
         print("📸 Generating snapshots for all branches...")
-        snapshot_for_branch(project_root, "main", project_root, args.snapshot_all)
-        snapshot_for_branch(project_root, "testing", os.path.join(project_root, TESTING_BRANCH_DIR_NAME), args.snapshot_all)
-        snapshot_for_branch(project_root, "dev", os.path.join(project_root, DEV_BRANCH_DIR_NAME), args.snapshot_all)
+        snapshot_for_branch(environment_root, "main", main_branch_dir, args.snapshot_all)
+        snapshot_for_branch(environment_root, "testing", os.path.join(environment_root, TESTING_BRANCH_DIR_NAME), args.snapshot_all)
+        snapshot_for_branch(environment_root, "dev", os.path.join(environment_root, DEV_BRANCH_DIR_NAME), args.snapshot_all)
         print("\n✅ All snapshots generated.")
     elif args.run_tests_main:
-        run_tests_for_branch(project_root, "main", project_root)
+        run_tests_for_branch(environment_root, "main", main_branch_dir)
     elif args.run_tests_dev:
-        run_tests_for_branch(project_root, "dev", os.path.join(project_root, DEV_BRANCH_DIR_NAME))
+        run_tests_for_branch(environment_root, "dev", os.path.join(environment_root, DEV_BRANCH_DIR_NAME))
     elif args.run_tests_testing:
-        run_tests_for_branch(project_root, "testing", os.path.join(project_root, TESTING_BRANCH_DIR_NAME))
+        run_tests_for_branch(environment_root, "testing", os.path.join(environment_root, TESTING_BRANCH_DIR_NAME))
     elif args.run_tests_all:
         print("🧪 Running test suites for all branches...")
-        run_tests_for_branch(project_root, "main", project_root)
-        run_tests_for_branch(project_root, "testing", os.path.join(project_root, TESTING_BRANCH_DIR_NAME))
-        run_tests_for_branch(project_root, "dev", os.path.join(project_root, DEV_BRANCH_DIR_NAME))
+        run_tests_for_branch(environment_root, "main", main_branch_dir)
+        run_tests_for_branch(environment_root, "testing", os.path.join(environment_root, TESTING_BRANCH_DIR_NAME))
+        run_tests_for_branch(environment_root, "dev", os.path.join(environment_root, DEV_BRANCH_DIR_NAME))
         print("\n✅ All test suites have been run.")
 
 if __name__ == "__main__":
