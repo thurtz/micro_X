@@ -6,6 +6,7 @@ import subprocess # For running other utility scripts
 import sys # For using sys.executable
 import argparse # For command-line arguments
 import re # For log parsing
+import ast # For parsing Python files and extracting docstrings
 
 # --- Help Text ---
 HELP_TEXT = """
@@ -19,7 +20,7 @@ Usage:
 Options:
   -s, --summary <message>   - Add a summary message to the snapshot.
   --include-logs            - Include the latest log session in the snapshot.
-  --summarize               - Summarize module files using their API documentation blocks.
+  --summarize               - Summarize module files using their docstrings.
   --include-full-module <name> - Specify a module to include in full, even when --summarize is active.
 
 Examples:
@@ -157,10 +158,6 @@ LOG_MESSAGE_CAPTURE_PATTERN = re.compile(
     r"[\w\.<>-]+:\d+\s*-\s*(.*)$"
 )
 
-# API Documentation markers
-API_DOC_START_MARKER = "# --- API DOCUMENTATION for"
-API_DOC_END_MARKER = "# --- END API DOCUMENTATION ---"
-
 # --- Helper Functions ---
 def get_project_root():
     """Determines the project root directory."""
@@ -193,32 +190,48 @@ def read_file_content(filepath):
         return None
 
 def extract_api_documentation(filepath: str) -> str:
-    """Extracts the API documentation block from a module file."""
+    """Extracts docstrings from functions, coroutines, and classes in a Python file."""
     try:
         with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
-            lines = f.readlines()
+            source = f.read()
         
-        doc_lines = []
-        in_doc_block = False
-        for line in lines:
-            if API_DOC_START_MARKER in line:
-                in_doc_block = True
-            
-            if in_doc_block:
-                doc_lines.append(line)
-            
-            if API_DOC_END_MARKER in line:
-                break # Stop after finding the end marker
+        tree = ast.parse(source)
+        docstrings = []
+
+        # Module-level docstring
+        module_docstring = ast.get_docstring(tree)
+        if module_docstring:
+            docstrings.append(f"""Module: {os.path.basename(filepath)}
+{module_docstring}
+"""
+)
+
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                docstring = ast.get_docstring(node)
+                if docstring:
+                    if isinstance(node, ast.ClassDef):
+                        docstrings.append(f"""Class: {node.name}
+{docstring}
+"""
+)
+                    else:
+                        docstrings.append(f"""Function: {node.name}
+{docstring}
+"""
+)
         
-        if doc_lines:
-            return "".join(doc_lines)
+        if docstrings:
+            return "\n".join(docstrings)
         else:
-            return f"[API Documentation block not found in {os.path.basename(filepath)}]\n"
+            return f"[No docstrings found in {os.path.basename(filepath)}]\n"
             
     except FileNotFoundError:
         return f"[File not found: {os.path.basename(filepath)}]\n"
+    except SyntaxError as e:
+        return f"[Syntax error parsing {os.path.basename(filepath)}: {e}]\n"
     except Exception as e:
-        return f"[Error reading API documentation from {os.path.basename(filepath)}: {e}]\n"
+        return f"[Error extracting docstrings from {os.path.basename(filepath)}: {e}]\n"
 
 def run_utility_script(script_name: str, project_root: str, utils_dir: str) -> dict:
     """Runs a utility script and returns a structured result.
@@ -597,7 +610,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--summarize", action="store_true",
-        help="Summarize module files using their API documentation blocks\ninstead of including the full code to save tokens.",
+        help="Summarize module files using their docstrings instead of including the full code to save tokens.",
         default=False
     )
     parser.add_argument(
