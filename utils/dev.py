@@ -291,8 +291,7 @@ def snapshot_for_branch(environment_root, branch_name, branch_project_root_path,
 
     if not any(arg.startswith('--summary') or arg == '-s' for arg in extra_args):
         snapshot_command.extend(['--summary', f'Generated from main branch for {branch_name} branch'])
-    if '--include-logs' not in extra_args:
-        snapshot_command.append('--include-logs')
+
     
     output = run_command(snapshot_command, branch_project_root_path, f"Generating snapshot for {branch_name}", capture=True)
     if output is None:

@@ -23,7 +23,9 @@ def generate_snapshot(
 ) -> str:
     """
     Creates a snapshot of a specified project branch. Defaults to the 'dev' branch.
-    Can optionally include a summary, include logs, or summarize modules.
+    Use the 'summary' parameter to add a message.
+    Only set 'include_logs' to True if the user explicitly asks for logs.
+    Only set 'summarize_modules' to True if the user explicitly asks to summarize, shorten, or reduce the size of the snapshot.
     If 'branch' is 'all', snapshots are generated for main, testing, and dev branches.
     The 'snapshot' command is an alias for 'generate_snapshot'.
     """
