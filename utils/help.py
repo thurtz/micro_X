@@ -32,6 +32,7 @@ Common Commands:
   /command            - Manage command categorizations.
   /config             - Opens a web UI to manage your configuration.
   /snapshot           - Creates a snapshot of the project for context sharing.
+  /knowledge          - Manages and queries the local RAG knowledge base.
   /tree               - Generates a file showing the project structure.
   /docs               - Opens the project documentation in a web browser.
   /test               - Runs the project's test suite.
@@ -44,7 +45,7 @@ Common Commands:
 
 For more details on a specific feature, use '/help <topic>'.
 Available Topics:
-  ai, alias, command, config, dev, install_requirements, keybindings, list, security, snapshot, utilities
+  ai, alias, command, config, dev, install_requirements, keybindings, knowledge, list, security, snapshot, utilities
 """
 
 AI_HELP = """
@@ -130,7 +131,7 @@ def main():
         print(GENERAL_HELP)
     elif topic == 'ai':
         print(AI_HELP)
-    elif topic in ('alias', 'command', 'config', 'dev', 'docs', 'install_requirements', 'list', 'snapshot', 'utilities'):
+    elif topic in ('alias', 'command', 'config', 'dev', 'docs', 'install_requirements', 'knowledge', 'list', 'snapshot', 'utilities'):
         module_name = {
             'alias': 'alias.py',
             'command': 'command.py',
@@ -138,6 +139,7 @@ def main():
             'dev': 'dev.py',
             'docs': 'docs.py',
             'install_requirements': 'install_requirements.py',
+            'knowledge': 'knowledge.py',
             'list': 'list_scripts.py',
             'snapshot': 'generate_snapshot.py',
             'utilities': 'docs.py'

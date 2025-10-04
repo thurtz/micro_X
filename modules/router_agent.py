@@ -47,7 +47,7 @@ def create_router_agent(config: dict):
     agent_executor = AgentExecutor(
         agent=agent,
         tools=tools,
-        verbose=True, # Keep verbose for now to confirm it works
+        verbose=False, # Keep verbose for now to confirm it works
         handle_parsing_errors=True,
         return_intermediate_steps=True # This is the crucial change
     )

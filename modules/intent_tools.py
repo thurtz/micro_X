@@ -107,6 +107,43 @@ def remove_alias(alias_name: str) -> str:
     return f'/utils alias --remove {alias_name}'
 
 
+@tool
+def query_knowledge_base(query: str, kb_name: str = "default") -> str:
+    """
+    Use this tool to answer questions using a user-curated knowledge base.
+    If the user's query mentions a specific knowledge base, provide its name using the 'kb_name' parameter.
+    The input must be the user's full question.
+    """
+    return f'/knowledge --name {kb_name} query "{query}"'
+
+
+@tool
+def add_file_to_knowledge_base(path: str, kb_name: str = "default") -> str:
+    """
+    Use this tool to add a local file to a specified knowledge base.
+    The user must provide the path to the file. If they specify a knowledge base name, pass it as 'kb_name'.
+    For example: 'add the file /path/to/my/doc.md to the my_kb knowledge base'.
+    """
+    return f'/knowledge --name {kb_name} add-file {path}'
+
+
+@tool
+def add_url_to_knowledge_base(url: str, kb_name: str = "default", recursive: bool = False, depth: int = 1, save_cache: bool = False) -> str:
+    """
+    Use this tool to add content from a URL to a specified knowledge base.
+    The user must provide the URL. If they specify a knowledge base name, pass it as 'kb_name'.
+    Set 'recursive' to True or specify a 'depth' greater than 1 to crawl the website.
+    Set 'save_cache' to True to keep a local copy of the downloaded pages.
+    """
+    command = f'/knowledge --name {kb_name} add-url {url}'
+    # A depth > 1 implies recursion.
+    if recursive or depth > 1:
+        command += f' --recursive --depth {depth}'
+    if save_cache:
+        command += ' --save-cache'
+    return command
+
+
 def get_all_tools():
     """Returns a list of all defined intent tools."""
     return [
@@ -121,4 +158,7 @@ def get_all_tools():
         move_command_to_category,
         add_alias,
         remove_alias,
+        query_knowledge_base,
+        add_file_to_knowledge_base,
+        add_url_to_knowledge_base,
     ]
