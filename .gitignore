@@ -196,3 +196,7 @@ micro_X-dev/
 
 *.code-workspace
 gemini_startup_prompt.txt
+
+# Knowledge base files
+knowledge_bases/
+knowledge_base/
