@@ -24,6 +24,23 @@ except ImportError as e:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: /setup_brew Utility
+
+This utility helps install and configure Homebrew on macOS, Debian-based Linux, or WSL.
+
+Usage:
+  /setup_brew --install
+
+The --install flag will:
+1. Check for and install Homebrew if it's not already present.
+2. On Linux/WSL, it will first ask to install prerequisite packages (like build-essential, curl, git) using 'sudo apt-get'.
+3. After installation, it will check your shell configuration file (e.g., .zshrc, .bashrc) and offer to add the necessary Homebrew environment setup command if it's missing.
+
+This utility is intended for users who do not have Homebrew installed and want a guided setup.
+"""
+
 # --- Helper Functions ---
 def command_exists(command):
     """Checks if a command exists on the system."""
@@ -186,16 +203,24 @@ def setup_brew_path():
 
 def main():
     """Main function to install Homebrew and create an alias."""
+    class HelpAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
+        def __call__(self, parser, namespace, values, option_string=None):
+            print(HELP_TEXT)
+            parser.exit()
+
     parser = argparse.ArgumentParser(
         description="Install Homebrew on macOS, Debian-based Linux, or WSL and create an alias for it in micro_X.",
-        epilog="This utility helps set up the Homebrew package manager and configures your shell environment."
+        add_help=False
     )
+    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
     parser.add_argument('--install', action='store_true', help='Run the Homebrew installation process.')
 
     args = parser.parse_args()
 
     if not args.install:
-        parser.print_help()
+        print(HELP_TEXT)
         sys.exit(0)
 
 

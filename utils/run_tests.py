@@ -8,6 +8,25 @@ import re # Not strictly needed in this version if only doing string replace for
 import logging
 import argparse # Added for help argument handling
 
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: /test Utility
+
+This utility runs the pytest test suite for the micro_X project and saves the sanitized results to the 'pytest_results' directory.
+
+Usage:
+  /test
+
+The script will:
+- Automatically locate the pytest executable within the project's .venv.
+- Run all tests found in the 'tests/' directory.
+- Sanitize the output by replacing local paths with placeholders like <PROJECT_ROOT> and <HOME>.
+- Save the full, sanitized output to:
+  - pytest_results/pytest_results.txt (for the latest run)
+  - pytest_results/pytest_results_<timestamp>.txt (as an archive)
+- Print a summary of the test results to the console.
+"""
+
 # --- Configuration ---
 RESULTS_DIR_NAME = "pytest_results"
 FIXED_RESULTS_FILENAME = "pytest_results.txt"
@@ -242,15 +261,22 @@ if __name__ == "__main__":
         format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
     )
 
+    class HelpAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
+        def __call__(self, parser, namespace, values, option_string=None):
+            print(HELP_TEXT)
+            parser.exit()
+
     parser = argparse.ArgumentParser(
         description="Run pytest for the micro_X project and save sanitized results.",
-        epilog="This script is typically run via '/utils run_tests' from within the micro_X shell, "
-               "or directly for development purposes. It expects pytest to be installed in the '.venv' "
-               "of the project root."
+        add_help=False
     )
+    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
 
-    
-    args = parser.parse_args() # Handles -h/--help
-
-    exit_code = run_tests_main_logic()
-    sys.exit(exit_code)
+    # If no arguments are provided, run the script, otherwise print help
+    if len(sys.argv) > 1:
+        args = parser.parse_args()
+    else:
+        exit_code = run_tests_main_logic()
+        sys.exit(exit_code)

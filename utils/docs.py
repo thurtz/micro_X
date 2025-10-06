@@ -8,25 +8,16 @@ import subprocess
 
 # --- Help Text ---
 HELP_TEXT = """
-micro_X Help: Built-in Utilities
+micro_X Help: /docs Utility
 
-micro_X comes with several utility scripts to help manage the shell and your project.
-While they can be run with '/utils <script_name>', it is recommended to use the shorter alias for them.
+This utility opens the local micro_X Sphinx documentation in your default web browser.
 
-Common Utilities & Their Aliases:
-  /alias
-  /command
-  /config
-  /dev
-  /docs
-  /snapshot
-  /tree
-  /list
-  /ollama
-  /update
-  /test             (full command: /utils run_tests)
+Usage:
+  /docs             Opens documentation in the default graphical web browser.
+  /docs --lynx      Opens documentation in the Lynx text-based browser.
+  /docs --help      Shows this help message.
 
-To see all available utility scripts, run '/list'.
+The script will look for the main index.html file in the 'docs/source/build/html' directory of the project. If the file is not found, it will print an error message.
 """
 
 def main(args):

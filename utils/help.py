@@ -42,10 +42,12 @@ Common Commands:
   /dev                - Manage the multi-branch development environment.
     -> /dev --activate : Clones 'testing' and 'dev' branches to setup the dev environment.
   /setup_brew         - Installs Homebrew and required packages on macOS.
+  /git_branch         - Displays the current git branch.
+
 
 For more details on a specific feature, use '/help <topic>'.
 Available Topics:
-  ai, alias, command, config, dev, install_requirements, keybindings, knowledge, list, security, snapshot, utilities
+  ai, alias, command, config, dev, docs, git_branch, keybindings, knowledge, list, ollama, security, setup_brew, snapshot, test, tree, update, utilities
 """
 
 AI_HELP = """
@@ -109,6 +111,32 @@ Your Responsibility:
   - The 'Explain' feature is your best tool for understanding a command's purpose and potential impact.
 """
 
+UTILITIES_HELP = """
+micro_X Help: Built-in Utilities
+
+micro_X comes with several utility scripts to help manage the shell and your project.
+While they can be run with '/utils <script_name>', it is recommended to use the shorter alias for them.
+
+Common Utilities & Their Aliases:
+  /alias              - Manage command aliases.
+  /command            - Manage command categorizations.
+  /config             - Opens a web UI to manage your configuration.
+  /dev                - Manage the multi-branch development environment.
+  /docs               - Opens the project documentation in a web browser.
+  /git_branch         - Displays the current git branch.
+  /knowledge          - Manages and queries the local RAG knowledge base.
+  /list               - Lists available utility and user scripts.
+  /ollama             - Manage the Ollama service.
+  /setup_brew         - Installs Homebrew and required packages on macOS.
+  /snapshot           - Creates a snapshot of the project for context sharing.
+  /test               - Runs the project's test suite.
+  /tree               - Generates a file showing the project structure.
+  /update             - Pulls the latest changes for micro_X.
+
+To see all available utility scripts, run '/list'.
+For more details on a specific utility, use '/help <utility_name>'.
+"""
+
 # --- Main Logic ---
 
 def main():
@@ -131,18 +159,24 @@ def main():
         print(GENERAL_HELP)
     elif topic == 'ai':
         print(AI_HELP)
-    elif topic in ('alias', 'command', 'config', 'dev', 'docs', 'install_requirements', 'knowledge', 'list', 'snapshot', 'utilities'):
+    elif topic == 'utilities':
+        print(UTILITIES_HELP)
+    elif topic in ('alias', 'command', 'config', 'dev', 'docs', 'git_branch', 'knowledge', 'list', 'ollama', 'setup_brew', 'snapshot', 'test', 'tree', 'update'):
         module_name = {
             'alias': 'alias.py',
             'command': 'command.py',
             'config': 'config_manager.py',
             'dev': 'dev.py',
             'docs': 'docs.py',
-            'install_requirements': 'install_requirements.py',
+            'git_branch': 'git_branch.py',
             'knowledge': 'knowledge.py',
             'list': 'list_scripts.py',
+            'ollama': 'ollama_cli.py',
+            'setup_brew': 'setup_brew.py',
             'snapshot': 'generate_snapshot.py',
-            'utilities': 'docs.py'
+            'test': 'run_tests.py',
+            'tree': 'generate_tree.py',
+            'update': 'update.py'
         }[topic]
         utils_dir = os.path.dirname(os.path.abspath(__file__))
         module_path = os.path.join(utils_dir, module_name)

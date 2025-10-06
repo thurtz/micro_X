@@ -25,6 +25,22 @@ except ImportError as e:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: /ollama Utility
+
+This utility manages the Ollama service, which is used to run local AI models.
+
+Usage:
+  /ollama <subcommand>
+
+Subcommands:
+  start     - Starts the managed Ollama service if it's not already running.
+  stop      - Stops the managed Ollama service.
+  restart   - Restarts the managed Ollama service.
+  status    - Shows the current status of the Ollama service.
+  help      - Shows this help message.
+"""
 
 def print_for_manager(message, style_class='INFO'):
     """A simple print function to mimic the UI manager's append_output for this standalone script."""
@@ -53,22 +69,20 @@ async def main():
         print(f"❌ Error: Failed to load application configuration: {e}", file=sys.stderr)
         sys.exit(1)
 
+    class HelpAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
+        def __call__(self, parser, namespace, values, option_string=None):
+            print(HELP_TEXT)
+            parser.exit()
 
     parser = argparse.ArgumentParser(
         description="Manage the Ollama service for the micro_X shell.",
-        epilog="This utility interacts with the Ollama service, potentially using tmux for management."
+        add_help=False
     )
-    # Use a subparsers approach for clearer command structure
-    subparsers = parser.add_subparsers(dest='subcommand', help='Available subcommands', required=True)
+    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
+    parser.add_argument('subcommand', nargs='?', default='help', help='Available subcommands: start, stop, restart, status, help')
 
-    subparsers.add_parser('start', help="Start the managed Ollama service if it's not running.")
-    subparsers.add_parser('stop', help="Stop the managed Ollama service.")
-    subparsers.add_parser('restart', help="Restart the managed Ollama service.")
-    subparsers.add_parser('status', help="Show the current status of the Ollama service.")
-    subparsers.add_parser('help', help="Show this help message.")
-
-    # In a real scenario, sys.argv would be used. For direct calls, you might pass args.
-    # When run from shell_engine, the arguments after 'ollama_cli.py' are parsed.
     args = parser.parse_args()
 
     # The ollama_manager functions now require the config and a callback.
@@ -82,7 +96,7 @@ async def main():
     elif args.subcommand == 'status':
         await ollama_manager.get_ollama_status_info(config, print_for_manager)
     elif args.subcommand == 'help':
-        parser.print_help()
+        print(HELP_TEXT)
 
 
 if __name__ == "__main__":
