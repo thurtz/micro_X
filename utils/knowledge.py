@@ -154,8 +154,10 @@ async def main():
 
     # 4. Check if a command was provided. If not, print help.
     if not remaining_argv or remaining_argv[0] not in subparsers.choices.keys():
-        print(HELP_TEXT)
-        sys.exit(0)
+        # Also handle the case where only -h is passed after global args
+        if not remaining_argv or remaining_argv == ['--help'] or remaining_argv == ['-h']:
+             print(HELP_TEXT)
+             sys.exit(0)
 
     # 5. Parse the remaining args for the command, merging them into the global_args namespace
     args = parser.parse_args(remaining_argv, namespace=global_args)
