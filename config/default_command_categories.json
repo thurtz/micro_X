@@ -235,6 +235,7 @@
     "python utils/setup_brew.py --help",
     "python utils/setup_brew.py --install",
     "python utils/dev.py --activate",
+    "python utils/update.py",
     "brew"
   ],
   "interactive_tui": [
