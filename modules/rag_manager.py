@@ -150,6 +150,17 @@ class RAGManager:
                     headers = {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
                     }
+
+                    # First, send a HEAD request to check the content type
+                    head_response = requests.head(current_url, timeout=5, allow_redirects=True, headers=headers)
+                    head_response.raise_for_status()
+                    content_type = head_response.headers.get('Content-Type', '')
+
+                    if 'text/html' not in content_type:
+                        logger.info(f"Skipping non-HTML URL: {current_url} (Content-Type: {content_type})")
+                        continue
+
+                    # If content type is valid, proceed with GET request
                     response = requests.get(current_url, timeout=10, headers=headers)
                     response.raise_for_status()
                     html_content = response.text
