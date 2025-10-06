@@ -12,7 +12,7 @@
   "/ollama": "/utils ollama_cli",
   "/snapshot": "/utils generate_snapshot",
   "/tree": "/utils generate_tree",
-  "/update": "/utils update",
+  "/update": "python utils/update.py",
   "/test": "/utils run_tests",
   "/install_requirements": "/utils install_requirements",
   "/setup_brew": "python utils/setup_brew.py",

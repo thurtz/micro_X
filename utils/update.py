@@ -94,8 +94,21 @@ def run_update():
                 if original_req_hash != new_req_hash:
                     print(f"⚠️ {REQUIREMENTS_FILENAME} has changed.")
                     logger.info(f"{REQUIREMENTS_FILENAME} changed during update.")
-                    print("💡 After restarting, consider updating dependencies by running:")
-                    print(f"   /utils install_requirements --all")
+                    try:
+                        # Prompt the user to run the installation
+                        choice = input("   Run dependency installation now? (y/n): ").lower()
+                        if choice == 'y':
+                            print("🚀 Running dependency installation...")
+                            install_script_path = os.path.join(project_root, 'utils', 'install_requirements.py')
+                            # Use sys.executable to ensure we use the same python interpreter
+                            subprocess.run([sys.executable, install_script_path, '--all'], check=True)
+                            print("✅ Dependency installation complete.")
+                        else:
+                            print("Skipping installation. You can run '/utils install_requirements --all' later.")
+                    except Exception as e:
+                        print(f"❌ Failed to run installer: {e}")
+                        print("Please run '/utils install_requirements --all' manually.")
+
                 print("💡 Please restart micro_X for the changes to take effect.")
         else:
             print(f"❌ Git pull failed.\n--- Git Error ---\n{pull_process.stderr.strip()}\n-----------------")
