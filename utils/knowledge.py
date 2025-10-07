@@ -176,16 +176,18 @@ async def main():
 
     # --- Command Handling ---
     if args.command == "add-file":
-        if os.path.isabs(args.path):
-            rag_manager.add_file(args.path)
+        absolute_path = os.path.abspath(args.path)
+        if os.path.isfile(absolute_path):
+            rag_manager.add_file(absolute_path)
         else:
-            logger.error(f"Path '{args.path}' is not absolute. Please provide an absolute path.")
+            logger.error(f"File not found at resolved path: '{absolute_path}'")
 
     elif args.command == "add-dir":
-        if os.path.isabs(args.path):
-            rag_manager.add_directory(args.path)
+        absolute_path = os.path.abspath(args.path)
+        if os.path.isdir(absolute_path):
+            rag_manager.add_directory(absolute_path)
         else:
-            logger.error(f"Path '{args.path}' is not absolute. Please provide an absolute path.")
+            logger.error(f"Directory not found at resolved path: '{absolute_path}'")
 
     elif args.command == "add-url":
         rag_manager.add_url(args.url, recursive=args.recursive, save_cache=args.save_cache, depth=args.depth)
