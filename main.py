@@ -422,7 +422,7 @@ async def main_async_runner():
 
     initial_welcome_message = (
         "Welcome to micro_X Shell 🚀\n"
-        "Type a Linux command, or try '/ai your query' (e.g., /ai list text files).\n"
+        "Type a Linux command, or try '/translate your query' (e.g., /translate list text files).\n"
         "Key shortcuts are shown below. For more help, type '/help'.\n"
         "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
         "Use '/ollama help' to manage the Ollama service.\n"

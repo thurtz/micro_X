@@ -7,6 +7,6 @@ CONFIG_DIR_NAME = "config"
 UTILS_DIR_NAME = "utils"
 USER_SCRIPTS_DIR_NAME = "user_scripts"
 RESERVED_COMMAND_NAMES = [
-    "/ai", "/command", "/ollama", "/utils", "/update", "/help",
+    "/translate", "/command", "/ollama", "/utils", "/update", "/help",
     "exit", "quit", "/exit", "/quit"
 ]

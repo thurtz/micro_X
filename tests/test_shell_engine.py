@@ -262,11 +262,11 @@ async def test_execute_shell_command_verbose_success(shell_engine):
 
     with patch('asyncio.create_subprocess_shell', return_value=mock_process):
         # When original input is different, it triggers the verbose prefix
-        await shell_engine.execute_shell_command("ls -l", "/ai list files")
+        await shell_engine.execute_shell_command("ls -l", "/translate list files")
 
         # It should only be called once with the verbose prefix
         shell_engine.ui_manager.append_output.assert_called_once_with(
-            "Output from '/ai list files':\nVerbose output"
+            "Output from '/translate list files':\nVerbose output"
         )
 
 

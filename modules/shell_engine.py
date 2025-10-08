@@ -564,7 +564,7 @@ class ShellEngine:
 
         It orchestrates the flow:
         
-        1. Handles `/ai` queries by calling the AI handler.
+        1. Handles `/translate` queries by calling the AI handler.
         2. Processes direct command input from the user.
         3. For unknown commands, it uses the AI validator and may treat the input
            as a natural language query.
@@ -620,7 +620,7 @@ class ShellEngine:
             "open_docs": ("/docs", False),
             "open_docs_help": ("/docs --help", False),
             "open_docs_lynx": ("python utils/docs.py --lynx", True),
-            "show_help_ai": ("/help ai", False),
+            "show_help_translate": ("/help translate", False),
             "show_help_alias": ("/help alias", False),
             "show_help_command": ("/help command", False),
             "show_help_config": ("/help config", False),
@@ -666,15 +666,15 @@ class ShellEngine:
         # --- END INTENT CLASSIFICATION ---
 
         current_app_inst = self.ui_manager.get_app_instance()
-        if user_input_stripped.startswith("/ai "):
+        if user_input_stripped.startswith("/translate "):
             if not await self.ollama_manager_module.is_ollama_server_running():
                 self.ui_manager.append_output("⚠️ Ollama service is not available.", style_class='warning'); return
-            human_query = user_input_stripped[len("/ai "):].strip()
+            human_query = user_input_stripped[len("/translate "):].strip()
             if not human_query: self.ui_manager.append_output("⚠️ AI query empty.", style_class='warning'); return
             self.ui_manager.append_output(f"🤖 AI Query: {human_query}", style_class='ai-query')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
             linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(human_query, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
-            if linux_command: await self.process_command(linux_command, f"'/ai {human_query}'", ai_raw_candidate, None, is_ai_generated=True)
+            if linux_command: await self.process_command(linux_command, f"'/translate {human_query}'", ai_raw_candidate, None, is_ai_generated=True)
             else:
                 self.ui_manager.append_output("🤔 AI could not produce a validated command.", style_class='warning')
                 if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
