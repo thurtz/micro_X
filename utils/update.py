@@ -6,6 +6,22 @@ import subprocess
 import hashlib
 import logging
 import shutil
+import argparse
+
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: /update Utility
+
+This utility checks for and pulls the latest updates for micro_X from the git repository.
+
+Usage:
+  /update
+
+The script will:
+- Fetch and pull changes from the 'origin' remote for the current branch.
+- If the 'requirements.txt' file has changed, it will prompt you to run the dependency installer.
+- It is recommended to restart micro_X after updating.
+"""
 
 # --- Configuration ---
 REQUIREMENTS_FILENAME = "requirements.txt"
@@ -125,5 +141,28 @@ def run_update():
         print(f"❌ An unexpected error occurred during the update process: {e}")
         logger.error(f"Unexpected update error: {e}", exc_info=True)
 
+def main():
+    """
+    Main function to parse arguments and execute logic.
+    """
+    class HelpAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
+        def __call__(self, parser, namespace, values, option_string=None):
+            print(HELP_TEXT)
+            parser.exit()
+
+    parser = argparse.ArgumentParser(
+        description="Checks for and pulls the latest updates for micro_X from the git repository.",
+        add_help=False
+    )
+    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
+
+    # If no arguments are provided, run the script, otherwise print help
+    if len(sys.argv) > 1:
+        args = parser.parse_args()
+    else:
+        run_update()
+
 if __name__ == "__main__":
-    run_update()
+    main()
