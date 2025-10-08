@@ -23,10 +23,10 @@ GENERAL_HELP = """
 micro_X AI-Enhanced Shell
 
 A smart shell that translates natural language and streamlines your workflow.
-Start by typing a command or use '/ai' to translate from English.
+Start by typing a command or use '/translate' to translate from English.
 
 Common Commands:
-  /ai <query>         - Translates natural language to a shell command.
+  /translate <query>  - Translates natural language to a shell command.
   /help [topic]       - Displays this help message or help for a specific topic.
   /alias              - Manage command aliases (shortcuts).
   /command            - Manage command categorizations.
@@ -47,18 +47,18 @@ Common Commands:
 
 For more details on a specific feature, use '/help <topic>'.
 Available Topics:
-  ai, alias, command, config, dev, docs, git_branch, keybindings, knowledge, list, ollama, security, setup_brew, snapshot, test, tree, update, utilities
+  translate, alias, command, config, dev, docs, git_branch, keybindings, knowledge, list, ollama, security, setup_brew, snapshot, test, tree, update, utilities
 """
 
 AI_HELP = """
-micro_X Help: AI Features
+micro_X Help: AI Translation Features
 
 The core of micro_X is its ability to translate natural language into shell commands.
 
-/ai <query>
+/translate <query>
   - Translates your natural language <query> into a Linux command.
-  - Example: /ai list all text files in the current folder
-  - Example: /ai show me my IP address
+  - Example: /translate list all text files in the current folder
+  - Example: /translate show me my IP address
 
 AI Command Confirmation Flow:
   All AI-generated commands require your approval before execution. You will be prompted with the following options:
@@ -69,7 +69,7 @@ AI Command Confirmation Flow:
   [C]ancel: Abort the command. It will not be executed.
 
 AI Validation:
-  If you type a command that micro_X has not seen before, it will first use an AI to determine if it's a valid command or a natural language phrase. If it seems like a phrase, it will be treated as if you had used '/ai'.
+  If you type a command that micro_X has not seen before, it will first use an AI to determine if it's a valid command or a natural language phrase. If it seems like a phrase, it will be treated as if you had used '/translate'.
 """
 
 KEYS_HELP = """
@@ -149,7 +149,7 @@ def main():
         'topic',
         nargs='?',
         default='general',
-        help="The topic to get help on. Available: ai, alias, command, utilities, keybindings, config, security, dev."
+        help="The topic to get help on. Available: translate, alias, command, utilities, keybindings, config, security, dev."
     )
 
     args, unknown = parser.parse_known_args()
@@ -157,7 +157,7 @@ def main():
 
     if topic == 'general':
         print(GENERAL_HELP)
-    elif topic == 'ai':
+    elif topic == 'translate':
         print(AI_HELP)
     elif topic == 'utilities':
         print(UTILITIES_HELP)

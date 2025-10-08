@@ -15,7 +15,7 @@ If you installed the desktop entry during setup on Linux, you can also launch it
 The micro_X interface is divided into three main parts:
 
 * **Output Area**: The top, larger pane displays command output, AI messages, and logs. It is scrollable.  
-* **Input Area**: The bottom pane with a prompt (e.g., (~) >) is where you type your commands or /ai queries.  
+* **Input Area**: The bottom pane with a prompt (e.g., (~) >) is where you type your commands or /translate queries.  
 * **Key Help Bar**: A single line at the very bottom shows common keybindings.
 
 ## **Keybindings**

@@ -316,7 +316,7 @@ class TestUIConfirmationFlow:
     async def test_conf_flow_explain_then_execute_yes(self, mock_explain_ai, ui_manager_instance, mock_buffer_input):
         mock_explain_ai.return_value = "This is a detailed explanation of the command."
         command_to_confirm = "ls -la /tmp"
-        display_source = "/ai list all in tmp"
+        display_source = "/translate list all in tmp"
         mock_normal_accept_handler = MagicMock() 
 
         flow_task = asyncio.create_task(
@@ -350,7 +350,7 @@ class TestUIConfirmationFlow:
     @pytest.mark.asyncio
     async def test_conf_flow_categorize_simple_direct(self, ui_manager_instance, mock_buffer_input):
         command_to_confirm = "echo 'direct simple'"
-        display_source = "/ai echo simple"
+        display_source = "/translate echo simple"
         mock_normal_accept_handler = MagicMock()
 
         flow_task = asyncio.create_task(
@@ -371,7 +371,7 @@ class TestUIConfirmationFlow:
     @pytest.mark.asyncio
     async def test_conf_flow_modify_command(self, ui_manager_instance, mock_buffer_input):
         command_to_confirm = "some_command_to_edit"
-        display_source = "/ai edit this"
+        display_source = "/translate edit this"
         mock_normal_accept_handler = MagicMock()
 
         flow_task = asyncio.create_task(
@@ -395,7 +395,7 @@ class TestUIConfirmationFlow:
     @pytest.mark.asyncio
     async def test_conf_flow_cancel_direct(self, ui_manager_instance, mock_buffer_input):
         command_to_confirm = "dangerous_command"
-        display_source = "/ai do something risky"
+        display_source = "/translate do something risky"
         mock_normal_accept_handler = MagicMock()
 
         flow_task = asyncio.create_task(
