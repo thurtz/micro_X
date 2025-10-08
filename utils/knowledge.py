@@ -11,8 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from modules.rag_manager import RAGManager
 from modules import config_handler
-from langchain_ollama.llms import OllamaLLM
-from langchain_core.prompts import ChatPromptTemplate
+from modules.query_engine import query_knowledge_base, query_knowledge_base_rag
 
 # --- Logging Setup ---
 logger = logging.getLogger(__name__)
@@ -50,40 +49,6 @@ def load_config():
 
     return config
 
-async def get_rag_response(rag_manager: RAGManager, query: str, llm: OllamaLLM) -> str:
-    """Retrieves context from RAG and generates a response using an LLM."""
-    context_chunks = rag_manager.query(query, n_results=5)
-
-    if not context_chunks:
-        return "I could not find any relevant information in the knowledge base to answer your question."
-
-    context = "\n\n---\n\n".join(context_chunks)
-
-    template = """
-    You are an assistant for question-answering tasks.
-    Use the following pieces of retrieved context to answer the question.
-    If you don't know the answer, just say that you don't know.
-    Keep the answer concise and relevant.
-    Do not include your thinking process or any XML-style tags like <think> in your final response.
-
-    Context:
-    {context}
-
-    Question: {question}
-
-    Answer:
-    """
-    prompt = ChatPromptTemplate.from_template(template)
-
-    chain = prompt | llm
-
-    raw_response = await chain.ainvoke({"context": context, "question": query})
-    
-    # Programmatically strip the <think> block as a fallback
-    clean_response = re.sub(r"<think>.*?</think>", "", raw_response, flags=re.DOTALL).strip()
-    
-    return clean_response
-
 # --- Help Text ---
 HELP_TEXT = """
 micro_X Knowledge Base Utility
@@ -92,6 +57,7 @@ Usage: /knowledge [--name <kb_name>] <command> [options] [-q]
 
 Options:
   --name <kb_name>    Specify the knowledge base to use (defaults to 'default').
+  --rag               Use a language model to generate a natural language response to a query.
 
 Commands:
   query <text>        Ask a question to the knowledge base.
@@ -121,6 +87,7 @@ async def main():
     global_parser = argparse.ArgumentParser(add_help=False)
     global_parser.add_argument('-q', '--quiet', action='store_true', help='Suppress informational output.')
     global_parser.add_argument('--name', type=str, default='default', help='Specify the name of the knowledge base to use.')
+    global_parser.add_argument('--rag', action='store_true', help='Use a language model to generate a natural language response.')
     
     # 2. Parse the known global args, and leave the rest for the command parser
     global_args, remaining_argv = global_parser.parse_known_args()
@@ -150,7 +117,7 @@ async def main():
 
     # Command: query
     parser_query = subparsers.add_parser("query", help="Query the knowledge base.")
-    parser_query.add_argument("query_text", type=str, help="The question to ask.")
+    parser_query.add_argument("query_text", type=str, nargs=argparse.REMAINDER, help="The question to ask.")
 
     # 4. Check if a command was provided. If not, print help.
     if not remaining_argv or remaining_argv[0] not in subparsers.choices.keys():
@@ -163,16 +130,21 @@ async def main():
     args = parser.parse_args(remaining_argv, namespace=global_args)
 
     # --- Logging Configuration ---
-    log_level = logging.WARNING if args.quiet else logging.INFO
-    logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
+    if not logging.getLogger().hasHandlers():
+        log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, 'micro_x.log')
+        log_level = logging.WARNING if args.quiet else logging.INFO
+        handler = logging.FileHandler(log_file)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logging.getLogger().addHandler(handler)
+        logging.getLogger().setLevel(log_level)
 
     # --- Initialization ---
     config = load_config()
     rag_manager = RAGManager(config, name=args.name)
     rag_manager.initialize()
-
-    llm_model_name = config.get('ai_models', {}).get('router', {}).get('model', 'herawen/lisa')
-    llm = OllamaLLM(model=llm_model_name)
 
     # --- Command Handling ---
     if args.command == "add-file":
@@ -193,7 +165,11 @@ async def main():
         rag_manager.add_url(args.url, recursive=args.recursive, save_cache=args.save_cache, depth=args.depth)
 
     elif args.command == "query":
-        response = await get_rag_response(rag_manager, args.query_text, llm)
+        query_text = " ".join(args.query_text)
+        if args.rag:
+            response = await query_knowledge_base_rag(kb_name=args.name, query=query_text)
+        else:
+            response = query_knowledge_base(kb_name=args.name, query=query_text)
         print("\nResponse:")
         print(response)
 
