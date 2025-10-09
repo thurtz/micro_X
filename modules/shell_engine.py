@@ -581,6 +581,11 @@ class ShellEngine:
             if self.main_restore_normal_input_ref and from_edit_mode: self.main_restore_normal_input_ref()
             return
 
+        # --- FIX: Handle 'cd' command directly ---
+        if user_input_stripped.startswith("cd ") or user_input_stripped == "cd":
+            await self.handle_cd_command(user_input_stripped)
+            return
+
         # --- INTENT CLASSIFICATION (NEW) ---
         INTENT_COMMAND_MAP = {
             "show_help": ("/help", False),
