@@ -12,15 +12,12 @@ You can control the Ollama service directly from within micro_X.
 * **/ollama restart**: Restarts the managed ollama serve process.  
 * **/ollama help**: Displays help information for these subcommands.
 
-## **Managing Runtime AI Configuration (/config)**
+## **Web-Based Configuration Manager (/config)**
 
-You can view and modify parts of the AI configuration without restarting micro_X.
+For an easy way to view and edit your user configuration files, you can use the web-based configuration manager.
 
-* **/config list**: Shows the current models and options for each AI role.  
-* **/config get \<key.path\>**: Displays the value of a specific configuration key.  
-* **/config set \<key.path\> \<value\>**: Sets a new value for a configuration key at runtime.  
-* **/config save**: Saves the current runtime AI model configurations to your user_config.json file.  
-* **/config help**: Shows usage instructions.
+*   **/config --start**: Starts a local web server and opens a page in your browser for editing `user_config.json` and `user_command_categories.json`.
+*   **/config --stop**: Stops the configuration manager's web server.
 
 ## **Updating micro_X (/update)**
 
@@ -35,7 +32,10 @@ micro_X comes with helpful utility scripts located in the utils/ directory.
 
 * **/utils list**: Displays a list of available utility scripts.  
 * **/utils \<script_name\> \[args...\]**: Executes the specified utility script.  
-  * *Example*: /utils generate_tree  
+  * *Example*: /utils generate_tree
+
+**Note:** While you can run utility scripts directly, it is recommended to use their corresponding aliases (e.g., `/tree` instead of `/utils generate_tree`) for a better experience. The aliases are designed to be more memorable and provide a consistent interface.
+
   * **Web Config Manager**: A key utility is the web-based configuration manager. Launch it with:  
     /utils config_manager --start
 

@@ -134,3 +134,36 @@ The review recommended improving the robustness of the command cleaning logic an
 * **Added Negative Test Cases:** Several new test cases were added to `clean_command_test_cases`. These new tests explicitly assert that `_clean_extracted_command` does **not** modify valid commands containing common shell syntax, such as:  
     * `echo '$(pwd)'`  
     * `echo`
+
+# **Change Log: Documentation and User Experience Improvements**
+
+## **Date: 2025-10-09**
+
+## **This document details a series of changes made to improve the documentation and user experience of micro_X.**
+
+## **1. Issues Addressed**
+
+This series of changes addresses several discrepancies found between the project's documentation and its actual behavior. The goal is to ensure that the documentation is accurate, clear, and helpful for both end-users and developers.
+
+## **2. Summary of Changes**
+
+*   **Created `user_scripts/` directory:** The `user_scripts/` directory, which is expected by the code for user-defined scripts, was missing. It has been created and a `.placeholder` file has been added to ensure it is tracked by git.
+*   **Updated `README.md`:** The `README.md` file has been updated to:
+    *   Clarify that any unknown command is automatically sent to the AI for translation.
+    *   Clarify that the `/translate` command can be used to force a query to be treated as a natural language command.
+    *   Update the description of the `/config` command to reflect its current functionality (starting and stopping the web server).
+    *   Remove the "Runtime AI Configuration" section from the "Key Features" section.
+*   **Updated User Guide:** The user guide has been updated to be more accurate and consistent with the current implementation:
+    *   `docs/source/user_guide/01_installation.md`: Removed the redundant `chmod +x setup.sh` command.
+    *   `docs/source/user_guide/03_ai_features.md`: Clarified the AI translation functionality, explaining the difference between automatic and forced translation.
+    *   `docs/source/user_guide/04_command_categorization.md`: Corrected the categorization prompt to match the current implementation.
+    *   `docs/source/user_guide/05_management_and_utils.md`: Updated the description of the `/config` command and added a note recommending the use of aliases over direct script execution.
+    *   `docs/source/user_guide/07_advanced_topics.md`: Corrected the description of `semi_interactive` commands.
+
+## **3. Impact**
+
+These changes improve the overall quality and usability of the project by:
+
+*   **Reducing Confusion:** The documentation now accurately reflects the behavior of the application, reducing potential confusion for users.
+*   **Improving User Experience:** The creation of the `user_scripts/` directory and the clarification of command functionalities make the application easier to use.
+*   **Enhancing Developer Experience:** The updated documentation makes it easier for developers to understand the project and contribute to it.
