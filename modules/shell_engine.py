@@ -625,6 +625,7 @@ class ShellEngine:
             "open_docs": ("/docs", False),
             "open_docs_help": ("/docs --help", False),
             "open_docs_lynx": ("python utils/docs.py --lynx", True),
+            "show_help_docs": ("/help docs", False),
             "show_help_translate": ("/help translate", False),
             "show_help_alias": ("/help alias", False),
             "show_help_command": ("/help command", False),

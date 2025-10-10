@@ -192,6 +192,11 @@
         "docs lynx",
         "open the docs in lynx"
     ],
+    "show_help_docs": [
+        "/help docs",
+        "help docs",
+        "how to use docs"
+    ],
     "show_help_translate": [
         "/help translate",
         "help translate"
