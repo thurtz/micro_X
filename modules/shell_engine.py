@@ -632,6 +632,7 @@ class ShellEngine:
             "show_help_dev": ("/help dev", False),
             "show_help_keybindings": ("/help keybindings", False),
             "show_help_security": ("/help security", False),
+            "show_help_knowledge": ("/help knowledge", False),
             "show_help_utilities": ("/help utilities", False),
             "show_help_snapshot": ("/snapshot --help", False),
             "show_help_install": ("/help install_requirements", False),
