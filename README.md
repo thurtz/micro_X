@@ -43,6 +43,7 @@ micro_X provides a text-based user interface (TUI) where you can:
 *   Type standard Linux commands.
 *   Enter natural language queries and have them automatically translated into shell commands.
 *   Force a query to be treated as a natural language command by prefixing it with `/translate`.
+*   **Query Documentation:** Ask questions about the project's documentation in natural language using the `/docs --query` command.
 *   **Confirm AI-Generated Commands:** Review, get explanations, modify, or cancel commands suggested by the AI before execution.
 *   Categorize commands (simple, semi_interactive, interactive_tui) for appropriate execution, including running interactive commands in tmux.
 *   **Run Custom Scripts:** Add your own Python scripts to a dedicated `user_scripts/` directory (which you may need to create) and run them with the `/run` command.
@@ -110,6 +111,8 @@ micro_X's behavior at startup is influenced by the current Git branch:
 *   **Automatic AI Translation:** Enter any natural language query, and if it's not a known command, micro_X will attempt to translate it into a shell command.
 *   **Forced AI Translation (`/translate`):** Prefix your query with `/translate` to force it to be treated as a natural language command.
     *   `(/~) > /translate list text files`
+*   **Query Documentation (`/docs`):** Ask questions about the project's documentation.
+    *   `(/~) > /docs --query "how do I use the snapshot command?" --rag`
 *   **User Scripts (`/run`):** Execute your own scripts from the `user_scripts/` directory.
     *   `(/~) > /run my_script --with-args`
 *   **Aliases (`/alias`, `/command`, `/config`, etc.):** Use aliases for common utilities.
