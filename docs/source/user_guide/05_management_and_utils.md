@@ -26,6 +26,13 @@ The /update command checks for and downloads the latest changes for micro_X from
 
 If changes are downloaded, you will be prompted to restart micro_X for them to take effect.
 
+## **Querying the Documentation (/docs)**
+
+You can search the project's documentation using natural language queries.
+
+*   **/docs --query <question>**: Queries the documentation knowledge base and returns relevant excerpts.
+*   **/docs --query <question> --rag**: Queries the documentation with a language model to generate a natural language response.
+
 ## **Using Utility Scripts (/utils)**
 
 micro_X comes with helpful utility scripts located in the utils/ directory.

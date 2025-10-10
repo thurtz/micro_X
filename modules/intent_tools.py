@@ -151,6 +151,14 @@ def add_url_to_knowledge_base(url: str, kb_name: str = "default", recursive: boo
     return command
 
 
+@tool
+def query_docs(query: str) -> str:
+    """
+    Searches the project's documentation to answer a user's question. Use this for any query that asks about the project's own features, commands, or architecture.
+    """
+    return f'/docs --query "{query}" --rag'
+
+
 def get_all_tools():
     """Returns a list of all defined intent tools."""
     return [
@@ -169,4 +177,5 @@ def get_all_tools():
         add_file_to_knowledge_base,
         add_directory_to_knowledge_base,
         add_url_to_knowledge_base,
+        query_docs,
     ]
