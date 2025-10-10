@@ -2,15 +2,17 @@
 
 The core of micro_X is its ability to integrate AI to translate, validate, and explain commands.
 
-## **AI Translation (/translate command)**
+## **AI Translation**
 
-To translate a natural language query into a shell command, prefix your query with /translate.
+micro_X can translate your natural language queries into shell commands in two ways:
 
-1. Type /translate followed by your request.  
-   * *Example*: /translate show me all files larger than 10MB in the current directory  
-   * *Example*: /translate what is my current IP address  
-2. Press **Enter**.  
-3. micro_X will send your query to the AI, which will attempt to translate it into a valid command.
+1.  **Automatic Translation**: If you enter a query that is not a known command, micro_X will automatically treat it as a natural language query and attempt to translate it into a shell command.
+2.  **Forced Translation (`/translate` command)**: To explicitly tell micro_X to treat your query as a natural language command, prefix it with `/translate`.
+
+    *   *Example*: `/translate show me all files larger than 10MB in the current directory`
+    *   *Example*: `/translate what is my current IP address`
+
+In both cases, micro_X will send your query to the AI, which will attempt to translate it into a valid command.
 
 ## **Command Confirmation Flow**
 
