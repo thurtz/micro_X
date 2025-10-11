@@ -594,6 +594,7 @@ class ShellEngine:
             "ollama_restart": ("/ollama restart", False),
             "ollama_status": ("/ollama status", False),
             "ollama_help": ("/ollama help", False),
+            "show_help_ollama": ("/help ollama", False),
             "command_list": ("/command --list", False),
             "command_help": ("/command --help", False),
             "config_start": ("/config --start", False),
