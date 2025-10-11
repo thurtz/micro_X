@@ -248,6 +248,11 @@
         "help snapshot",
         "how to use snapshot"
     ],
+    "show_help_tree": [
+        "/help tree",
+        "help tree",
+        "how to use tree"
+    ],
     "list_utils": [
         "/list --type utils",
         "list utils",
@@ -258,10 +263,19 @@
         "list help",
         "how to use list"
     ],
+    "show_help_list": [
+        "/help list",
+        "help list"
+    ],
     "update_system": [
         "/update",
         "update",
         "update system",
         "update micro_x"
+    ],
+    "show_help_update": [
+        "/help update",
+        "help update",
+        "how to update"
     ]
 }

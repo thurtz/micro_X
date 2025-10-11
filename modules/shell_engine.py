@@ -636,10 +636,13 @@ class ShellEngine:
             "show_help_knowledge": ("/help knowledge", False),
             "show_help_utilities": ("/help utilities", False),
             "show_help_snapshot": ("/snapshot --help", False),
+            "show_help_tree": ("/help tree", False),
             "show_help_install": ("/help install_requirements", False),
             "list_help": ("/list --help", False),
             "list_utils": ("/list --type utils", False),
+            "show_help_list": ("/help list", False),
             "update_system": ("/update", False),
+            "show_help_update": ("/help update", False),
         }
 
         if self.embedding_manager_instance:
