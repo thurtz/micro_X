@@ -611,9 +611,6 @@ class ShellEngine:
             "dev_run_tests_dev": ("/dev --run-tests-dev", False),
             "dev_run_tests_all": ("/dev --run-tests-all", False),
             "generate_project_tree": ("/tree", False),
-            "install_dependencies_runtime": ("/install_requirements --runtime", False),
-            "install_dependencies_dev": ("/install_requirements --dev", False),
-            "install_dependencies_all": ("/install_requirements --all", False),
             "setup_brew_install": ("python utils/setup_brew.py --install", True),
             "show_help_setup_brew": ("/help setup_brew", False),
             "open_docs": ("/docs", False),
@@ -632,7 +629,6 @@ class ShellEngine:
             "show_help_snapshot": ("/help snapshot", False),
             "show_help_test": ("/help test", False),
             "show_help_tree": ("/help tree", False),
-            "show_help_install": ("/help install_requirements", False),
             "list_utils": ("/list --type utils", False),
             "show_help_list": ("/help list", False),
             "update_system": ("/update", False),
@@ -651,10 +647,6 @@ class ShellEngine:
                     app_instance = self.ui_manager.get_app_instance()
                     if app_instance and hasattr(app_instance, 'is_running') and app_instance.is_running:
                         app_instance.exit()
-                    return
-
-                elif intent == "clear_screen":
-                    await self.process_command("clear", "clear")
                     return
 
                 elif intent in INTENT_COMMAND_MAP:
