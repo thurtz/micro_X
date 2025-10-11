@@ -18,11 +18,6 @@
         "close the shell",
         "I'm done"
     ],
-    "show_history": [
-        "/history",
-        "history",
-        "show my command history"
-    ],
     "ollama_start": [
         "/ollama start",
         "ollama start",
