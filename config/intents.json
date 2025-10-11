@@ -53,6 +53,11 @@
         "/ollama help",
         "ollama help"
     ],
+    "show_help_ollama": [
+        "/help ollama",
+        "help ollama",
+        "how to use ollama"
+    ],
     "command_list": [
         "/command list",
         "command list"
