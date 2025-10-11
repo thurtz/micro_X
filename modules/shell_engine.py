@@ -623,6 +623,7 @@ class ShellEngine:
             "install_requirements_help": ("/install_requirements --help", False),
             "setup_brew_install": ("python utils/setup_brew.py --install", True),
             "setup_brew_help": ("/setup_brew --help", False),
+            "show_help_setup_brew": ("/help setup_brew", False),
             "open_docs": ("/docs", False),
             "open_docs_help": ("/docs --help", False),
             "open_docs_lynx": ("python utils/docs.py --lynx", True),

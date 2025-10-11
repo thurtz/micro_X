@@ -183,6 +183,11 @@
         "/setup_brew --help",
         "setup_brew help"
     ],
+    "show_help_setup_brew": [
+        "/help setup_brew",
+        "help setup_brew",
+        "how to use setup_brew"
+    ],
     "open_docs": [
         "/docs",
         "docs"
