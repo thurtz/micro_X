@@ -220,6 +220,11 @@
         "help snapshot",
         "how to use snapshot"
     ],
+    "show_help_test": [
+        "/help test",
+        "help test",
+        "how to use test"
+    ],
     "show_help_tree": [
         "/help tree",
         "help tree",

@@ -630,6 +630,7 @@ class ShellEngine:
             "show_help_knowledge": ("/help knowledge", False),
             "show_help_utilities": ("/help utilities", False),
             "show_help_snapshot": ("/help snapshot", False),
+            "show_help_test": ("/help test", False),
             "show_help_tree": ("/help tree", False),
             "show_help_install": ("/help install_requirements", False),
             "list_utils": ("/list --type utils", False),
