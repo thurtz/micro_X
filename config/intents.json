@@ -125,22 +125,6 @@
         "tree",
         "generate project tree"
     ],
-    "install_dependencies_runtime": [
-        "/utils install_requirements --runtime",
-        "install_requirements runtime"
-    ],
-    "install_dependencies_dev": [
-        "/utils install_requirements --dev",
-        "install_requirements dev"
-    ],
-    "install_dependencies_all": [
-        "/utils install_requirements --all",
-        "install_requirements all"
-    ],
-    "show_help_install": [
-        "/help install_requirements",
-        "help install_requirements"
-    ],
     "setup_brew_install": [
         "/setup_brew --install",
         "setup_brew install"
