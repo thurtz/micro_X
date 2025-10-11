@@ -323,7 +323,7 @@ class ShellEngine:
             log_path = temp_log_file.name
             escaped_command_str = shlex.quote(command_to_execute)
             wrapped_command = f"bash -c {escaped_command_str} |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
-            tmux_cmd_list_launch = ["tmux", "new-window", "-d", "-n", window_name, wrapped_command] # Added -d to detach
+            tmux_cmd_list_launch = ["tmux", "new-window", "-n", window_name, wrapped_command]
             
             logger.info(f"Launching semi_interactive tmux: {' '.join(tmux_cmd_list_launch)} (log: {log_path})")
             
