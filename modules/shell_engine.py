@@ -649,10 +649,6 @@ class ShellEngine:
                         app_instance.exit()
                     return
 
-                elif intent == "clear_screen":
-                    await self.process_command("clear", "clear")
-                    return
-
                 elif intent in INTENT_COMMAND_MAP:
                     command_to_run, needs_categorization = INTENT_COMMAND_MAP[intent]
                     if needs_categorization:
