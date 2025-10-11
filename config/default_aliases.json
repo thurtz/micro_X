@@ -17,5 +17,6 @@
   "/install_requirements": "/utils install_requirements",
   "/setup_brew": "python utils/setup_brew.py",
   "/setup_brew --help": "python utils/setup_brew.py --help",
-  "/setup_brew --install": "python utils/setup_brew.py --install"
+  "/setup_brew --install": "python utils/setup_brew.py --install",
+  "/setup": "./setup.sh"
 }
