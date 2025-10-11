@@ -632,6 +632,7 @@ class ShellEngine:
             "show_help_command": ("/help command", False),
             "show_help_config": ("/help config", False),
             "show_help_dev": ("/help dev", False),
+            "show_help_git_branch": ("/help git_branch", False),
             "show_help_keybindings": ("/help keybindings", False),
             "show_help_security": ("/help security", False),
             "show_help_knowledge": ("/help knowledge", False),

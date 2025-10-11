@@ -224,6 +224,11 @@
         "help dev",
         "how to develop the shell"
     ],
+    "show_help_git_branch": [
+        "/help git_branch",
+        "help git_branch",
+        "how to use git_branch"
+    ],
     "show_help_keybindings": [
         "/help keybindings",
         "help keybindings",
