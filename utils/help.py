@@ -42,7 +42,7 @@ Common Commands:
   /ollama             - Manage the Ollama service.
   /dev                - Manage the multi-branch development environment.
     -> /dev --activate : Clones 'testing' and 'dev' branches to setup the dev environment.
-  /setup_brew         - Installs Homebrew and required packages on macOS.
+  /setup_brew         - Installs Homebrew and required packages.
   /git_branch         - Displays the current git branch.
 
 
@@ -128,7 +128,7 @@ Common Utilities & Their Aliases:
   /knowledge          - Manages and queries the local RAG knowledge base.
   /list               - Lists available utility and user scripts.
   /ollama             - Manage the Ollama service.
-  /setup_brew         - Installs Homebrew and required packages on macOS.
+  /setup_brew         - Installs Homebrew and required packages.
   /snapshot           - Creates a snapshot of the project for context sharing.
   /test               - Runs the project's test suite.
   /tree               - Generates a file showing the project structure.
