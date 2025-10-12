@@ -689,6 +689,15 @@ class ShellEngine:
             # 2. If not, try the Translator Agent (`get_validated_ai_command`) to translate it to a shell command.
             # 3. If that also fails, run the original input as a direct command.
 
+            if user_input_stripped.startswith('!'):
+                command_to_categorize = user_input_stripped[1:].strip()
+                if not command_to_categorize:
+                    self.ui_manager.append_output(f"❌ Empty command after '!' prefix.", style_class='error')
+                    return
+                self.ui_manager.append_output(f"✨ '{command_to_categorize}' is not a known command. Starting categorization...", style_class='info')
+                await self.process_command(command_to_categorize, user_input_stripped)
+                return
+
             if user_input_stripped.startswith('/'):
                 self.ui_manager.append_output(f"❌ Unknown command: {user_input_stripped}", style_class='error')
                 return
