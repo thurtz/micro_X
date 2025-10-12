@@ -27,6 +27,7 @@ Start by typing a command or use '/translate' to translate from English.
 
 Common Commands:
   /translate <query>  - Translates natural language to a shell command.
+  !command            - Force a command to be treated as a direct command, bypassing AI.
   /help [topic]       - Displays this help message or help for a specific topic.
   /alias              - Manage command aliases (shortcuts).
   /command            - Manage command categorizations.

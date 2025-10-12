@@ -16,6 +16,13 @@ Categories:
   - semi_interactive: For commands that run longer or have a lot of output (e.g., apt update, ping). They run in a managed tmux window, with output shown upon completion.
   - interactive_tui: For full-screen, interactive applications (e.g., nano, vim, htop, ssh). They take over the screen in a tmux window until you exit.
 
+Forcing Direct Command Execution:
+  To bypass all AI validation and natural language processing, prefix your command with an exclamation mark (!). This tells micro_X to treat the input as a direct command.
+  - If the command is already known and categorized, it will be executed immediately.
+  - If the command is new, this will skip the AI validation and directly open the categorization menu.
+  - Example (execute a known command): !ls -l
+  - Example (add a new command): !my-new-command --with-options
+
 /command <subcommand>
   - The '/command' utility (an alias for '/utils command') allows you to manage your saved categorizations.
   - Usage:
