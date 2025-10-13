@@ -40,6 +40,7 @@ Common Commands:
   /update             - Pulls the latest changes for micro_X.
   /list               - Lists available utility and user scripts.
   /ollama             - Manage the Ollama service.
+  /logs               - Tails the logs for the main, testing, or dev branches.
   /dev                - Manage the multi-branch development environment.
     -> /dev --activate : Clones 'testing' and 'dev' branches to setup the dev environment.
   /setup_brew         - Installs Homebrew and required packages.
@@ -48,7 +49,7 @@ Common Commands:
 
 For more details on a specific feature, use '/help <topic>'.
 Available Topics:
-  translate, alias, command, config, dev, docs, git_branch, keybindings, knowledge, list, ollama, security, setup_brew, snapshot, test, tree, update, utilities
+  translate, alias, command, config, dev, docs, git_branch, keybindings, knowledge, list, logs, ollama, security, setup_brew, snapshot, test, tree, update, utilities
 """
 
 AI_HELP = """
@@ -162,7 +163,7 @@ def main():
         print(AI_HELP)
     elif topic == 'utilities':
         print(UTILITIES_HELP)
-    elif topic in ('alias', 'command', 'config', 'dev', 'docs', 'git_branch', 'knowledge', 'list', 'ollama', 'setup_brew', 'snapshot', 'test', 'tree', 'update'):
+    elif topic in ('alias', 'command', 'config', 'dev', 'docs', 'git_branch', 'knowledge', 'list', 'logs', 'ollama', 'setup_brew', 'snapshot', 'test', 'tree', 'update'):
         module_name = {
             'alias': 'alias.py',
             'command': 'command.py',
@@ -172,6 +173,7 @@ def main():
             'git_branch': 'git_branch.py',
             'knowledge': 'knowledge.py',
             'list': 'list_scripts.py',
+            'logs': 'logs.py',
             'ollama': 'ollama_cli.py',
             'setup_brew': 'setup_brew.py',
             'snapshot': 'generate_snapshot.py',

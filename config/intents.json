@@ -222,5 +222,30 @@
         "/help update",
         "help update",
         "how to update"
+    ],
+    "logs_default": [
+        "/logs",
+        "logs",
+        "show logs"
+    ],
+    "logs_main": [
+        "/logs --main",
+        "logs main",
+        "show main logs"
+    ],
+    "logs_testing": [
+        "/logs --testing",
+        "logs testing",
+        "show testing logs"
+    ],
+    "logs_dev": [
+        "/logs --dev",
+        "logs dev",
+        "show dev logs"
+    ],
+    "show_help_logs": [
+        "/help logs",
+        "help logs",
+        "how to use logs"
     ]
 }

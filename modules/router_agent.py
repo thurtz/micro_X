@@ -7,7 +7,7 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama
 
-from modules.intent_tools import get_all_tools
+from modules.router_tools import get_all_tools
 
 # --- Logging Setup ---
 logger = logging.getLogger(__name__)

@@ -633,6 +633,11 @@ class ShellEngine:
             "show_help_list": ("/help list", False),
             "update_system": ("/update", False),
             "show_help_update": ("/help update", False),
+            "logs_default": ("python utils/logs.py", True),
+            "logs_main": ("python utils/logs.py --main", True),
+            "logs_testing": ("python utils/logs.py --testing", True),
+            "logs_dev": ("python utils/logs.py --dev", True),
+            "show_help_logs": ("/help logs", False),
         }
 
         if self.embedding_manager_instance:

@@ -5,6 +5,25 @@ import os
 import subprocess
 import sys
 
+HELP_TEXT = '''
+micro_X Help: /logs Command
+
+Usage: /logs [options]
+
+  Tails the micro_X log file for a specified branch. If no branch is specified, it defaults to the current branch.
+
+Options:
+  --main      Tail logs from the main branch.
+  --testing   Tail logs from the testing branch.
+  --dev       Tail logs from the dev branch.
+  -h, --help  Show this help message.
+
+Examples:
+  /logs           - Tails the logs of the current branch.
+  /logs --main    - Tails the logs of the main branch.
+  /logs --dev     - Tails the logs of the dev branch.
+'''
+
 # Define the root directory for the micro_X project structure.
 # os.path.expanduser("~") ensures the home directory is correctly resolved.
 ROOT_DIR = os.path.abspath(os.path.join(os.path.expanduser("~"), "micro_X"))
