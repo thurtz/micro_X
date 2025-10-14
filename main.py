@@ -232,17 +232,28 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
         return True, True
 
     current_branch = await git_context_manager_instance.get_current_branch()
+
+    # Set verbosity based on branch if not overridden by user
+    if config.get("behavior", {}).get("verbosity_level") == "default":
+        if current_branch in protected_branches:
+            config["behavior"]["verbosity_level"] = "quiet"
+        elif current_branch == developer_branch:
+            config["behavior"]["verbosity_level"] = "normal"
+
     head_commit = await git_context_manager_instance.get_head_commit_hash()
     logger.info(f"Detected Git branch: {current_branch}, HEAD: {head_commit}")
-    ui_manager_instance.append_output(f"ℹ️ Git context: Branch '{current_branch}', Commit '{head_commit[:7] if head_commit else 'N/A'}'", style_class='info')
+    if config.get("behavior", {}).get("verbosity_level") != "quiet":
+        ui_manager_instance.append_output(f"ℹ️ Git context: Branch '{current_branch}', Commit '{head_commit[:7] if head_commit else 'N/A'}'", style_class='info')
 
     if current_branch == developer_branch:
         is_developer_mode = True
-        ui_manager_instance.append_output(f"✅ Running in Developer Mode (branch: '{developer_branch}'). Integrity checks are informational.", style_class='success')
+        if config.get("behavior", {}).get("verbosity_level") != "quiet":
+            ui_manager_instance.append_output(f"✅ Running in Developer Mode (branch: '{developer_branch}'). Integrity checks are informational.", style_class='success')
         logger.info(f"Developer mode enabled: '{developer_branch}' branch checked out.")
     elif current_branch in protected_branches:
         is_developer_mode = False
-        ui_manager_instance.append_output(f"ℹ️ Running on protected branch '{current_branch}'. Performing integrity checks...", style_class='info')
+        if config.get("behavior", {}).get("verbosity_level") != "quiet":
+            ui_manager_instance.append_output(f"ℹ️ Running on protected branch '{current_branch}'. Performing integrity checks...", style_class='info')
 
         is_clean = await git_context_manager_instance.is_working_directory_clean()
         if not is_clean:
@@ -255,14 +266,16 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
                 raise StartupIntegrityError(error_msg, details=detail_msg)
             integrity_ok = False
         else:
-            ui_manager_instance.append_output(f"✅ Working directory is clean for branch '{current_branch}'.", style_class='info')
+            if config.get("behavior", {}).get("verbosity_level") != "quiet":
+                ui_manager_instance.append_output(f"✅ Working directory is clean for branch '{current_branch}'.", style_class='info')
 
         if integrity_ok:
             comparison_status, local_h, remote_h, fetch_status = await git_context_manager_instance.compare_head_with_remote_tracking(current_branch)
 
             if fetch_status == "success":
                 if comparison_status == "synced":
-                    ui_manager_instance.append_output(f"✅ Branch '{current_branch}' is synced with 'origin/{current_branch}'.", style_class='success')
+                    if config.get("behavior", {}).get("verbosity_level") != "quiet":
+                        ui_manager_instance.append_output(f"✅ Branch '{current_branch}' is synced with 'origin/{current_branch}'.", style_class='success')
                     logger.info(f"Branch '{current_branch}' (Local: {local_h[:7] if local_h else 'N/A'}) is synced with remote (Remote: {remote_h[:7] if remote_h else 'N/A'}).")
                 elif comparison_status == "behind" and allow_run_if_behind:
                     warn_msg = f"⚠️ Your local branch '{current_branch}' is behind 'origin/{current_branch}'. New updates are available."
@@ -392,17 +405,25 @@ async def main_async_runner():
     ui_manager_instance.main_exit_app_ref = _exit_app_main
     ui_manager_instance.main_restore_normal_input_ref = restore_normal_input_handler
 
-    ollama_service_ready = await shell_engine_instance.ollama_manager_module.ensure_ollama_service(config, ui_manager_instance.append_output)
-    if not ollama_service_ready:
-        ui_manager_instance.append_output("⚠️ Ollama service is not available or failed to start. AI-dependent features will be affected.", style_class='error')
-        ui_manager_instance.append_output("   You can try '/ollama help' for manual control options.", style_class='info')
-        logger.warning("Ollama service check failed or service could not be started.")
+    if config.get("behavior", {}).get("verbosity_level") != "quiet":
+        ollama_service_ready = await shell_engine_instance.ollama_manager_module.ensure_ollama_service(config, ui_manager_instance.append_output)
+        if not ollama_service_ready:
+            ui_manager_instance.append_output("⚠️ Ollama service is not available or failed to start. AI-dependent features will be affected.", style_class='error')
+            ui_manager_instance.append_output("   You can try '/ollama help' for manual control options.", style_class='info')
+            logger.warning("Ollama service check failed or service could not be started.")
+        else:
+            ui_manager_instance.append_output("✅ Ollama service is active and ready.", style_class='success')
+            logger.info("Ollama service is active.")
+            embedding_manager_instance = EmbeddingManager(config)
+            embedding_manager_instance.initialize()
+            shell_engine_instance.embedding_manager_instance = embedding_manager_instance
     else:
-        ui_manager_instance.append_output("✅ Ollama service is active and ready.", style_class='success')
-        logger.info("Ollama service is active.")
-        embedding_manager_instance = EmbeddingManager(config)
-        embedding_manager_instance.initialize()
-        shell_engine_instance.embedding_manager_instance = embedding_manager_instance
+        # In quiet mode, we still need to check for the service, but we don't print messages.
+        ollama_service_ready = await shell_engine_instance.ollama_manager_module.is_ollama_server_running()
+        if ollama_service_ready:
+            embedding_manager_instance = EmbeddingManager(config)
+            embedding_manager_instance.initialize()
+            shell_engine_instance.embedding_manager_instance = embedding_manager_instance
 
 
     init_category_manager(SCRIPT_DIR, CONFIG_DIR, ui_manager_instance.append_output)
@@ -420,22 +441,25 @@ async def main_async_runner():
         base_name = os.path.basename(current_dir_for_prompt)
         initial_prompt_dir = base_name if len(base_name) <= max_prompt_len else "..." + base_name[-(max_prompt_len - 3):] if (max_prompt_len - 3) > 0 else "..."
 
-    initial_welcome_message = (
-        "Welcome to micro_X Shell 🚀\n"
-        "Type a Linux command, or try '/translate your query' (e.g., /translate list text files).\n"
-        "Key shortcuts are shown below. For more help, type '/help'.\n"
-        "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
-        "Use '/ollama help' to manage the Ollama service.\n"
-    )
-    initial_buffer_for_ui = list(ui_manager_instance.output_buffer)
+    if config.get("behavior", {}).get("verbosity_level") != "quiet":
+        initial_welcome_message = (
+            "Welcome to micro_X Shell 🚀\n"
+            "Type a Linux command, or try '/translate your query' (e.g., /translate list text files).\n"
+            "Key shortcuts are shown below. For more help, type '/help'.\n"
+            "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
+            "Use '/ollama help' to manage the Ollama service.\n"
+        )
+        initial_buffer_for_ui = list(ui_manager_instance.output_buffer)
 
-    is_buffer_empty_or_just_welcome = not initial_buffer_for_ui or \
-                                      (len(initial_buffer_for_ui) == 1 and initial_buffer_for_ui[0][1] == initial_welcome_message)
+        is_buffer_empty_or_just_welcome = not initial_buffer_for_ui or \
+                                          (len(initial_buffer_for_ui) == 1 and initial_buffer_for_ui[0][1] == initial_welcome_message)
 
-    if is_buffer_empty_or_just_welcome and not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
-        initial_buffer_for_ui.insert(0, ('class:welcome', initial_welcome_message))
-    elif not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
-        initial_buffer_for_ui.append(('class:welcome', initial_welcome_message))
+        if is_buffer_empty_or_just_welcome and not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
+            initial_buffer_for_ui.insert(0, ('class:welcome', initial_welcome_message))
+        elif not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
+            initial_buffer_for_ui.append(('class:welcome', initial_welcome_message))
+    else:
+        initial_buffer_for_ui = []
 
     # --- FIX START: Conditional UI Initialization Arguments ---
     # This block constructs the arguments for initialize_ui_elements
