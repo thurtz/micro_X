@@ -598,7 +598,7 @@ class ShellEngine:
             "config_start": ("/config --start", False),
             "config_stop": ("/config --stop", False),
             "alias_list": ("/alias --list", False),
-            "dev_activate": ("/dev --activate", False),
+            "dev_activate": ("python utils/dev.py --activate", True),
             "dev_update_all": ("/dev --update-all", False),
             "dev_update_testing": ("/dev --update-testing", False),
             "dev_update_dev": ("/dev --update-dev", False),
