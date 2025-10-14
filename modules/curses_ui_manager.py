@@ -230,11 +230,42 @@ class CursesUIManager:
                                 await self.shell_engine_instance.submit_user_input(self.input_text)
                             await asyncio.sleep(0.001)
                     self.input_text = ""
-                elif key == 27 or key in [3, 4]:
+                elif key == 27: # escape
+                    if self.hung_task_flow_active:
+                        self.append_output("\n⚠️ Hung task prompt cancelled.", 'warning')
+                        if 'future' in self.hung_task_flow_state and not self.hung_task_flow_state['future'].done():
+                            self.hung_task_flow_state['future'].set_result({'action': 'cancel'})
+                    elif self.categorization_flow_active:
+                        self.append_output("\n⚠️ Categorization cancelled by user.", 'warning')
+                        logger.info("Categorization flow cancelled by Escape.")
+                        if 'future' in self.categorization_flow_state and \
+                           self.categorization_flow_state.get('future') and \
+                           not self.categorization_flow_state['future'].done():
+                            self.categorization_flow_state['future'].set_result({'action': 'cancel_execution'})
+                    elif self.confirmation_flow_active:
+                        self.append_output("\n⚠️ Command confirmation cancelled by user.", 'warning')
+                        logger.info("Confirmation flow cancelled by Escape.")
+                        if 'future' in self.confirmation_flow_state and \
+                           self.confirmation_flow_state.get('future') and \
+                           not self.confirmation_flow_state['future'].done():
+                            self.confirmation_flow_state['future'].set_result({'action': 'cancel'})
+                    elif self.is_in_edit_mode:
+                        self.append_output("\n⌨️ Command editing cancelled.", 'info')
+                        logger.info("Command edit mode cancelled by Escape.")
+                        self.is_in_edit_mode = False
+                        if self.main_restore_normal_input_ref:
+                            self.main_restore_normal_input_ref()
+                elif key in [3, 4]: # ctrl+c, ctrl+d
                     if self.main_exit_app_ref:
                         self.main_exit_app_ref()
                     else:
                         self.exit()
+                elif key == 11: # ctrl+k
+                    if self.shell_engine_instance and self.shell_engine_instance.current_process:
+                        logger.info("Ctrl+K pressed, killing current process.")
+                        asyncio.create_task(self.shell_engine_instance.kill_current_process())
+                    else:
+                        logger.info("Ctrl+K pressed, but no process to kill.")
                 elif key == curses.KEY_BACKSPACE or key == 127:
                     self.input_text = self.input_text[:-1]
                 elif key in [curses.KEY_UP, curses.KEY_DOWN, curses.KEY_LEFT, curses.KEY_RIGHT]:
