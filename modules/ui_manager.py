@@ -59,6 +59,8 @@ class UIManager:
 
         self.current_prompt_text = ""
 
+        self.status_bar_control = FormattedTextControl("")
+
         self.kb = KeyBindings()
         self._register_keybindings()
 
@@ -720,6 +722,8 @@ class UIManager:
             'key-help': 'bg:#282c34 #5c6370', 'line': '#3e4451',
             'prompt': 'bg:#21252b #61afef', 'scrollbar.background': 'bg:#282c34',
             'scrollbar.button': 'bg:#3e4451', 'default': '#abb2bf',
+            'status-bar': 'bg:#282c34 #abb2bf',
+            'status-bar.thinking': 'bg:#282c34 #56b6c2',
             'welcome': 'bold #86c07c', 'info': '#61afef',
             'info-header': 'bold #61afef', 'info-subheader': 'underline #61afef',
             'info-item': '#abb2bf', 'info-item-empty': 'italic #5c6370',
@@ -759,9 +763,17 @@ class UIManager:
             content=FormattedTextControl(key_help_text_content),
             height=1, style='class:key-help'
         )
+        self.status_bar = Window(
+            content=self.status_bar_control,
+            height=1,
+            style='class:status-bar'
+        )
         layout_components = [
-            self.output_field, Window(height=1, char='─', style='class:line'),
-            self.input_field, self.key_help_field
+            self.output_field, 
+            self.status_bar,
+            Window(height=1, char='─', style='class:line'),
+            self.input_field, 
+            self.key_help_field
         ]
         self.root_container = HSplit(layout_components)
         self.layout = Layout(self.root_container, focused_element=self.input_field)
@@ -769,6 +781,12 @@ class UIManager:
             self.output_field.buffer.on_cursor_position_changed += self._on_output_cursor_pos_changed
         logger.info("UIManager: UI elements fully initialized.")
         return self.layout
+
+    def update_status_bar(self, text: str, style: str = 'class:status-bar'):
+        self.status_bar_control.text = text
+        self.status_bar.style = style
+        if self.app:
+            self.app.invalidate()
 
     def _on_output_cursor_pos_changed(self, _=None):
         if self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:

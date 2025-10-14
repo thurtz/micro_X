@@ -283,6 +283,7 @@ class ShellEngine:
             append_output_func(f"❌ Error executing '{command_to_execute}': {e}", style_class='error')
             logger.exception(f"Error executing shell command: {e}")
         finally:
+            self.ui_manager.update_status_bar("")
             logger.info(f"Process for command '{self.current_process_command}' finished.")
             self.current_process = None
             self.current_process_command = ""
@@ -310,6 +311,7 @@ class ShellEngine:
             append_output_func(f"❌ Unexpected error during tmux execution: {e}", style_class='error')
             logger.exception(f"Unexpected error during tmux execution for command '{command_to_execute}': {e}")
         finally:
+            self.ui_manager.update_status_bar("")
             logger.info(f"Process for command '{self.current_process_command}' finished.")
             self.current_process = None
             self.current_process_command = ""
@@ -433,6 +435,7 @@ class ShellEngine:
         except Exception as e:
             self.ui_manager.append_output(f"❌ Failed to execute script: {e}", style_class='error')
         finally:
+            self.ui_manager.update_status_bar("")
             self.current_process = None
             self.current_process_command = ""
 
@@ -559,11 +562,12 @@ class ShellEngine:
             is_direct_simple_command = (category == "simple" and not is_ai_generated and not forced_category)
 
             if not is_direct_simple_command and self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
-                append_output_func(f"▶️ {exec_message_prefix} ({category} - {self.category_manager_module.CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style_class='executing')
+                self.ui_manager.update_status_bar(f"▶️ {exec_message_prefix} ({category} - {self.category_manager_module.CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style='class:status-bar')
 
             if category == "simple": await self.execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
             else: await self.execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category)
         finally:
+            self.ui_manager.update_status_bar("")
             if self.ui_manager and not self.ui_manager.categorization_flow_active and not self.ui_manager.confirmation_flow_active and not self.ui_manager.is_in_edit_mode:
                 if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
 
@@ -721,7 +725,7 @@ class ShellEngine:
 
             # --- 1. Try the Router Agent ---
             if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
-                self.ui_manager.append_output(f"✨ '{user_input_stripped}' is not a known command. Checking with Router AI...", style_class='ai-thinking')
+                self.ui_manager.update_status_bar(f"✨ '{user_input_stripped}' is not a known command. Checking with Router AI...", style='class:status-bar.thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
             
             router_command = await run_router_agent(self.router_agent_instance, user_input_stripped)
@@ -735,7 +739,7 @@ class ShellEngine:
 
             # --- 2. Fallback to Translator Agent ---
             if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
-                self.ui_manager.append_output(f"🤔 Router found no tool. Trying with Translator AI...", style_class='ai-thinking')
+                self.ui_manager.update_status_bar(f"🤔 Router found no tool. Trying with Translator AI...", style='class:status-bar.thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
 
             linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(user_input_stripped, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
