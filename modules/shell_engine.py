@@ -561,7 +561,7 @@ class ShellEngine:
             # Conditionally display the "Executing" message to create a cleaner, shell-like output for simple, direct commands.
             is_direct_simple_command = (category == "simple" and not is_ai_generated and not forced_category)
 
-            if not is_direct_simple_command and self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+            if not is_direct_simple_command:
                 self.ui_manager.update_status_bar(f"▶️ {exec_message_prefix} ({category} - {self.category_manager_module.CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style='class:status-bar')
 
             if category == "simple": await self.execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
@@ -724,8 +724,7 @@ class ShellEngine:
                 return
 
             # --- 1. Try the Router Agent ---
-            if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
-                self.ui_manager.update_status_bar(f"✨ '{user_input_stripped}' is not a known command. Checking with Router AI...", style='class:status-bar.thinking')
+            self.ui_manager.update_status_bar(f"✨ '{user_input_stripped}' is not a known command. Checking with Router AI...", style='class:status-bar.thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
             
             router_command = await run_router_agent(self.router_agent_instance, user_input_stripped)
@@ -738,8 +737,7 @@ class ShellEngine:
                 return
 
             # --- 2. Fallback to Translator Agent ---
-            if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
-                self.ui_manager.update_status_bar(f"🤔 Router found no tool. Trying with Translator AI...", style='class:status-bar.thinking')
+            self.ui_manager.update_status_bar(f"🤔 Router found no tool. Trying with Translator AI...", style='class:status-bar.thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
 
             linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(user_input_stripped, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
