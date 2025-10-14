@@ -352,18 +352,8 @@ async def main_async_runner():
     # to the ShellEngine. This resolves the dependency order issue.
     ui_backend_choice = config.get("ui", {}).get("ui_backend", "prompt_toolkit")
 
-    # 1. Create the UI manager instance first.
-    if ui_backend_choice == "curses":
-        logger.info("Selected UI Backend: curses")
-        ui_manager_instance = CursesUIManager(config)
-    else:
-        if ui_backend_choice != "prompt_toolkit":
-            logger.warning(f"Unrecognized UI backend '{ui_backend_choice}' configured. Defaulting to 'prompt_toolkit'.")
-        logger.info("Selected UI Backend: prompt_toolkit")
-        ui_manager_instance = UIManager(config)
-
-    # 2. Create the ShellEngine instance and pass the UI manager to it.
-    shell_engine_instance = ShellEngine(config, ui_manager_instance,
+    # 1. Create the ShellEngine instance first, but without the ui_manager reference.
+    shell_engine_instance = ShellEngine(config, None, # ui_manager is set later
                                         category_manager_module=sys.modules['modules.category_manager'],
                                         ai_handler_module=sys.modules['modules.ai_handler'],
                                         ollama_manager_module=sys.modules['modules.ollama_manager'],
@@ -373,6 +363,19 @@ async def main_async_runner():
                                         is_developer_mode=False, # Will be set after integrity checks
                                         git_context_manager_instance=None # Will be set after integrity checks
                                         )
+
+    # 2. Create the UI manager instance, passing the shell_engine_instance to it.
+    if ui_backend_choice == "curses":
+        logger.info("Selected UI Backend: curses")
+        ui_manager_instance = CursesUIManager(config, shell_engine_instance)
+    else:
+        if ui_backend_choice != "prompt_toolkit":
+            logger.warning(f"Unrecognized UI backend '{ui_backend_choice}' configured. Defaulting to 'prompt_toolkit'.")
+        logger.info("Selected UI Backend: prompt_toolkit")
+        ui_manager_instance = UIManager(config, shell_engine_instance)
+
+    # 3. Now, set the ui_manager on the shell_engine_instance.
+    shell_engine_instance.ui_manager = ui_manager_instance
 
     # 3. For CursesUIManager, ensure the shell_engine_instance is set after its creation.
     if isinstance(ui_manager_instance, CursesUIManager):

@@ -25,7 +25,7 @@ class UIManager:
     including input/output fields, keybindings, styling, and coordinating complex,
     multi-step interactive user flows like command categorization and confirmation.
     """
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, shell_engine_instance=None):
         """Initializes the UIManager with the application configuration.
 
         The Application instance itself is set later via `ui_manager_instance.app = app_instance`.
@@ -34,6 +34,7 @@ class UIManager:
             config: The application configuration.
         """
         self.config = config
+        self.shell_engine_instance = shell_engine_instance
         self.app = None # This will be set by main.py
         self.output_field = None
         self.input_field = None
@@ -73,7 +74,15 @@ class UIManager:
     def _register_keybindings(self):
         @self.kb.add('c-c')
         @self.kb.add('c-d')
-        def _handle_exit_or_cancel(event):
+        def _handle_exit(event):
+            logger.info("Exit keybinding triggered.")
+            if self.main_exit_app_ref:
+                self.main_exit_app_ref()
+            else:
+                event.app.exit()
+
+        @self.kb.add('escape')
+        def _handle_cancel(event):
             if self.hung_task_flow_active:
                 self.append_output("\n⚠️ Hung task prompt cancelled.", style_class='warning')
                 if 'future' in self.hung_task_flow_state and not self.hung_task_flow_state['future'].done():
@@ -81,7 +90,7 @@ class UIManager:
                 event.app.invalidate()
             elif self.categorization_flow_active:
                 self.append_output("\n⚠️ Categorization cancelled by user.", style_class='warning')
-                logger.info("Categorization flow cancelled by Ctrl+C/D.")
+                logger.info("Categorization flow cancelled by Escape.")
                 if 'future' in self.categorization_flow_state and \
                    self.categorization_flow_state.get('future') and \
                    not self.categorization_flow_state['future'].done():
@@ -89,7 +98,7 @@ class UIManager:
                 event.app.invalidate()
             elif self.confirmation_flow_active:
                 self.append_output("\n⚠️ Command confirmation cancelled by user.", style_class='warning')
-                logger.info("Confirmation flow cancelled by Ctrl+C/D.")
+                logger.info("Confirmation flow cancelled by Escape.")
                 if 'future' in self.confirmation_flow_state and \
                    self.confirmation_flow_state.get('future') and \
                    not self.confirmation_flow_state['future'].done():
@@ -97,17 +106,19 @@ class UIManager:
                 event.app.invalidate()
             elif self.is_in_edit_mode:
                 self.append_output("\n⌨️ Command editing cancelled.", style_class='info')
-                logger.info("Command edit mode cancelled by Ctrl+C/D.")
+                logger.info("Command edit mode cancelled by Escape.")
                 self.is_in_edit_mode = False
                 if self.main_restore_normal_input_ref:
                     self.main_restore_normal_input_ref()
                 event.app.invalidate()
+
+        @self.kb.add('c-k')
+        def _handle_kill_process(event):
+            if self.shell_engine_instance and self.shell_engine_instance.current_process:
+                logger.info("Ctrl+K pressed, killing current process.")
+                asyncio.create_task(self.shell_engine_instance.kill_current_process())
             else:
-                logger.info("Exit keybinding triggered.")
-                if self.main_exit_app_ref:
-                    self.main_exit_app_ref()
-                else:
-                    event.app.exit()
+                logger.info("Ctrl+K pressed, but no process to kill.")
 
 
         @self.kb.add('c-n')

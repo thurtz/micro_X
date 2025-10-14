@@ -267,11 +267,11 @@ class ShellEngine:
             if stderr:
                 append_output_func(f"Stderr from '{original_user_input_display}':\n{stderr.decode(errors='replace').strip()}", style_class='warning')
             
-            if not stdout and not stderr and self.current_process.returncode == 0:
+            if not stdout and not stderr and self.current_process and self.current_process.returncode == 0:
                 if show_verbose_prefix:
                     append_output_func(f"Output from '{original_user_input_display}': (No output)", style_class='info')
             
-            if self.current_process.returncode != 0:
+            if self.current_process and self.current_process.returncode != 0:
                 logger.warning(f"Command '{command_to_execute}' exited with code {self.current_process.returncode}")
                 if not stderr:
                     append_output_func(f"⚠️ Command '{original_user_input_display}' exited with code {self.current_process.returncode}.", style_class='warning')
@@ -421,6 +421,10 @@ class ShellEngine:
             if stdout: self.ui_manager.append_output(f"Output from '{subcommand}.py':\n{stdout.decode(errors='replace').strip()}")
             if stderr: self.ui_manager.append_output(f"Stderr from '{subcommand}.py':\n{stderr.decode(errors='replace').strip()}", style_class='warning')
             
+            # Check if the process was killed externally
+            if self.current_process is None:
+                return
+
             if self.current_process.returncode == 0:
                 self.ui_manager.append_output(f"✅ Script '{subcommand}.py' completed.", style_class='success')
                 if subcommand == 'alias': self._reload_aliases()
