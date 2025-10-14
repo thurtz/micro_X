@@ -30,7 +30,8 @@
     "ollama_api_call_retries": 2,
     "tui_detection_line_threshold_pct": 30,
     "tui_detection_char_threshold_pct": 3,
-    "use_strict_extraction_for_primary_translator": false
+    "use_strict_extraction_for_primary_translator": false,
+    "verbosity_level": "default"
   },
   "ui": {
     "max_prompt_length": 20,

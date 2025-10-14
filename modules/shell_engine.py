@@ -335,7 +335,8 @@ class ShellEngine:
                 append_output_func(f"❌ Error launching semi-interactive tmux session '{window_name}'.", style_class='error')
                 return
 
-            append_output_func(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output...", style_class='info')
+            if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+                append_output_func(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output...", style_class='info')
             if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
             # Polling logic remains the same as it checks for window existence, not process completion
@@ -369,7 +370,8 @@ class ShellEngine:
         tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", command_to_execute]
         
         logger.info(f"Launching interactive_tui tmux: {' '.join(shlex.quote(s) for s in tmux_cmd_list)}")
-        append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait...", style_class='info')
+        if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+            append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait...", style_class='info')
         if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
         self.current_process = await asyncio.create_subprocess_exec(*tmux_cmd_list, cwd=self.current_directory)
@@ -404,7 +406,8 @@ class ShellEngine:
             self.ui_manager.append_output(f"❌ Script not found: {subcommand}.py in '{script_dir_name}'.", style_class='error'); return
 
         command_to_execute_list = [sys.executable, script_path] + parts[2:]
-        self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute_list)}", style_class='info')
+        if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+            self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute_list)}", style_class='info')
         
         try:
             self.current_process = await asyncio.create_subprocess_exec(
@@ -458,7 +461,8 @@ class ShellEngine:
                 # Simple append, for more complex logic (e.g., placeholders) this would need enhancement
                 final_command = f"{expanded_command} {' '.join(shlex.quote(arg) for arg in remaining_args)}".strip()
 
-                self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
+                if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+                    self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
                 user_input_stripped = final_command
 
                 # --- FIX START: Immediate execution for categorized aliases ---
@@ -550,7 +554,7 @@ class ShellEngine:
             # Conditionally display the "Executing" message to create a cleaner, shell-like output for simple, direct commands.
             is_direct_simple_command = (category == "simple" and not is_ai_generated and not forced_category)
 
-            if not is_direct_simple_command:
+            if not is_direct_simple_command and self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
                 append_output_func(f"▶️ {exec_message_prefix} ({category} - {self.category_manager_module.CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style_class='executing')
 
             if category == "simple": await self.execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
@@ -712,7 +716,8 @@ class ShellEngine:
                 return
 
             # --- 1. Try the Router Agent ---
-            self.ui_manager.append_output(f"✨ '{user_input_stripped}' is not a known command. Checking with Router AI...", style_class='ai-thinking')
+            if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+                self.ui_manager.append_output(f"✨ '{user_input_stripped}' is not a known command. Checking with Router AI...", style_class='ai-thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
             
             router_command = await run_router_agent(self.router_agent_instance, user_input_stripped)
@@ -725,7 +730,8 @@ class ShellEngine:
                 return
 
             # --- 2. Fallback to Translator Agent ---
-            self.ui_manager.append_output(f"🤔 Router found no tool. Trying with Translator AI...", style_class='ai-thinking')
+            if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+                self.ui_manager.append_output(f"🤔 Router found no tool. Trying with Translator AI...", style_class='ai-thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
 
             linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(user_input_stripped, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
