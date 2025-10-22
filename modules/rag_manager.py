@@ -17,6 +17,8 @@ from urllib.parse import urljoin, urlparse
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_EXTENSIONS = {".pdf", ".html", ".htm", ".txt", ".md", ".py", ".json", ".rst"}
+
 class RAGManager:
     def __init__(self, config: dict, name: str = "default"):
         self.config = config
@@ -49,7 +51,6 @@ class RAGManager:
                 embedding_function=self.embeddings,
                 persist_directory=self._db_path,
             )
-            logger.debug(f"self.vector_store object after init: {self.vector_store}")
 
             # 3. Initialize text splitter
             self.text_splitter = RecursiveCharacterTextSplitter(
@@ -68,6 +69,11 @@ class RAGManager:
         """Adds a single file to the knowledge base."""
         if not self.vector_store:
             logger.error("RAG vector store not initialized. Cannot add file.")
+            return
+
+        _, extension = os.path.splitext(file_path)
+        if extension.lower() not in SUPPORTED_EXTENSIONS:
+            logger.info(f"Skipping unsupported file type: {file_path}")
             return
         
         logger.info(f"Processing file: {file_path}")

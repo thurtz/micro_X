@@ -31,29 +31,28 @@ OS_DETECTED=""
 OS_NAME=""
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    OS_DETECTED="linux"
-    if [ -f /etc/os-release ]; then
+    OS_DETECTED="linux" # Default for linux-gnu
+    # Check for WSL first, as it's a specific environment on top of a Linux distro
+    if grep -qi microsoft /proc/version || [[ -n "$WSL_DISTRO_NAME" ]]; then
+        OS_DETECTED="wsl"
+        OS_NAME="WSL ($WSL_DISTRO_NAME)"
+    # Then check for Termux, another specific environment
+    elif [[ -n "$TERMUX_VERSION" ]]; then
+        OS_DETECTED="termux"
+        OS_NAME="Termux"
+    # Fallback to general Linux distribution detection
+    elif [ -f /etc/os-release ]; then
         # shellcheck disable=SC1091
         source /etc/os-release
         OS_NAME=$NAME
         if [[ "$ID" == "linuxmint"* || "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* || "$ID" == "ubuntu"* || "$ID" == "debian"* ]]; then
-            OS_DETECTED="linux-mint-like" # Specific enough for Mint/Debian/Ubuntu based
+            OS_DETECTED="linux-mint-like" # Specific for Mint/Debian/Ubuntu
         fi
     elif command_exists lsb_release; then
         OS_NAME=$(lsb_release -is)
         if [[ "$OS_NAME" == "LinuxMint"* || "$OS_NAME" == "Ubuntu"* || "$OS_NAME" == "Debian"* ]]; then
              OS_DETECTED="linux-mint-like"
         fi
-    fi
-    # Check for Termux (Android)
-    if [[ -n "$TERMUX_VERSION" ]]; then
-        OS_DETECTED="termux"
-        OS_NAME="Termux"
-    fi
-    # Check for WSL
-    if grep -qi microsoft /proc/version || [[ -n "$WSL_DISTRO_NAME" ]]; then
-        OS_DETECTED="wsl"
-        OS_NAME="WSL ($WSL_DISTRO_NAME)"
     fi
 
 elif [[ "$OSTYPE" == "darwin"* ]]; then
@@ -71,7 +70,7 @@ if [[ -n "$OS_DETECTED" ]]; then
             read -p "Detected a Mint/Debian/Ubuntu-like Linux. Use Mint setup? (Y/n/menu): " choice
             if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
                 SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_mint.sh"
-            elif [[ "$choice" =~ ^[Mm]$ ]]; then
+            elif [[ "$choice" =~ ^[Mm] ]]; then
                 OS_DETECTED="" # Force menu
             fi
             ;;
@@ -79,7 +78,7 @@ if [[ -n "$OS_DETECTED" ]]; then
             read -p "Detected macOS. Use macOS setup? (Y/n/menu): " choice
             if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
                 SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_mac.sh"
-            elif [[ "$choice" =~ ^[Mm]$ ]]; then
+            elif [[ "$choice" =~ ^[Mm] ]]; then
                 OS_DETECTED="" # Force menu
             fi
             ;;
@@ -87,7 +86,7 @@ if [[ -n "$OS_DETECTED" ]]; then
             read -p "Detected Termux. Use Termux setup? (Y/n/menu): " choice
             if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
                 SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_termux.sh"
-            elif [[ "$choice" =~ ^[Mm]$ ]]; then
+            elif [[ "$choice" =~ ^[Mm] ]]; then
                 OS_DETECTED="" # Force menu
             fi
             ;;
@@ -95,7 +94,7 @@ if [[ -n "$OS_DETECTED" ]]; then
             read -p "Detected WSL. Use WSL setup? (Y/n/menu): " choice
             if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
                 SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_wsl.sh"
-            elif [[ "$choice" =~ ^[Mm]$ ]]; then
+            elif [[ "$choice" =~ ^[Mm] ]]; then
                 OS_DETECTED="" # Force menu
             fi
             ;;

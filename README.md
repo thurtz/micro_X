@@ -41,21 +41,22 @@ If you wish to contribute to development or test new features, you can activate 
 micro_X provides a text-based user interface (TUI) where you can:
 
 *   Type standard Linux commands.
-*   Force natural language queries (prefixed with /ai) to have them translated into shell commands.
-*   Benefit from AI-powered validation and translation of natural language (without the need for /ai prefixed) or directly entered commands.
+*   Enter natural language queries and have them automatically translated into shell commands.
+*   Force a query to be treated as a natural language command by prefixing it with `/translate`.
+*   **Query Documentation:** Ask questions about the project's documentation in natural language using the `/docs --query` command.
 *   **Confirm AI-Generated Commands:** Review, get explanations, modify, or cancel commands suggested by the AI before execution.
 *   Categorize commands (simple, semi_interactive, interactive_tui) for appropriate execution, including running interactive commands in tmux.
-*   **Run Custom Scripts:** Add your own Python scripts to a dedicated `user_scripts/` directory and run them with the `/run` command.
+*   **Run Custom Scripts:** Add your own Python scripts to a dedicated `user_scripts/` directory (which you may need to create) and run them with the `/run` command.
 *   **Create Command Aliases:** Use the built-in alias utility to create shortcuts for your favorite or frequently used commands.
 *   Manage command history and categorizations.
 *   Control the underlying Ollama service directly from within the shell.
 *   **Branch-Aware Integrity & Developer Mode:** Automatically enables a permissive 'Developer Mode' when running off the dev branch. Performs startup integrity checks on main and testing branches.
-*   **Web-Based Configuration Manager:** An integrated tool to easily view and edit user configurations and command categorizations via a web interface (launched with the **/config** command).
+*   **Web-Based Configuration Manager:** An integrated tool to easily view and edit user configurations and command categorizations via a web interface (launched with the `/config --start` command).
 
 ## **Key Features**
 
 *   **AI-Powered Command Generation & Validation:**
-    *   **Natural Language to Command Translation:** Uses configurable Ollama models for initial translation.
+    *   **Natural Language to Command Translation:** Uses configurable Ollama models for initial translation. Any unrecognized input is automatically treated as a natural language query.
     *   **AI-Powered Command Validation:** Employs a configurable Ollama model to assess command validity.
     *   **AI-Powered Command Explanation:** Request an explanation for AI-generated commands to understand their purpose and potential impact.
     *   **Interactive Command Confirmation:** For AI-generated commands, micro_X prompts for user action:
@@ -75,8 +76,6 @@ micro_X provides a text-based user interface (TUI) where you can:
 
 *   **Ollama Service Management:** Control the Ollama service directly from micro_X using the `/ollama` command (subcommands: `start`, `stop`, `restart`, `status`, `help`).
 
-*   **Runtime AI Configuration:** View and modify AI model settings (e.g., model name, temperature) at runtime using the `/config` command. Save changes to your user configuration file.
-
 *   **Branch-Aware Integrity & Developer Mode:**
     *   **Developer Mode:** Activated on the `dev` branch or if integrity checks cannot be performed. Integrity checks are informational, allowing development without interruption.
     *   **Protected Mode:** Active on `main` or `testing` branches. Performs strict startup integrity checks (clean working directory, sync with remote). Failure halts execution to prevent running unstable code.
@@ -90,7 +89,7 @@ micro_X provides a text-based user interface (TUI) where you can:
 
 *   **Logging & Configuration:** Detailed logging and persistent configuration.
 
-*   **Web-Based Configuration Manager:** Launch with the `/config` command to easily manage `user_config.json` and `user_command_categories.json` via a web UI.
+*   **Web-Based Configuration Manager:** Launch with the `/config --start` command to easily manage `user_config.json` and `user_command_categories.json` via a web UI.
 
 ## **Usage**
 
@@ -109,13 +108,18 @@ micro_X's behavior at startup is influenced by the current Git branch:
 ### **Interacting with micro_X**
 
 *   **Direct Commands:** Type any Linux command and press Enter (e.g., `ls -l`).
-*   **AI Translation (`/ai`):** Prefix your query with `/ai` to translate it into a command.
-    *   `(/~) > /ai list text files`
+*   **Automatic AI Translation:** Enter any natural language query, and if it's not a known command, micro_X will attempt to translate it into a shell command.
+*   **Forced AI Translation (`/translate`):** Prefix your query with `/translate` to force it to be treated as a natural language command.
+    *   `(/~) > /translate list text files`
+*   **Query Documentation (`/docs`):** Ask questions about the project's documentation.
+    *   `(/~) > /docs --query "how do I use the snapshot command?" --rag`
 *   **User Scripts (`/run`):** Execute your own scripts from the `user_scripts/` directory.
     *   `(/~) > /run my_script --with-args`
 *   **Aliases (`/alias`, `/command`, `/config`, etc.):** Use aliases for common utilities.
     *   `(/~) > /alias --add /snap /snapshot`
+*   **Configuration Manager:**
     *   `(/~) > /config --start`
+
 *   **Help (`/help`):** Displays the main help message.
 *   **Exit (`/exit` or `exit`):** Exits the micro_X shell.
 

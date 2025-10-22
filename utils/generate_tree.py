@@ -124,14 +124,38 @@ def generate_file_tree(startpath, output_filepath, display_root_name="micro_X", 
         return False # Indicate failure
 
 
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: /tree Utility
+
+This utility generates a file tree structure for the current project and saves it to 'project_tree.txt' in the project root.
+
+Usage:
+  /tree
+
+The generated file provides a visual representation of the project's directory and file structure, which is useful for understanding the project layout. The tree ignores common temporary and build directories like '.git', '__pycache__', and '.venv'.
+"""
+
 if __name__ == "__main__":
+    class HelpAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
+        def __call__(self, parser, namespace, values, option_string=None):
+            print(HELP_TEXT)
+            parser.exit()
+
     parser = argparse.ArgumentParser(
         description="Generate a directory tree structure for the micro_X project.",
-        epilog="This script is typically run from the '/utils list' or '/utils generate_tree' command within the micro_X shell."
+        add_help=False
     )
+    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
 
-    
-    args = parser.parse_args() # This will handle -h/--help
+    # If no arguments are provided, run the script, otherwise print help
+    if len(sys.argv) > 1:
+        args = parser.parse_args()
+    else:
+        # This allows the script to run without arguments
+        pass
 
     script_location_dir = os.path.dirname(os.path.abspath(__file__))
     

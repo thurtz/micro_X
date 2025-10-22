@@ -110,9 +110,8 @@ def remove_alias(alias_name: str) -> str:
 @tool
 def query_knowledge_base(query: str, kb_name: str = "default") -> str:
     """
-    Use this tool to answer questions using a user-curated knowledge base.
+    Searches a specified knowledge base to answer a user's question. Use this for any query that asks to 'search', 'find', 'look up', 'what is', or 'how does' something.
     If the user's query mentions a specific knowledge base, provide its name using the 'kb_name' parameter.
-    The input must be the user's full question.
     """
     return f'/knowledge --name {kb_name} query "{query}"'
 
@@ -120,18 +119,26 @@ def query_knowledge_base(query: str, kb_name: str = "default") -> str:
 @tool
 def add_file_to_knowledge_base(path: str, kb_name: str = "default") -> str:
     """
-    Use this tool to add a local file to a specified knowledge base.
-    The user must provide the path to the file. If they specify a knowledge base name, pass it as 'kb_name'.
-    For example: 'add the file /path/to/my/doc.md to the my_kb knowledge base'.
+    Adds, ingests, or stores a local file in a specified knowledge base. Use this when the user asks to 'add a file', 'index this document', or 'learn from this file'.
+    If a knowledge base name is mentioned, provide it as 'kb_name'.
     """
     return f'/knowledge --name {kb_name} add-file {path}'
 
 
 @tool
+def add_directory_to_knowledge_base(path: str, kb_name: str = "default") -> str:
+    """
+    Adds, ingests, or stores all files from a local directory into a specified knowledge base. Use this when the user asks to 'add a directory', 'index this folder', or 'learn from these documents'.
+    If a knowledge base name is mentioned, provide it as 'kb_name'.
+    """
+    return f'/knowledge --name {kb_name} add-dir {path}'
+
+
+@tool
 def add_url_to_knowledge_base(url: str, kb_name: str = "default", recursive: bool = False, depth: int = 1, save_cache: bool = False) -> str:
     """
-    Use this tool to add content from a URL to a specified knowledge base.
-    The user must provide the URL. If they specify a knowledge base name, pass it as 'kb_name'.
+    Adds, ingests, or stores content from a URL in a specified knowledge base. Use this when the user asks to 'add a url', 'learn from this website', or 'crawl a page'.
+    If a knowledge base name is mentioned, provide it as 'kb_name'.
     Set 'recursive' to True or specify a 'depth' greater than 1 to crawl the website.
     Set 'save_cache' to True to keep a local copy of the downloaded pages.
     """
@@ -142,6 +149,14 @@ def add_url_to_knowledge_base(url: str, kb_name: str = "default", recursive: boo
     if save_cache:
         command += ' --save-cache'
     return command
+
+
+@tool
+def query_docs(query: str) -> str:
+    """
+    Searches the project's documentation to answer a user's question. Use this for any query that asks about the project's own features, commands, or architecture.
+    """
+    return f'/docs --query "{query}" --rag'
 
 
 def get_all_tools():
@@ -160,5 +175,7 @@ def get_all_tools():
         remove_alias,
         query_knowledge_base,
         add_file_to_knowledge_base,
+        add_directory_to_knowledge_base,
         add_url_to_knowledge_base,
+        query_docs,
     ]

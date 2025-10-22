@@ -271,6 +271,20 @@ def stop_server_tmux_session(branch_name: str):
     except Exception as e:
         print(f"An unexpected error occurred during server stop: {e}")
 
+def get_current_branch(project_root: str) -> str:
+    """Gets the current Git branch name."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=project_root,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "default" # Fallback if not a git repo or git is not installed
+
 def main():
     # Custom help action to print HELP_TEXT and exit
     class HelpAction(argparse.Action):
@@ -306,7 +320,7 @@ def main():
     parser.add_argument(
         "--branch",
         type=str,
-        default="default", # Fallback if micro_X doesn't pass it
+        default=None, # Default to None to detect if it was passed
         help="The current Git branch name (used for session and port naming). Passed by micro_X."
     )
     parser.add_argument(
@@ -322,6 +336,10 @@ def main():
     
     args = parser.parse_args()
 
+    project_root = get_project_root()
+
+    branch_name = args.branch if args.branch else get_current_branch(project_root)
+
     if args.internal_start_actual_server:
         if not args.project_root:
             print("Error: --project-root is required for --internal-start-actual-server.")
@@ -329,20 +347,18 @@ def main():
         # The branch name passed to the internal server is mostly for potential logging
         # or if the server itself needed to behave differently based on the branch.
         # The tmux session it runs in is already named with the branch.
-        print(f"Internal server starting for branch: {args.branch} on port: {args.port} in project: {args.project_root}")
+        print(f"Internal server starting for branch: {branch_name} on port: {args.port} in project: {args.project_root}")
         ConfigManagerHTTPRequestHandler.PROJECT_ROOT_PATH = args.project_root
         start_server_thread(args.port, args.project_root)
         return
 
-    project_root = get_project_root()
-    
     # Determine preferred port based on branch and user's base preference
-    preferred_port_for_branch = get_preferred_port_for_branch(args.branch, args.port)
+    preferred_port_for_branch = get_preferred_port_for_branch(branch_name, args.port)
 
     if args.start:
-        start_server_in_tmux(preferred_port_for_branch, project_root, args.branch)
+        start_server_in_tmux(preferred_port_for_branch, project_root, branch_name)
     elif args.stop:
-        stop_server_tmux_session(args.branch)
+        stop_server_tmux_session(branch_name)
     else:
         # If no action is specified, print help
         print(HELP_TEXT)

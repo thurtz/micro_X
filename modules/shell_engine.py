@@ -267,11 +267,11 @@ class ShellEngine:
             if stderr:
                 append_output_func(f"Stderr from '{original_user_input_display}':\n{stderr.decode(errors='replace').strip()}", style_class='warning')
             
-            if not stdout and not stderr and self.current_process.returncode == 0:
+            if not stdout and not stderr and self.current_process and self.current_process.returncode == 0:
                 if show_verbose_prefix:
                     append_output_func(f"Output from '{original_user_input_display}': (No output)", style_class='info')
             
-            if self.current_process.returncode != 0:
+            if self.current_process and self.current_process.returncode != 0:
                 logger.warning(f"Command '{command_to_execute}' exited with code {self.current_process.returncode}")
                 if not stderr:
                     append_output_func(f"⚠️ Command '{original_user_input_display}' exited with code {self.current_process.returncode}.", style_class='warning')
@@ -283,6 +283,7 @@ class ShellEngine:
             append_output_func(f"❌ Error executing '{command_to_execute}': {e}", style_class='error')
             logger.exception(f"Error executing shell command: {e}")
         finally:
+            self.ui_manager.update_status_bar("")
             logger.info(f"Process for command '{self.current_process_command}' finished.")
             self.current_process = None
             self.current_process_command = ""
@@ -310,6 +311,7 @@ class ShellEngine:
             append_output_func(f"❌ Unexpected error during tmux execution: {e}", style_class='error')
             logger.exception(f"Unexpected error during tmux execution for command '{command_to_execute}': {e}")
         finally:
+            self.ui_manager.update_status_bar("")
             logger.info(f"Process for command '{self.current_process_command}' finished.")
             self.current_process = None
             self.current_process_command = ""
@@ -323,7 +325,7 @@ class ShellEngine:
             log_path = temp_log_file.name
             escaped_command_str = shlex.quote(command_to_execute)
             wrapped_command = f"bash -c {escaped_command_str} |& tee {shlex.quote(log_path)}; sleep {tmux_sleep_after}"
-            tmux_cmd_list_launch = ["tmux", "new-window", "-d", "-n", window_name, wrapped_command] # Added -d to detach
+            tmux_cmd_list_launch = ["tmux", "new-window", "-n", window_name, wrapped_command]
             
             logger.info(f"Launching semi_interactive tmux: {' '.join(tmux_cmd_list_launch)} (log: {log_path})")
             
@@ -335,7 +337,8 @@ class ShellEngine:
                 append_output_func(f"❌ Error launching semi-interactive tmux session '{window_name}'.", style_class='error')
                 return
 
-            append_output_func(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output...", style_class='info')
+            if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+                append_output_func(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output...", style_class='info')
             if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
             # Polling logic remains the same as it checks for window existence, not process completion
@@ -369,7 +372,8 @@ class ShellEngine:
         tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", command_to_execute]
         
         logger.info(f"Launching interactive_tui tmux: {' '.join(shlex.quote(s) for s in tmux_cmd_list)}")
-        append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait...", style_class='info')
+        if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+            append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait...", style_class='info')
         if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
         self.current_process = await asyncio.create_subprocess_exec(*tmux_cmd_list, cwd=self.current_directory)
@@ -404,7 +408,8 @@ class ShellEngine:
             self.ui_manager.append_output(f"❌ Script not found: {subcommand}.py in '{script_dir_name}'.", style_class='error'); return
 
         command_to_execute_list = [sys.executable, script_path] + parts[2:]
-        self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute_list)}", style_class='info')
+        if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+            self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute_list)}", style_class='info')
         
         try:
             self.current_process = await asyncio.create_subprocess_exec(
@@ -418,6 +423,10 @@ class ShellEngine:
             if stdout: self.ui_manager.append_output(f"Output from '{subcommand}.py':\n{stdout.decode(errors='replace').strip()}")
             if stderr: self.ui_manager.append_output(f"Stderr from '{subcommand}.py':\n{stderr.decode(errors='replace').strip()}", style_class='warning')
             
+            # Check if the process was killed externally
+            if self.current_process is None:
+                return
+
             if self.current_process.returncode == 0:
                 self.ui_manager.append_output(f"✅ Script '{subcommand}.py' completed.", style_class='success')
                 if subcommand == 'alias': self._reload_aliases()
@@ -426,6 +435,7 @@ class ShellEngine:
         except Exception as e:
             self.ui_manager.append_output(f"❌ Failed to execute script: {e}", style_class='error')
         finally:
+            self.ui_manager.update_status_bar("")
             self.current_process = None
             self.current_process_command = ""
 
@@ -458,7 +468,8 @@ class ShellEngine:
                 # Simple append, for more complex logic (e.g., placeholders) this would need enhancement
                 final_command = f"{expanded_command} {' '.join(shlex.quote(arg) for arg in remaining_args)}".strip()
 
-                self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
+                if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+                    self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
                 user_input_stripped = final_command
 
                 # --- FIX START: Immediate execution for categorized aliases ---
@@ -551,11 +562,12 @@ class ShellEngine:
             is_direct_simple_command = (category == "simple" and not is_ai_generated and not forced_category)
 
             if not is_direct_simple_command:
-                append_output_func(f"▶️ {exec_message_prefix} ({category} - {self.category_manager_module.CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style_class='executing')
+                self.ui_manager.update_status_bar(f"▶️ {exec_message_prefix} ({category} - {self.category_manager_module.CATEGORY_DESCRIPTIONS.get(category, 'Unknown')}): {command_to_execute_sanitized}", style='class:status-bar')
 
             if category == "simple": await self.execute_shell_command(command_to_execute_sanitized, original_user_input_for_display)
             else: await self.execute_command_in_tmux(command_to_execute_sanitized, original_user_input_for_display, category)
         finally:
+            self.ui_manager.update_status_bar("")
             if self.ui_manager and not self.ui_manager.categorization_flow_active and not self.ui_manager.confirmation_flow_active and not self.ui_manager.is_in_edit_mode:
                 if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
 
@@ -564,7 +576,7 @@ class ShellEngine:
 
         It orchestrates the flow:
         
-        1. Handles `/ai` queries by calling the AI handler.
+        1. Handles `/translate` queries by calling the AI handler.
         2. Processes direct command input from the user.
         3. For unknown commands, it uses the AI validator and may treat the input
            as a natural language query.
@@ -581,6 +593,11 @@ class ShellEngine:
             if self.main_restore_normal_input_ref and from_edit_mode: self.main_restore_normal_input_ref()
             return
 
+        # --- FIX: Handle 'cd' command directly ---
+        if user_input_stripped.startswith("cd ") or user_input_stripped == "cd":
+            await self.handle_cd_command(user_input_stripped)
+            return
+
         # --- INTENT CLASSIFICATION (NEW) ---
         INTENT_COMMAND_MAP = {
             "show_help": ("/help", False),
@@ -588,19 +605,15 @@ class ShellEngine:
             "ollama_stop": ("/ollama stop", False),
             "ollama_restart": ("/ollama restart", False),
             "ollama_status": ("/ollama status", False),
-            "ollama_help": ("/ollama help", False),
+            "show_help_ollama": ("/help ollama", False),
             "command_list": ("/command --list", False),
-            "command_help": ("/command --help", False),
             "config_start": ("/config --start", False),
             "config_stop": ("/config --stop", False),
-            "config_help": ("/config --help", False),
             "alias_list": ("/alias --list", False),
-            "alias_help": ("/alias --help", False),
-            "dev_activate": ("/dev --activate", False),
+            "dev_activate": ("python utils/dev.py --activate", True),
             "dev_update_all": ("/dev --update-all", False),
             "dev_update_testing": ("/dev --update-testing", False),
             "dev_update_dev": ("/dev --update-dev", False),
-            "dev_help": ("/dev --help", False),
             "dev_snapshot_main": ("/dev --snapshot-main", False),
             "dev_snapshot_testing": ("/dev --snapshot-testing", False),
             "dev_snapshot_dev": ("/dev --snapshot-dev", False),
@@ -610,29 +623,33 @@ class ShellEngine:
             "dev_run_tests_dev": ("/dev --run-tests-dev", False),
             "dev_run_tests_all": ("/dev --run-tests-all", False),
             "generate_project_tree": ("/tree", False),
-            "generate_project_tree_help": ("/tree --help", False),
-            "install_dependencies_runtime": ("/install_requirements --runtime", False),
-            "install_dependencies_dev": ("/install_requirements --dev", False),
-            "install_dependencies_all": ("/install_requirements --all", False),
-            "install_requirements_help": ("/install_requirements --help", False),
             "setup_brew_install": ("python utils/setup_brew.py --install", True),
-            "setup_brew_help": ("/setup_brew --help", False),
+            "show_help_setup_brew": ("/help setup_brew", False),
             "open_docs": ("/docs", False),
-            "open_docs_help": ("/docs --help", False),
             "open_docs_lynx": ("python utils/docs.py --lynx", True),
-            "show_help_ai": ("/help ai", False),
+            "show_help_docs": ("/help docs", False),
+            "show_help_translate": ("/help translate", False),
             "show_help_alias": ("/help alias", False),
             "show_help_command": ("/help command", False),
             "show_help_config": ("/help config", False),
             "show_help_dev": ("/help dev", False),
+            "show_help_git_branch": ("/help git_branch", False),
             "show_help_keybindings": ("/help keybindings", False),
             "show_help_security": ("/help security", False),
+            "show_help_knowledge": ("/help knowledge", False),
             "show_help_utilities": ("/help utilities", False),
-            "show_help_snapshot": ("/snapshot --help", False),
-            "show_help_install": ("/help install_requirements", False),
-            "list_help": ("/list --help", False),
+            "show_help_snapshot": ("/help snapshot", False),
+            "show_help_test": ("/help test", False),
+            "show_help_tree": ("/help tree", False),
             "list_utils": ("/list --type utils", False),
+            "show_help_list": ("/help list", False),
             "update_system": ("/update", False),
+            "show_help_update": ("/help update", False),
+            "logs_default": ("python utils/logs.py", True),
+            "logs_main": ("python utils/logs.py --main", True),
+            "logs_testing": ("python utils/logs.py --testing", True),
+            "logs_dev": ("python utils/logs.py --dev", True),
+            "show_help_logs": ("/help logs", False),
         }
 
         if self.embedding_manager_instance:
@@ -649,10 +666,6 @@ class ShellEngine:
                         app_instance.exit()
                     return
 
-                elif intent == "clear_screen":
-                    await self.process_command("clear", "clear")
-                    return
-
                 elif intent in INTENT_COMMAND_MAP:
                     command_to_run, needs_categorization = INTENT_COMMAND_MAP[intent]
                     if needs_categorization:
@@ -666,15 +679,15 @@ class ShellEngine:
         # --- END INTENT CLASSIFICATION ---
 
         current_app_inst = self.ui_manager.get_app_instance()
-        if user_input_stripped.startswith("/ai "):
+        if user_input_stripped.startswith("/translate "):
             if not await self.ollama_manager_module.is_ollama_server_running():
                 self.ui_manager.append_output("⚠️ Ollama service is not available.", style_class='warning'); return
-            human_query = user_input_stripped[len("/ai "):].strip()
+            human_query = user_input_stripped[len("/translate "):].strip()
             if not human_query: self.ui_manager.append_output("⚠️ AI query empty.", style_class='warning'); return
             self.ui_manager.append_output(f"🤖 AI Query: {human_query}", style_class='ai-query')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
             linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(human_query, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
-            if linux_command: await self.process_command(linux_command, f"'/ai {human_query}'", ai_raw_candidate, None, is_ai_generated=True)
+            if linux_command: await self.process_command(linux_command, f"'/translate {human_query}'", ai_raw_candidate, None, is_ai_generated=True)
             else:
                 self.ui_manager.append_output("🤔 AI could not produce a validated command.", style_class='warning')
                 if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
@@ -693,6 +706,15 @@ class ShellEngine:
             # 2. If not, try the Translator Agent (`get_validated_ai_command`) to translate it to a shell command.
             # 3. If that also fails, run the original input as a direct command.
 
+            if user_input_stripped.startswith('!'):
+                command_to_categorize = user_input_stripped[1:].strip()
+                if not command_to_categorize:
+                    self.ui_manager.append_output(f"❌ Empty command after '!' prefix.", style_class='error')
+                    return
+                self.ui_manager.append_output(f"✨ '{command_to_categorize}' is not a known command. Starting categorization...", style_class='info')
+                await self.process_command(command_to_categorize, user_input_stripped)
+                return
+
             if user_input_stripped.startswith('/'):
                 self.ui_manager.append_output(f"❌ Unknown command: {user_input_stripped}", style_class='error')
                 return
@@ -702,7 +724,7 @@ class ShellEngine:
                 return
 
             # --- 1. Try the Router Agent ---
-            self.ui_manager.append_output(f"✨ '{user_input_stripped}' is not a known command. Checking with Router AI...", style_class='ai-thinking')
+            self.ui_manager.update_status_bar(f"✨ '{user_input_stripped}' is not a known command. Checking with Router AI...", style='class:status-bar.thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
             
             router_command = await run_router_agent(self.router_agent_instance, user_input_stripped)
@@ -715,7 +737,7 @@ class ShellEngine:
                 return
 
             # --- 2. Fallback to Translator Agent ---
-            self.ui_manager.append_output(f"🤔 Router found no tool. Trying with Translator AI...", style_class='ai-thinking')
+            self.ui_manager.update_status_bar(f"🤔 Router found no tool. Trying with Translator AI...", style='class:status-bar.thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
 
             linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(user_input_stripped, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)

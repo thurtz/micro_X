@@ -2,6 +2,17 @@
 
 import subprocess
 import sys
+import argparse
+
+# --- Help Text ---
+HELP_TEXT = """
+micro_X Help: /git_branch Utility
+
+This utility prints the current git branch name.
+
+Usage:
+  /git_branch
+"""
 
 def get_current_branch():
     """Prints the current git branch name."""
@@ -27,6 +38,28 @@ def get_current_branch():
         print(f"❌ An unexpected error occurred: {e}", file=sys.stderr)
         sys.exit(1)
 
-if __name__ == "__main__":
-    get_current_branch()
+def main():
+    """
+    Main function to parse arguments and execute logic.
+    """
+    class HelpAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
+        def __call__(self, parser, namespace, values, option_string=None):
+            print(HELP_TEXT)
+            parser.exit()
 
+    parser = argparse.ArgumentParser(
+        description="Prints the current git branch name.",
+        add_help=False
+    )
+    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
+
+    # If no arguments are provided, run the script, otherwise print help
+    if len(sys.argv) > 1:
+        args = parser.parse_args()
+    else:
+        get_current_branch()
+
+if __name__ == "__main__":
+    main()

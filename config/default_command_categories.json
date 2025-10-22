@@ -80,7 +80,9 @@
     "dpkg -l packagename",
     "rpm -q packagename",
     "python utils/docs.py",
-    "python utils/docs.py --help"
+    "python utils/docs.py --help",
+    "python utils/logs.py --help",
+    "python utils/logs.py -h"
   ],
   "semi_interactive": [
     "less",
@@ -235,7 +237,9 @@
     "python utils/setup_brew.py --help",
     "python utils/setup_brew.py --install",
     "python utils/dev.py --activate",
-    "brew"
+    "python utils/update.py",
+    "brew",
+    "./setup.sh"
   ],
   "interactive_tui": [
     "nano",
@@ -269,6 +273,10 @@
     "sudo ufw default deny incoming",
     "sudo systemctl edit servicename",
     "bash",
-    "python utils/docs.py --lynx"
+    "python utils/docs.py --lynx",
+    "python utils/logs.py",
+    "python utils/logs.py --main",
+    "python utils/logs.py --testing",
+    "python utils/logs.py --dev"
   ]
 }

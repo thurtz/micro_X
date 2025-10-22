@@ -5,34 +5,78 @@ import webbrowser
 import argparse
 import shutil
 import subprocess
+import asyncio
+import logging
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from modules.query_engine import query_knowledge_base, query_knowledge_base_rag
 
 # --- Help Text ---
 HELP_TEXT = """
-micro_X Help: Built-in Utilities
+micro_X Help: /docs Utility
 
-micro_X comes with several utility scripts to help manage the shell and your project.
-While they can be run with '/utils <script_name>', it is recommended to use the shorter alias for them.
+This utility opens the local micro_X Sphinx documentation or allows you to query it.
 
-Common Utilities & Their Aliases:
-  /alias
-  /command
-  /config
-  /dev
-  /docs
-  /snapshot
-  /tree
-  /list
-  /ollama
-  /update
-  /test             (full command: /utils run_tests)
+Usage:
+  /docs                       Opens documentation in the default graphical web browser.
+  /docs --query <question>    Queries the documentation knowledge base.
+  /docs --query <question> --rag Queries the documentation with a language model for a natural language response.
+  /docs --lynx                Opens documentation in the Lynx text-based browser.
+  /docs --help                Shows this help message.
 
-To see all available utility scripts, run '/list'.
+The script will look for the main index.html file in the 'docs/source/build/html' directory of the project. If the file is not found, it will print an error message.
 """
 
-def main(args):
+def main():
     """
-    Finds and opens the local Sphinx documentation in a web browser.
+    Finds and opens the local Sphinx documentation in a web browser or queries the knowledge base.
     """
+    parser = argparse.ArgumentParser(
+        description="Finds and opens the local micro_X documentation in a web browser.",
+        add_help=False
+    )
+    parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='show this help message and exit')
+    parser.add_argument(
+        '--lynx', 
+        action='store_true', 
+        help='Open documentation in the Lynx text-based browser.'
+    )
+    parser.add_argument(
+        '--query', 
+        nargs='+',
+        type=str,
+        help='Query the documentation knowledge base.'
+    )
+    parser.add_argument(
+        '--rag', 
+        action='store_true', 
+        help='Use a language model to generate a natural language response.'
+    )
+
+    args = parser.parse_args()
+
+    # --- Logging Configuration ---
+    if not logging.getLogger().hasHandlers():
+        log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, 'micro_x.log')
+        log_level = logging.INFO
+        handler = logging.FileHandler(log_file)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logging.getLogger().addHandler(handler)
+        logging.getLogger().setLevel(log_level)
+
+    if args.query:
+        query_text = " ".join(args.query)
+        if args.rag:
+            response = asyncio.run(query_knowledge_base_rag(kb_name="micro_X_docs", query=query_text))
+        else:
+            response = query_knowledge_base(kb_name="micro_X_docs", query=query_text)
+        print("\nResponse:")
+        print(response)
+        sys.exit(0)
+
     try:
         # The script is in /utils, so the project root is one level up.
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -66,27 +110,4 @@ def main(args):
         sys.exit(1)
 
 if __name__ == "__main__":
-    class HelpAction(argparse.Action):
-        def __init__(self, option_strings, dest, **kwargs):
-            super(HelpAction, self).__init__(option_strings, dest, nargs=0, **kwargs)
-        def __call__(self, parser, namespace, values, option_string=None):
-            print(HELP_TEXT)
-            parser.exit()
-
-    parser = argparse.ArgumentParser(
-        description="Finds and opens the local micro_X documentation in a web browser.",
-        add_help=False
-    )
-    parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
-    parser.add_argument(
-        '--lynx', 
-        action='store_true', 
-        help='Open documentation in the Lynx text-based browser.'
-    )
-
-    # If no arguments are provided, print help text
-    if len(sys.argv) == 1:
-        main(parser.parse_args())
-    else:
-        args = parser.parse_args()
-        main(args)
+    main()
