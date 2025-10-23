@@ -11,6 +11,8 @@ import sys
 import hashlib
 import json
 from typing import Optional
+import httpx
+import aiohttp
 
 from modules.output_analyzer import is_tui_like_output
 
@@ -84,14 +86,7 @@ class ShellEngine:
         self.is_developer_mode = is_developer_mode
         self.git_context_manager_instance = git_context_manager_instance
         self.embedding_manager_instance = None
-        self.router_agent_instance = create_router_agent(self.config)
-
-        self.current_directory = os.getcwd()
-        
-        # --- Process Management State ---
-        self.current_process: Optional[asyncio.subprocess.Process] = None
-        self.current_process_command: str = ""
-
+        self.router_agent_instance = None
 
         module_file_path = os.path.abspath(__file__)
         modules_dir_path = os.path.dirname(module_file_path)
@@ -119,6 +114,24 @@ class ShellEngine:
             logger.info("ShellEngine received main_normal_input_accept_handler_ref.")
         else:
             logger.warning("ShellEngine did NOT receive main_normal_input_accept_handler_ref. Edit mode might not work correctly.")
+
+    async def initialize_router_agent(self):
+        """Initializes the router agent."""
+        self.router_agent_instance = await create_router_agent()
+
+    async def _get_current_directory(self) -> str:
+        """Fetches the current directory from the MCP server."""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get("http://127.0.0.1:8123/context")
+            if response.status_code == 200:
+                return response.json().get("current_directory", "/")
+            else:
+                logger.warning(f"MCP server returned status {response.status_code} for context fetch.")
+                return "/"
+        except httpx.RequestError:
+            logger.warning("Could not connect to MCP server to fetch directory.")
+            return "/"
 
     async def kill_current_process(self):
         """Terminates the currently tracked process, if any."""
@@ -170,14 +183,15 @@ class ShellEngine:
         logger.info("Aliases reloaded.")
 
 
-    def expand_shell_variables(self, command_string: str) -> str:
+    async def expand_shell_variables(self, command_string: str) -> str:
+        current_directory = await self._get_current_directory()
         pwd_placeholder = f"__MICRO_X_PWD_PLACEHOLDER_{uuid.uuid4().hex}__"
         temp_command_string = re.sub(r'\$PWD(?![a-zA-Z0-9_])', pwd_placeholder, command_string)
         temp_command_string = re.sub(r'\$\{PWD\}', pwd_placeholder, temp_command_string)
         expanded_string = os.path.expandvars(temp_command_string)
-        expanded_string = expanded_string.replace(pwd_placeholder, self.current_directory)
+        expanded_string = expanded_string.replace(pwd_placeholder, current_directory)
         if command_string != expanded_string:
-            logger.debug(f"Expanded shell variables: '{command_string}' -> '{expanded_string}' (PWD: '{self.current_directory}')")
+            logger.debug(f"Expanded shell variables: '{command_string}' -> '{expanded_string}' (PWD: '{current_directory}')")
         return expanded_string
 
     def sanitize_and_validate(self, command: str, original_input_for_log: str) -> Optional[str]:
@@ -198,7 +212,7 @@ class ShellEngine:
         return command
 
     async def handle_cd_command(self, full_cd_command: str):
-        """Handles the 'cd' command to change the current directory."""
+        """Handles the 'cd' command by updating the directory via the MCP server."""
         if not self.ui_manager:
             logger.error("ShellEngine.handle_cd_command: UIManager not initialized.")
             return
@@ -207,33 +221,49 @@ class ShellEngine:
             parts = full_cd_command.split(" ", 1)
             target_dir_str = parts[1].strip() if len(parts) > 1 else "~"
 
+            # First, resolve the path locally to check for existence.
             expanded_dir_arg = os.path.expanduser(os.path.expandvars(target_dir_str))
-
             if os.path.isabs(expanded_dir_arg):
                 new_dir_abs = expanded_dir_arg
             else:
-                new_dir_abs = os.path.abspath(os.path.join(self.current_directory, expanded_dir_arg))
+                new_dir_abs = os.path.abspath(os.path.join(await self._get_current_directory(), expanded_dir_arg))
 
-            if os.path.isdir(new_dir_abs):
-                self.current_directory = new_dir_abs
-                self.ui_manager.update_input_prompt(self.current_directory)
-                append_output_func(f"📂 Changed directory to: {self.current_directory}", style_class='info')
-                logger.info(f"Directory changed to: {self.current_directory}")
-            else:
+            if not os.path.isdir(new_dir_abs):
                 append_output_func(f"❌ Error: Directory '{target_dir_str}' (resolved to '{new_dir_abs}') does not exist.", style_class='error')
-                logger.warning(f"Failed cd to '{new_dir_abs}'. Target '{target_dir_str}' does not exist or is not a directory.")
+                logger.warning(f"Failed cd to '{new_dir_abs}'. Target does not exist or is not a directory.")
+                return
+
+            # If the directory exists, post it to the MCP server.
+            mcp_server_url = "http://127.0.0.1:8123/context/directory"
+            async with httpx.AsyncClient() as client:
+                response = await client.post(mcp_server_url, json={"directory": new_dir_abs})
+            
+            if response.status_code == 200:
+                response_data = response.json()
+
+                await self.ui_manager.update_input_prompt()
+                append_output_func(f"📂 Changed directory to: {new_dir_abs}", style_class='info')
+                logger.info(f"Directory changed to: {new_dir_abs} via MCP server.")
+            else:
+                append_output_func(f"❌ Error updating directory via MCP server: {response.text}", style_class='error')
+                logger.error(f"MCP server returned status {response.status_code} for directory update.")
+
+        except httpx.RequestError as e:
+            append_output_func(f"❌ Connection error to MCP server: {e}", style_class='error')
+            logger.exception("Could not connect to MCP server to update directory.")
         except Exception as e:
             append_output_func(f"❌ Error processing 'cd' command: {e}", style_class='error')
             logger.exception(f"Error in handle_cd_command for '{full_cd_command}'")
         finally:
             if self.main_restore_normal_input_ref:
-                self.main_restore_normal_input_ref()
+                await self.main_restore_normal_input_ref()
 
     async def execute_shell_command(self, command_to_execute: str, original_user_input_display: str):
         """Executes a simple shell command directly."""
         if not self.ui_manager: logger.error("ShellEngine.execute_shell_command: UIManager not available."); return
         append_output_func = self.ui_manager.append_output
-        logger.info(f"Executing simple command: '{command_to_execute}' in '{self.current_directory}'")
+        current_directory = await self._get_current_directory()
+        logger.info(f"Executing simple command: '{command_to_execute}' in '{current_directory}'")
         
         if not command_to_execute.strip():
             append_output_func("⚠️ Empty command cannot be executed.", style_class='warning')
@@ -245,7 +275,7 @@ class ShellEngine:
                 command_to_execute,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=self.current_directory
+                cwd=current_directory
             )
             self.current_process_command = command_to_execute
             logger.info(f"Started process {self.current_process.pid} for command: {command_to_execute}")
@@ -292,7 +322,8 @@ class ShellEngine:
         """Executes a command in a new tmux window, based on category."""
         if not self.ui_manager: logger.error("ShellEngine.execute_command_in_tmux: UIManager not available."); return
         append_output_func = self.ui_manager.append_output
-        logger.info(f"Executing tmux command ({category}): '{command_to_execute}' in '{self.current_directory}'")
+        current_directory = await self._get_current_directory()
+        logger.info(f"Executing tmux command ({category}): '{command_to_execute}' in '{current_directory}'")
         
         if shutil.which("tmux") is None:
             append_output_func("❌ Error: tmux not found. Cannot execute command in tmux.", style_class='error')
@@ -304,9 +335,9 @@ class ShellEngine:
         
         try:
             if category == "semi_interactive":
-                await self._run_semi_interactive_tmux(command_to_execute, original_user_input_display, window_name)
+                await self._run_semi_interactive_tmux(command_to_execute, original_user_input_display, window_name, current_directory)
             else: # "interactive_tui"
-                await self._run_interactive_tui_tmux(command_to_execute, original_user_input_display, window_name)
+                await self._run_interactive_tui_tmux(command_to_execute, original_user_input_display, window_name, current_directory)
         except Exception as e:
             append_output_func(f"❌ Unexpected error during tmux execution: {e}", style_class='error')
             logger.exception(f"Unexpected error during tmux execution for command '{command_to_execute}': {e}")
@@ -316,7 +347,7 @@ class ShellEngine:
             self.current_process = None
             self.current_process_command = ""
 
-    async def _run_semi_interactive_tmux(self, command_to_execute, original_user_input_display, window_name):
+    async def _run_semi_interactive_tmux(self, command_to_execute, original_user_input_display, window_name, current_directory):
         append_output_func = self.ui_manager.append_output
         tmux_poll_timeout = self.config.get('timeouts', {}).get('tmux_poll_seconds', 300)
         tmux_sleep_after = self.config.get('timeouts', {}).get('tmux_semi_interactive_sleep_seconds', 1)
@@ -329,7 +360,7 @@ class ShellEngine:
             
             logger.info(f"Launching semi_interactive tmux: {' '.join(tmux_cmd_list_launch)} (log: {log_path})")
             
-            self.current_process = await asyncio.create_subprocess_exec(*tmux_cmd_list_launch, cwd=self.current_directory)
+            self.current_process = await asyncio.create_subprocess_exec(*tmux_cmd_list_launch, cwd=current_directory)
             self.current_process_command = command_to_execute
             await self.current_process.wait()
 
@@ -367,7 +398,7 @@ class ShellEngine:
             elif window_closed_or_cmd_done:
                 append_output_func(f"Output from '{original_user_input_display}': (No output captured)", style_class='info')
 
-    async def _run_interactive_tui_tmux(self, command_to_execute, original_user_input_display, window_name):
+    async def _run_interactive_tui_tmux(self, command_to_execute, original_user_input_display, window_name, current_directory):
         append_output_func = self.ui_manager.append_output
         tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", command_to_execute]
         
@@ -376,7 +407,7 @@ class ShellEngine:
             append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait...", style_class='info')
         if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
-        self.current_process = await asyncio.create_subprocess_exec(*tmux_cmd_list, cwd=self.current_directory)
+        self.current_process = await asyncio.create_subprocess_exec(*tmux_cmd_list, cwd=current_directory)
         self.current_process_command = command_to_execute
         await self.current_process.wait()
 
@@ -536,7 +567,7 @@ class ShellEngine:
                     self.category_manager_module.add_command_to_category(command_str_original, category)
                 else: category = self.config['behavior']['default_category_for_unclassified']
 
-            command_to_execute_expanded = self.expand_shell_variables(command_str_original)
+            command_to_execute_expanded = await self.expand_shell_variables(command_str_original)
             command_to_execute_sanitized = self.sanitize_and_validate(command_to_execute_expanded, original_user_input_for_display)
             if not command_to_execute_sanitized: return
 
@@ -569,7 +600,7 @@ class ShellEngine:
         finally:
             self.ui_manager.update_status_bar("")
             if self.ui_manager and not self.ui_manager.categorization_flow_active and not self.ui_manager.confirmation_flow_active and not self.ui_manager.is_in_edit_mode:
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                if self.main_restore_normal_input_ref: await self.main_restore_normal_input_ref()
 
     async def submit_user_input(self, user_input: str, from_edit_mode: bool = False):
         """The main entry point for processing all user input that isn't a simple built-in.
@@ -590,8 +621,15 @@ class ShellEngine:
         if not self.ui_manager: logger.error("submit_user_input: UIManager not initialized."); return
         user_input_stripped = user_input.strip()
         if not user_input_stripped:
-            if self.main_restore_normal_input_ref and from_edit_mode: self.main_restore_normal_input_ref()
+            if self.main_restore_normal_input_ref and from_edit_mode: await self.main_restore_normal_input_ref()
             return
+
+        # Post command to history
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post("http://127.0.0.1:8123/context/history", json={"command": user_input_stripped})
+        except httpx.RequestError as e:
+            logger.warning(f"Could not post command to history: {e}")
 
         # --- FIX: Handle 'cd' command directly ---
         if user_input_stripped.startswith("cd ") or user_input_stripped == "cd":
@@ -650,6 +688,8 @@ class ShellEngine:
             "logs_testing": ("python utils/logs.py --testing", True),
             "logs_dev": ("python utils/logs.py --dev", True),
             "show_help_logs": ("/help logs", False),
+            "save_session": ("python utils/save.py", True),
+            "load_session": ("python utils/load.py", True),
         }
 
         if self.embedding_manager_instance:
@@ -674,7 +714,7 @@ class ShellEngine:
                         # The built-in command handler correctly expands aliases and calls the appropriate script.
                         await self.handle_built_in_command(command_to_run)
                     
-                    if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                    if self.main_restore_normal_input_ref: await self.main_restore_normal_input_ref()
                     return
         # --- END INTENT CLASSIFICATION ---
 
@@ -690,7 +730,7 @@ class ShellEngine:
             if linux_command: await self.process_command(linux_command, f"'/translate {human_query}'", ai_raw_candidate, None, is_ai_generated=True)
             else:
                 self.ui_manager.append_output("🤔 AI could not produce a validated command.", style_class='warning')
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                if self.main_restore_normal_input_ref: await self.main_restore_normal_input_ref()
             return
 
         if from_edit_mode:
@@ -733,7 +773,7 @@ class ShellEngine:
                 # The router agent found a tool to use. The tool's output is the command to run.
                 # We can treat this as a built-in command and execute it directly.
                 await self.handle_built_in_command(router_command)
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
+                if self.main_restore_normal_input_ref: await self.main_restore_normal_input_ref()
                 return
 
             # --- 2. Fallback to Translator Agent ---

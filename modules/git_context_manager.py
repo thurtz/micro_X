@@ -6,6 +6,8 @@ import shutil
 import os
 import logging
 from typing import Optional, Tuple, List
+import httpx
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -243,6 +245,32 @@ class GitContextManager:
             return f"ahead{comparison_prefix}", local_hash, remote_hash, fetch_status
 
         return f"diverged{comparison_prefix}", local_hash, remote_hash, fetch_status
+
+    async def get_and_post_git_status(self):
+        """Gathers git status and posts it to the MCP server."""
+        if not await self.is_repository():
+            return
+
+        branch = await self.get_current_branch()
+        commit = await self.get_head_commit_hash()
+        is_clean = await self.is_working_directory_clean()
+        comp_status, local_h, remote_h, fetch_s = await self.compare_head_with_remote_tracking(branch)
+
+        git_status = {
+            "branch": branch,
+            "commit": commit,
+            "is_clean": is_clean,
+            "comparison_status": comp_status,
+            "local_hash": local_h,
+            "remote_hash": remote_h,
+            "fetch_status": fetch_s
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post("http://127.0.0.1:8123/context/git_status", json={"status": git_status})
+        except httpx.RequestError as e:
+            logger.warning(f"Could not post git status to MCP server: {e}")
 
     async def verify_commit_signature(self, commit_hash: str) -> Tuple[bool, str]:
         logger.warning("GPG commit signature verification is not yet implemented.")
