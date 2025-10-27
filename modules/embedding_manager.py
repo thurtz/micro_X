@@ -4,37 +4,20 @@ import json
 import os
 import numpy as np
 import ollama
-import httpx
-import aiohttp
 
 logger = logging.getLogger(__name__)
 
-async def _get_mcp_context() -> dict:
-    """Fetches the full context from the MCP server."""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get("http://127.0.0.1:8123/context")
-        if response.status_code == 200:
-            return response.json()
-        else:
-            logger.warning(f"MCP server returned status {response.status_code} for context fetch.")
-            return {}
-    except httpx.RequestError:
-        logger.warning("Could not connect to MCP server to fetch context.")
-        return {}
-
 class EmbeddingManager:
-    def __init__(self):
+    def __init__(self, config: dict):
+        self.config = config
         self.client = None
         self.intents = {}
         self.intent_embeddings = {}
         self.embedding_model = None
 
-    async def _load_intents_from_file(self):
+    def _load_intents_from_file(self):
         """Loads intents from the JSON file specified in the config."""
-        context = await _get_mcp_context()
-        config = context.get("config", {})
-        intents_path = config.get('intent_classification', {}).get('intents_file_path')
+        intents_path = self.config.get('intent_classification', {}).get('intents_file_path')
         if not intents_path:
             logger.error("Intents file path not found in config.")
             return False
@@ -58,16 +41,14 @@ class EmbeddingManager:
             logger.error(f"Error decoding JSON from intents file: {intents_path}")
             return False
 
-    async def initialize(self):
+    def initialize(self):
         """
         Initializes the Ollama client and generates embeddings for all intents.
         """
-        if not await self._load_intents_from_file():
+        if not self._load_intents_from_file():
             return
 
-        context = await _get_mcp_context()
-        config = context.get("config", {})
-        self.embedding_model = config.get('intent_classification', {}).get('embedding_model')
+        self.embedding_model = self.config.get('intent_classification', {}).get('embedding_model')
         if not self.embedding_model:
             logger.error("Embedding model not specified in config.")
             return

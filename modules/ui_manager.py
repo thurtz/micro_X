@@ -2,7 +2,6 @@
 import logging
 import os
 import asyncio
-import httpx
 
 from prompt_toolkit import Application # Keep this import for type hinting if needed elsewhere
 from prompt_toolkit.key_binding import KeyBindings
@@ -922,21 +921,9 @@ class UIManager:
         self.last_output_was_separator = True
 
 
-    async def update_input_prompt(self):
-        """Updates the text of the input prompt by fetching the current directory from the MCP server."""
+    def update_input_prompt(self, current_directory_path: str):
+        """Updates the text of the input prompt, typically with the current directory."""
         if not self.input_field: return
-
-        current_directory_path = "/"
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get("http://127.0.0.1:8123/context")
-            if response.status_code == 200:
-                current_directory_path = response.json().get("current_directory", "/")
-            else:
-                logger.warning(f"MCP server returned status {response.status_code} for context fetch.")
-        except httpx.RequestError:
-            logger.warning("Could not connect to MCP server to fetch directory for prompt.")
-
         home_dir = os.path.expanduser("~")
         max_prompt_len = self.config.get('ui', {}).get('max_prompt_length', 20)
         dir_for_prompt: str
@@ -959,13 +946,13 @@ class UIManager:
             if self.layout and self.input_field: self.app.layout.focus(self.input_field)
             self.app.invalidate()
 
-    async def set_normal_input_mode(self, accept_handler_func: callable):
+    def set_normal_input_mode(self, accept_handler_func: callable, current_directory_path: str):
         """Resets the UI to the default state for normal command input."""
         logger.debug("UIManager: Setting normal input mode.")
         self.categorization_flow_active = False
         self.confirmation_flow_active = False
         self.is_in_edit_mode = False
-        await self.update_input_prompt()
+        self.update_input_prompt(current_directory_path)
         if self.input_field:
             self.input_field.multiline = self.config.get('behavior', {}).get('input_field_height', 3) > 1
             self.input_field.buffer.accept_handler = accept_handler_func

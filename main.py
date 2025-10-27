@@ -16,7 +16,6 @@ import hashlib
 import sys
 import datetime # Added for log timestamps
 from typing import Tuple, Optional
-import httpx
 
 # --- New Import ---
 import modules.config_handler
@@ -33,7 +32,6 @@ from modules.category_manager import (
 from modules.ui_manager import UIManager
 from modules.curses_ui_manager import CursesUIManager
 from modules.embedding_manager import EmbeddingManager
-from modules.context_server import MCPServer
 
 LOG_DIR = "logs"
 CONFIG_DIR = "config"
@@ -63,7 +61,6 @@ app_instance = None
 ui_manager_instance = None
 shell_engine_instance = None
 git_context_manager_instance = None
-mcp_server = MCPServer()
 
 # --- Process Management & Concurrency Control ---
 input_lock = asyncio.Lock()
@@ -175,7 +172,7 @@ def normal_input_accept_handler(buff):
     asyncio.create_task(_handle_input())
 
 
-async def restore_normal_input_handler():
+def restore_normal_input_handler():
     """
     Restores the UI to normal input mode. This is typically called after
     a special flow (like categorization or confirmation) is completed or cancelled.
@@ -193,7 +190,7 @@ async def restore_normal_input_handler():
             logger.debug("Conditions met for adding interaction separator.")
             ui_manager_instance.add_interaction_separator()
 
-        await ui_manager_instance.set_normal_input_mode(normal_input_accept_handler)
+        ui_manager_instance.set_normal_input_mode(normal_input_accept_handler, shell_engine_instance.current_directory)
     elif not ui_manager_instance:
         logger.warning("restore_normal_input_handler: ui_manager_instance is None.")
     elif not shell_engine_instance:
@@ -223,8 +220,6 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
         git_context_manager_instance = GitContextManager(project_root=SCRIPT_DIR, fetch_timeout=git_fetch_timeout_from_config)
     else:
         git_context_manager_instance = GitContextManager(project_root=SCRIPT_DIR) # Uses default timeout
-
-    await git_context_manager_instance.get_and_post_git_status()
 
     if not await git_context_manager_instance.is_git_available():
         ui_manager_instance.append_output("⚠️ Git command not found. Integrity checks cannot be performed. Assuming developer mode.", style_class='error')
@@ -349,194 +344,179 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
 
 async def main_async_runner():
     """ Main asynchronous runner for the application. """
-    global app_instance, ui_manager_instance, shell_engine_instance, git_context_manager_instance, mcp_server
-    try:
-        await mcp_server.start()
-        await asyncio.sleep(1)
-        async with httpx.AsyncClient() as client:
-            await client.post("http://127.0.0.1:8123/context/config", json={"config": config})
-            await client.post("http://127.0.0.1:8123/context/directory", json={"directory": os.getcwd()})
+    global app_instance, ui_manager_instance, shell_engine_instance, git_context_manager_instance
 
-        # --- FIX START: UI Backend Selection and Initialization ---
-        # This block correctly selects the UI backend based on the configuration,
-        # initializes the appropriate UI manager, and then passes the instance
-        # to the ShellEngine. This resolves the dependency order issue.
-        ui_backend_choice = config.get("ui", {}).get("ui_backend", "prompt_toolkit")
+    # --- FIX START: UI Backend Selection and Initialization ---
+    # This block correctly selects the UI backend based on the configuration,
+    # initializes the appropriate UI manager, and then passes the instance
+    # to the ShellEngine. This resolves the dependency order issue.
+    ui_backend_choice = config.get("ui", {}).get("ui_backend", "prompt_toolkit")
 
-        # 1. Create the ShellEngine instance first, but without the ui_manager reference.
-        shell_engine_instance = ShellEngine(config, None, # ui_manager is set later
-                                            category_manager_module=sys.modules['modules.category_manager'],
-                                            ai_handler_module=sys.modules['modules.ai_handler'],
-                                            ollama_manager_module=sys.modules['modules.ollama_manager'],
-                                            main_exit_app_ref=_exit_app_main,
-                                            main_restore_normal_input_ref=restore_normal_input_handler,
-                                            main_normal_input_accept_handler_ref=normal_input_accept_handler,
-                                            is_developer_mode=False, # Will be set after integrity checks
-                                            git_context_manager_instance=None # Will be set after integrity checks
-                                            )
+    # 1. Create the ShellEngine instance first, but without the ui_manager reference.
+    shell_engine_instance = ShellEngine(config, None, # ui_manager is set later
+                                        category_manager_module=sys.modules['modules.category_manager'],
+                                        ai_handler_module=sys.modules['modules.ai_handler'],
+                                        ollama_manager_module=sys.modules['modules.ollama_manager'],
+                                        main_exit_app_ref=_exit_app_main,
+                                        main_restore_normal_input_ref=restore_normal_input_handler,
+                                        main_normal_input_accept_handler_ref=normal_input_accept_handler,
+                                        is_developer_mode=False, # Will be set after integrity checks
+                                        git_context_manager_instance=None # Will be set after integrity checks
+                                        )
 
-        # 2. Create the UI manager instance, passing the shell_engine_instance to it.
-        if ui_backend_choice == "curses":
-            logger.info("Selected UI Backend: curses")
-            ui_manager_instance = CursesUIManager(config, shell_engine_instance)
+    # 2. Create the UI manager instance, passing the shell_engine_instance to it.
+    if ui_backend_choice == "curses":
+        logger.info("Selected UI Backend: curses")
+        ui_manager_instance = CursesUIManager(config, shell_engine_instance)
+    else:
+        if ui_backend_choice != "prompt_toolkit":
+            logger.warning(f"Unrecognized UI backend '{ui_backend_choice}' configured. Defaulting to 'prompt_toolkit'.")
+        logger.info("Selected UI Backend: prompt_toolkit")
+        ui_manager_instance = UIManager(config, shell_engine_instance)
+
+    # 3. Now, set the ui_manager on the shell_engine_instance.
+    shell_engine_instance.ui_manager = ui_manager_instance
+
+    # 3. For CursesUIManager, ensure the shell_engine_instance is set after its creation.
+    if isinstance(ui_manager_instance, CursesUIManager):
+      ui_manager_instance.shell_engine_instance = shell_engine_instance
+      ui_manager_instance.main_exit_app_ref = _exit_app_main
+    # --- FIX END ---
+
+    # Initialize Git context after the shell engine has its ui_manager
+    git_fetch_timeout_from_config = config.get('timeouts', {}).get('git_fetch_timeout')
+    if git_fetch_timeout_from_config is not None:
+        git_context_manager_instance = GitContextManager(project_root=SCRIPT_DIR, fetch_timeout=git_fetch_timeout_from_config)
+    else:
+        git_context_manager_instance = GitContextManager(project_root=SCRIPT_DIR)
+    shell_engine_instance.git_context_manager_instance = git_context_manager_instance
+
+    # Perform integrity checks and set developer mode flag on shell engine
+    is_developer_mode, integrity_checks_passed = await perform_startup_integrity_checks()
+    shell_engine_instance.is_developer_mode = is_developer_mode
+
+    integrity_config = config.get("integrity_check", {})
+    halt_on_failure = integrity_config.get("halt_on_integrity_failure", True)
+
+    if not is_developer_mode and not integrity_checks_passed and halt_on_failure:
+        # This block is now primarily for logging, the exception is the key signal
+        logger.critical("Halting micro_X due to failed integrity checks on a protected branch.")
+        # The actual error with details should have already been raised by a sub-check.
+        # This is a fallback to ensure halting if a sub-check returns False instead of raising.
+        raise StartupIntegrityError("Failed integrity checks on a protected branch.", details="Halting as per configuration.")
+
+    ui_manager_instance.main_exit_app_ref = _exit_app_main
+    ui_manager_instance.main_restore_normal_input_ref = restore_normal_input_handler
+
+    if config.get("behavior", {}).get("verbosity_level") != "quiet":
+        ollama_service_ready = await shell_engine_instance.ollama_manager_module.ensure_ollama_service(config, ui_manager_instance.append_output)
+        if not ollama_service_ready:
+            ui_manager_instance.append_output("⚠️ Ollama service is not available or failed to start. AI-dependent features will be affected.", style_class='error')
+            ui_manager_instance.append_output("   You can try '/ollama help' for manual control options.", style_class='info')
+            logger.warning("Ollama service check failed or service could not be started.")
         else:
-            if ui_backend_choice != "prompt_toolkit":
-                logger.warning(f"Unrecognized UI backend '{ui_backend_choice}' configured. Defaulting to 'prompt_toolkit'.")
-            logger.info("Selected UI Backend: prompt_toolkit")
-            ui_manager_instance = UIManager(config, shell_engine_instance)
+            ui_manager_instance.append_output("✅ Ollama service is active and ready.", style_class='success')
+            logger.info("Ollama service is active.")
+            embedding_manager_instance = EmbeddingManager(config)
+            embedding_manager_instance.initialize()
+            shell_engine_instance.embedding_manager_instance = embedding_manager_instance
+    else:
+        # In quiet mode, we still need to check for the service, but we don't print messages.
+        ollama_service_ready = await shell_engine_instance.ollama_manager_module.is_ollama_server_running()
+        if ollama_service_ready:
+            embedding_manager_instance = EmbeddingManager(config)
+            embedding_manager_instance.initialize()
+            shell_engine_instance.embedding_manager_instance = embedding_manager_instance
 
-        # 3. Now, set the ui_manager on the shell_engine_instance.
-        shell_engine_instance.ui_manager = ui_manager_instance
 
-        await shell_engine_instance.initialize_router_agent()
+    init_category_manager(SCRIPT_DIR, CONFIG_DIR, ui_manager_instance.append_output)
 
-        # 3. For CursesUIManager, ensure the shell_engine_instance is set after its creation.
-        if isinstance(ui_manager_instance, CursesUIManager):
-          ui_manager_instance.shell_engine_instance = shell_engine_instance
-          ui_manager_instance.main_exit_app_ref = _exit_app_main
-        # --- FIX END ---
+    history = FileHistory(HISTORY_FILE_PATH)
 
-        # Initialize Git context after the shell engine has its ui_manager
-        git_fetch_timeout_from_config = config.get('timeouts', {}).get('git_fetch_timeout')
-        if git_fetch_timeout_from_config is not None:
-            git_context_manager_instance = GitContextManager(project_root=SCRIPT_DIR, fetch_timeout=git_fetch_timeout_from_config)
+    home_dir = os.path.expanduser("~")
+    max_prompt_len = config.get('ui', {}).get('max_prompt_length', 20)
+    current_dir_for_prompt = shell_engine_instance.current_directory
+    if current_dir_for_prompt == home_dir: initial_prompt_dir = "~"
+    elif current_dir_for_prompt.startswith(home_dir + os.sep):
+        rel_path = current_dir_for_prompt[len(home_dir)+1:]; full_rel_prompt = "~/"; full_rel_prompt += rel_path
+        initial_prompt_dir = full_rel_prompt if len(full_rel_prompt) <= max_prompt_len else "~/"; initial_prompt_dir += "..." + rel_path[-(max_prompt_len - 5):] if (max_prompt_len - 5) > 0 else "~/... "
+    else:
+        base_name = os.path.basename(current_dir_for_prompt)
+        initial_prompt_dir = base_name if len(base_name) <= max_prompt_len else "..." + base_name[-(max_prompt_len - 3):] if (max_prompt_len - 3) > 0 else "..."
+
+    if config.get("behavior", {}).get("verbosity_level") != "quiet":
+        initial_welcome_message = (
+            "Welcome to micro_X Shell 🚀\n"
+            "Type a Linux command, or try '/translate your query' (e.g., /translate list text files).\n"
+            "Key shortcuts are shown below. For more help, type '/help'.\n"
+            "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
+            "Use '/ollama help' to manage the Ollama service.\n"
+        )
+        initial_buffer_for_ui = list(ui_manager_instance.output_buffer)
+
+        is_buffer_empty_or_just_welcome = not initial_buffer_for_ui or \
+                                          (len(initial_buffer_for_ui) == 1 and initial_buffer_for_ui[0][1] == initial_welcome_message)
+
+        if is_buffer_empty_or_just_welcome and not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
+            initial_buffer_for_ui.insert(0, ('class:welcome', initial_welcome_message))
+        elif not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
+            initial_buffer_for_ui.append(('class:welcome', initial_welcome_message))
+    else:
+        initial_buffer_for_ui = []
+
+    # --- FIX START: Conditional UI Initialization Arguments ---
+    # This block constructs the arguments for initialize_ui_elements
+    # conditionally, preventing a TypeError because CursesUIManager and UIManager
+    # expect different parameters.
+    kwargs_for_ui_init = {
+        "initial_prompt_text": f"({initial_prompt_dir}) > ",
+        "history": history,
+        "output_buffer_main": initial_buffer_for_ui
+    }
+    # The Curses UI manager needs a reference to the shell engine for its input loop.
+    if ui_backend_choice == "curses":
+        kwargs_for_ui_init["shell_engine_instance"] = shell_engine_instance
+
+    layout_or_stdscr = ui_manager_instance.initialize_ui_elements(**kwargs_for_ui_init)
+    # --- FIX END ---
+
+    # --- FIX START: Conditional Application Execution ---
+    # This block correctly handles the two different execution paths for the
+    # selected UI backend.
+    if ui_backend_choice == "curses":
+        # CursesUIManager has its own async run loop.
+        await ui_manager_instance.run_async()
+    else:
+        # This is the original path for the prompt_toolkit backend.
+        if ui_manager_instance and ui_manager_instance.input_field:
+            ui_manager_instance.input_field.buffer.accept_handler = normal_input_accept_handler
         else:
-            git_context_manager_instance = GitContextManager(project_root=SCRIPT_DIR)
-        shell_engine_instance.git_context_manager_instance = git_context_manager_instance
+            logger.critical("UIManager did not create input_field. Cannot set accept_handler.")
+            sys.exit(1) # Use sys.exit directly
 
-        # Perform integrity checks and set developer mode flag on shell engine
-        is_developer_mode, integrity_checks_passed = await perform_startup_integrity_checks()
-        shell_engine_instance.is_developer_mode = is_developer_mode
+        if ui_manager_instance:
+            ui_manager_instance.initial_prompt_settled = True
+            ui_manager_instance.last_output_was_separator = False
+            ui_manager_instance.add_startup_separator()
 
-        integrity_config = config.get("integrity_check", {})
-        halt_on_failure = integrity_config.get("halt_on_integrity_failure", True)
+        enable_mouse = config.get("ui", {}).get("enable_mouse_support", False)
+        logger.info(f"Prompt Toolkit Application mouse_support will be set to: {enable_mouse}")
 
-        if not is_developer_mode and not integrity_checks_passed and halt_on_failure:
-            # This block is now primarily for logging, the exception is the key signal
-            logger.critical("Halting micro_X due to failed integrity checks on a protected branch.")
-            # The actual error with details should have already been raised by a sub-check.
-            # This is a fallback to ensure halting if a sub-check returns False instead of raising.
-            raise StartupIntegrityError("Failed integrity checks on a protected branch.", details="Halting as per configuration.")
+        app_instance = Application(
+            layout=layout_or_stdscr, # This is the layout from UIManager
+            key_bindings=ui_manager_instance.get_key_bindings(),
+            style=ui_manager_instance.style,
+            full_screen=True,
+            mouse_support=enable_mouse
+        )
+        if ui_manager_instance:
+            ui_manager_instance.app = app_instance
 
-        ui_manager_instance.main_exit_app_ref = _exit_app_main
-        ui_manager_instance.main_restore_normal_input_ref = restore_normal_input_handler
+        logger.info("micro_X Shell application starting.")
+        await app_instance.run_async()
+    # --- FIX END ---
 
-        if config.get("behavior", {}).get("verbosity_level") != "quiet":
-            ollama_service_ready = await shell_engine_instance.ollama_manager_module.ensure_ollama_service(config, ui_manager_instance.append_output)
-            if not ollama_service_ready:
-                ui_manager_instance.append_output("⚠️ Ollama service is not available or failed to start. AI-dependent features will be affected.", style_class='error')
-                ui_manager_instance.append_output("   You can try '/ollama help' for manual control options.", style_class='info')
-                logger.warning("Ollama service check failed or service could not be started.")
-            else:
-                ui_manager_instance.append_output("✅ Ollama service is active and ready.", style_class='success')
-                embedding_manager_instance = EmbeddingManager()
-                await embedding_manager_instance.initialize()
-                shell_engine_instance.embedding_manager_instance = embedding_manager_instance
-        else:
-            # In quiet mode, we still need to check for the service, but we don't print messages.
-            ollama_service_ready = await shell_engine_instance.ollama_manager_module.is_ollama_server_running()
-            if ollama_service_ready:
-                embedding_manager_instance = EmbeddingManager()
-                await embedding_manager_instance.initialize()
-                shell_engine_instance.embedding_manager_instance = embedding_manager_instance
-
-
-        init_category_manager(SCRIPT_DIR, CONFIG_DIR, ui_manager_instance.append_output)
-
-        history = FileHistory(HISTORY_FILE_PATH)
-
-        home_dir = os.path.expanduser("~")
-        max_prompt_len = config.get('ui', {}).get('max_prompt_length', 20)
-        async with httpx.AsyncClient() as client:
-            response = await client.get("http://127.0.0.1:8123/context")
-        if response.status_code == 200:
-            current_dir_for_prompt = response.json().get("current_directory", "/")
-        else:
-            current_dir_for_prompt = "/"
-        if current_dir_for_prompt == home_dir: initial_prompt_dir = "~"
-        elif current_dir_for_prompt.startswith(home_dir + os.sep):
-            rel_path = current_dir_for_prompt[len(home_dir)+1:]; full_rel_prompt = "~/"; full_rel_prompt += rel_path
-            initial_prompt_dir = full_rel_prompt if len(full_rel_prompt) <= max_prompt_len else "~/"; initial_prompt_dir += "..." + rel_path[-(max_prompt_len - 5):] if (max_prompt_len - 5) > 0 else "~/... "
-        else:
-            base_name = os.path.basename(current_dir_for_prompt)
-            initial_prompt_dir = base_name if len(base_name) <= max_prompt_len else "..." + base_name[-(max_prompt_len - 3):] if (max_prompt_len - 3) > 0 else "..."
-
-        if config.get("behavior", {}).get("verbosity_level") != "quiet":
-            initial_welcome_message = (
-                "Welcome to micro_X Shell 🚀\n"
-                "Type a Linux command, or try '/translate your query' (e.g., /translate list text files).\n"
-                "Key shortcuts are shown below. For more help, type '/help'.\n"
-                "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
-                "Use '/ollama help' to manage the Ollama service.\n"
-            )
-            initial_buffer_for_ui = list(ui_manager_instance.output_buffer)
-
-            is_buffer_empty_or_just_welcome = not initial_buffer_for_ui or \
-                                              (len(initial_buffer_for_ui) == 1 and initial_buffer_for_ui[0][1] == initial_welcome_message)
-
-            if is_buffer_empty_or_just_welcome and not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
-                initial_buffer_for_ui.insert(0, ('class:welcome', initial_welcome_message))
-            elif not any(item[1] == initial_welcome_message for item in initial_buffer_for_ui):
-                initial_buffer_for_ui.append(('class:welcome', initial_welcome_message))
-        else:
-            initial_buffer_for_ui = []
-
-        # --- FIX START: Conditional UI Initialization Arguments ---
-        # This block constructs the arguments for initialize_ui_elements
-        # conditionally, preventing a TypeError because CursesUIManager and UIManager
-        # expect different parameters.
-        kwargs_for_ui_init = {
-            "initial_prompt_text": f"({initial_prompt_dir}) > ",
-            "history": history,
-            "output_buffer_main": initial_buffer_for_ui
-        }
-        # The Curses UI manager needs a reference to the shell engine for its input loop.
-        if ui_backend_choice == "curses":
-            kwargs_for_ui_init["shell_engine_instance"] = shell_engine_instance
-
-        layout_or_stdscr = ui_manager_instance.initialize_ui_elements(**kwargs_for_ui_init)
-        # --- FIX END ---
-
-        # --- FIX START: Conditional Application Execution ---
-        # This block correctly handles the two different execution paths for the
-        # selected UI backend.
-        if ui_backend_choice == "curses":
-            # CursesUIManager has its own async run loop.
-            await ui_manager_instance.run_async()
-        else:
-            # This is the original path for the prompt_toolkit backend.
-            if ui_manager_instance and ui_manager_instance.input_field:
-                ui_manager_instance.input_field.buffer.accept_handler = normal_input_accept_handler
-            else:
-                logger.critical("UIManager did not create input_field. Cannot set accept_handler.")
-                sys.exit(1) # Use sys.exit directly
-
-            if ui_manager_instance:
-                ui_manager_instance.initial_prompt_settled = True
-                ui_manager_instance.last_output_was_separator = False
-                ui_manager_instance.add_startup_separator()
-
-            enable_mouse = config.get("ui", {}).get("enable_mouse_support", False)
-            logger.info(f"Prompt Toolkit Application mouse_support will be set to: {enable_mouse}")
-
-            app_instance = Application(
-                layout=layout_or_stdscr, # This is the layout from UIManager
-                key_bindings=ui_manager_instance.get_key_bindings(),
-                style=ui_manager_instance.style,
-                full_screen=True,
-                mouse_support=enable_mouse
-            )
-            if ui_manager_instance:
-                ui_manager_instance.app = app_instance
-
-            logger.info("micro_X Shell application starting.")
-            await app_instance.run_async()
-        # --- FIX END ---
-
-        logger.info("micro_X Shell application run_async completed.")
-    finally:
-        if mcp_server.is_running():
-            await mcp_server.stop()
+    logger.info("micro_X Shell application run_async completed.")
 
 
 def run_shell():

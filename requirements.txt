@@ -11,7 +11,3 @@ langchain-ollama>=0.0.1
 chromadb>=0.4.24
 beautifulsoup4>=4.12.3
 langchain-chroma>=0.1.0
-fastapi
-uvicorn[standard]
-httpx
-aiohttp

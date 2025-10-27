@@ -26,7 +26,7 @@ async def get_validated_ai_command(human_query: str, config_param: dict, append_
     logger.info(f"Delegating validated translation for: '{human_query}' to LangGraph agent.")
     
     # The new LangGraph agent handles all the logic internally.
-    validated_command, raw_response = await run_lc_agent(human_query)
+    validated_command, raw_response = await run_lc_agent(human_query, config_param)
     
     if validated_command:
         append_output_func(f"✅ Agent returned validated command: '{validated_command}'", style_class='success')
