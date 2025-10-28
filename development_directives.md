@@ -20,3 +20,11 @@ This file contains the rules and guidelines for the Gemini AI assistant when wor
 - When committing changes using the `run_shell_command` tool, use the `-m` flag for each line of the commit message. This avoids complex shell escaping issues.
 - Example: `git commit -m "feat: Add new feature" -m "Detailed description of the feature."`
 - Files listed in the `.gitignore` file are not tracked by Git and therefore cannot be committed. Do not attempt to commit these files.
+
+## 4. Utility Script Conventions
+
+When creating a new utility script in the `utils/` directory, it must adhere to the following dual-component help system:
+
+1.  **`HELP_TEXT` Constant**: The script MUST contain a top-level string constant named `HELP_TEXT`. This constant is used by the main `/help <utility_name>` command to display a summary of the utility. The help system parses the file and extracts this constant directly; it does not run the script.
+
+2.  **`argparse` Implementation**: The script SHOULD also use the `argparse` module to handle its own command-line arguments, including its own `--help` flag. This allows the utility to be run with complex arguments and to provide detailed help for its own functionality (e.g., `/utils <script_name> --help`).

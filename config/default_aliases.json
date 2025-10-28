@@ -7,6 +7,7 @@
   "/docs --help": "python utils/docs.py --help",
   "/docs --lynx": "python utils/docs.py --lynx",
   "/help": "/utils help",
+  "/history": "/utils history",
   "/knowledge": "/utils knowledge",
   "/logs": "python utils/logs.py",
   "/logs --main": "python utils/logs.py --main",
