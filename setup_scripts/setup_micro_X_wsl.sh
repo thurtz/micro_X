@@ -188,9 +188,29 @@ echo ""
 echo "For a permanent setting, add the export line to your WSL shell's configuration file"
 echo "(e.g., ~/.bashrc if using bash, or ~/.zshrc if using zsh), then source it or open a new terminal:"
 echo "  echo 'export OLLAMA_HOST=http://localhost:11434' >> ~/.bashrc"
-echo "  source ~/.bashrc"
-echo ""
+  echo "  source ~/.bashrc"
+  echo ""
+
+echo "Attempting to verify connectivity from WSL to Ollama on Windows..."
+if ! command_exists curl; then
+    echo "curl command not found. Installing it to verify connection..."
+    sudo apt install -y curl
+fi
+
+if curl --fail --silent --show-error http://localhost:11434/ >/dev/null 2>&1; then
+    echo "✅ Successfully connected to Ollama on the Windows host."
+else
+    echo "❌ WARNING: Could not connect to Ollama on your Windows host at http://localhost:11434/"
+    echo "   This is required for micro_X to function."
+    echo "   TROUBLESHOOTING:"
+    echo "   1. Is the Ollama application installed and RUNNING on your Windows machine?"
+    echo "   2. Did you set the OLLAMA_HOST variable correctly? (run 'export OLLAMA_HOST=http://localhost:11434')"
+    echo "   3. Is your Windows Firewall blocking connections from WSL? You may need to allow incoming connections on port 11434."
+    echo "   You can proceed with the setup, but AI features will not work until this is resolved."
+fi
+
 echo "The micro_X.sh script in '$PROJECT_ROOT' might also be a good place to set this variable if it's not set globally." # MODIFIED
+
 echo "Verify connectivity from WSL to Ollama on Windows with: curl http://localhost:11434"
 echo "(You may need to install curl: sudo apt install curl)"
 echo "Also, ensure your Windows Firewall is not blocking connections to port 11434 from WSL."
