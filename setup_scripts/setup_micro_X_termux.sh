@@ -83,6 +83,14 @@ if command_exists ollama; then
     if [[ ! "$ollama_running_choice" =~ ^[Yy]$ ]]; then
         echo "Ollama server not confirmed as running. Model pulling might fail."
         echo "Please ensure 'ollama serve' is active before proceeding with model downloads or running micro_X."
+    else
+        echo "Verifying connection to Ollama server..."
+        if ! curl --fail --silent --show-error http://localhost:11434/ >/dev/null 2>&1; then
+            echo "ERROR: Could not connect to Ollama server at http://localhost:11434/"
+            echo "Please ensure 'ollama serve' is running correctly in another Termux session."
+            exit 1
+        fi
+        echo "Successfully connected to Ollama server."
     fi
 else
     echo "Ollama command not found. Cannot proceed with model downloads or verify server status."

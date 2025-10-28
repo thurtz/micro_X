@@ -101,6 +101,15 @@ if ! command_exists ollama; then
 else
     echo "Ollama command is available. Ensure the Ollama application is running."
 fi
+
+echo "Verifying connection to Ollama server..."
+if ! curl --fail --silent --show-error http://localhost:11434/ >/dev/null 2>&1; then
+    echo "ERROR: Could not connect to Ollama server at http://localhost:11434/"
+    echo "Please ensure the Ollama macOS application is running and has not been configured on a different port."
+    exit 1
+fi
+echo "Successfully connected to Ollama server."
+
 echo ""
 
 # --- 4. Install Required Ollama Models ---
