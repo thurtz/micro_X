@@ -29,6 +29,7 @@ Common Commands:
   /translate <query>  - Translates natural language to a shell command.
   !command            - Force a command to be treated as a direct command, bypassing AI.
   /help [topic]       - Displays this help message or help for a specific topic.
+  /history            - Displays the command history.
   /alias              - Manage command aliases (shortcuts).
   /command            - Manage command categorizations.
   /config             - Opens a web UI to manage your configuration.
@@ -49,7 +50,7 @@ Common Commands:
 
 For more details on a specific feature, use '/help <topic>'.
 Available Topics:
-  translate, alias, command, config, dev, docs, git_branch, keybindings, knowledge, list, logs, ollama, run, security, setup_brew, snapshot, test, tree, update, utilities
+  translate, alias, command, config, dev, docs, git_branch, history, keybindings, knowledge, list, logs, ollama, run, security, setup_brew, snapshot, test, tree, update, utilities
 """
 
 AI_HELP = """
@@ -179,7 +180,7 @@ def main():
         print(RUN_HELP)
     elif topic == 'utilities':
         print(UTILITIES_HELP)
-    elif topic in ('alias', 'command', 'config', 'dev', 'docs', 'git_branch', 'knowledge', 'list', 'logs', 'ollama', 'setup_brew', 'snapshot', 'test', 'tree', 'update'):
+    elif topic in ('alias', 'command', 'config', 'dev', 'docs', 'git_branch', 'history', 'knowledge', 'list', 'logs', 'ollama', 'setup_brew', 'snapshot', 'test', 'tree', 'update'):
         module_name = {
             'alias': 'alias.py',
             'command': 'command.py',
@@ -187,6 +188,7 @@ def main():
             'dev': 'dev.py',
             'docs': 'docs.py',
             'git_branch': 'git_branch.py',
+            'history': 'history.py',
             'knowledge': 'knowledge.py',
             'list': 'list_scripts.py',
             'logs': 'logs.py',
