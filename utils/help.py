@@ -37,8 +37,8 @@ Common Commands:
   /tree               - Generates a file showing the project structure.
   /docs               - Opens the project documentation in a web browser.
   /test               - Runs the project's test suite.
-  /update             - Pulls the latest changes for micro_X.
   /list               - Lists available utility and user scripts.
+  /run <script>       - Executes a script from the 'user_scripts' directory.
   /ollama             - Manage the Ollama service.
   /logs               - Tails the logs for the main, testing, or dev branches.
   /dev                - Manage the multi-branch development environment.
@@ -49,7 +49,7 @@ Common Commands:
 
 For more details on a specific feature, use '/help <topic>'.
 Available Topics:
-  translate, alias, command, config, dev, docs, git_branch, keybindings, knowledge, list, logs, ollama, security, setup_brew, snapshot, test, tree, update, utilities
+  translate, alias, command, config, dev, docs, git_branch, keybindings, knowledge, list, logs, ollama, run, security, setup_brew, snapshot, test, tree, update, utilities
 """
 
 AI_HELP = """
@@ -139,6 +139,20 @@ To see all available utility scripts, run '/list'.
 For more details on a specific utility, use '/help <utility_name>'.
 """
 
+RUN_HELP = """
+micro_X Help: Running User Scripts
+
+The /run command is used to execute your personal scripts located in the 'user_scripts/' directory.
+
+/run <script_name> [args...]
+  - Executes the specified script. You do not need to include the '.py' extension.
+  - Any additional arguments are passed directly to your script.
+  - Example: /run my_script --input /tmp/data
+
+Listing Scripts:
+  To see a list of all available user scripts, you can use the '/list' command.
+"""
+
 # --- Main Logic ---
 
 def main():
@@ -161,6 +175,8 @@ def main():
         print(GENERAL_HELP)
     elif topic == 'translate':
         print(AI_HELP)
+    elif topic == 'run':
+        print(RUN_HELP)
     elif topic == 'utilities':
         print(UTILITIES_HELP)
     elif topic in ('alias', 'command', 'config', 'dev', 'docs', 'git_branch', 'knowledge', 'list', 'logs', 'ollama', 'setup_brew', 'snapshot', 'test', 'tree', 'update'):
