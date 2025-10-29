@@ -28,3 +28,19 @@ When creating a new utility script in the `utils/` directory, it must adhere to 
 1.  **`HELP_TEXT` Constant**: The script MUST contain a top-level string constant named `HELP_TEXT`. This constant is used by the main `/help <utility_name>` command to display a summary of the utility. The help system parses the file and extracts this constant directly; it does not run the script.
 
 2.  **`argparse` Implementation**: The script SHOULD also use the `argparse` module to handle its own command-line arguments, including its own `--help` flag. This allows the utility to be run with complex arguments and to provide detailed help for its own functionality (e.g., `/utils <script_name> --help`).
+
+## 5. Adding New Intents
+
+Adding a new natural language intent is a two-step process:
+
+1.  **Define the Intent**: In `config/intents.json`, add a new key for your intent name (e.g., `"show_weather"`). The value should be an array of strings containing all the phrases a user might type to express this intent (e.g., `["what is the weather", "show weather"]`).
+
+2.  **Map the Intent**: In `modules/shell_engine.py`, add a new entry to the `INTENT_COMMAND_MAP` dictionary. This entry maps the intent name from step 1 to the exact command that should be executed (e.g., `"show_weather": ("/utils get_weather --now", False)`).
+
+## 6. Setup Script Conventions
+
+When creating or modifying OS-specific setup scripts in the `setup_scripts/` directory, the following conventions apply:
+
+- **Baseline Reference**: The `setup_micro_X_mint.sh` script is considered the baseline or "gold standard". New scripts for other operating systems should follow its structure, verbosity, and error-handling logic as closely as possible.
+
+- **Goal**: The objective is to provide a fully automated setup experience where possible. When full automation is not feasible (e.g., for Ollama on certain OSes), the script should provide clear, step-by-step manual instructions for the user.
