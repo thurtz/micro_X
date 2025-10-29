@@ -601,6 +601,7 @@ class ShellEngine:
         # --- INTENT CLASSIFICATION (NEW) ---
         INTENT_COMMAND_MAP = {
             "show_help": ("/help", False),
+            "show_history": ("/history", False),
             "ollama_start": ("/ollama start", False),
             "ollama_stop": ("/ollama stop", False),
             "ollama_restart": ("/ollama restart", False),

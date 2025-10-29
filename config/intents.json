@@ -9,6 +9,13 @@
         "what are your commands",
         "what are your capabilities"
     ],
+    "show_history": [
+        "/history",
+        "history",
+        "show my history",
+        "display command history",
+        "what have I done"
+    ],
     "exit_shell": [
         "exit",
         "quit",
