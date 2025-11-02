@@ -177,81 +177,6 @@ fi
 DESKTOP_FILE_TEMPLATE_SOURCE="$PROJECT_ROOT/micro_X.desktop"
 FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS="micro_X" # Default for instructions
 
-if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ]; then
-    echo "Found desktop entry template: $DESKTOP_FILE_TEMPLATE_SOURCE."
-    read -p "Do you want to install a desktop entry to your local applications menu? (y/N) " install_desktop_choice
-    if [[ "$install_desktop_choice" =~ ^[Yy]$ ]]; then
-        LOCAL_APPS_DIR="$HOME/.local/share/applications"
-        mkdir -p "$LOCAL_APPS_DIR"
-
-        CURRENT_BRANCH_NAME_SANITIZED="unknown"
-        if command_exists git && [ -d "$PROJECT_ROOT/.git" ]; then
-            BRANCH_OUTPUT=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)
-            if [ $? -eq 0 ] && [ -n "$BRANCH_OUTPUT" ] && [ "$BRANCH_OUTPUT" != "HEAD" ]; then
-                TEMP_SANITIZED_BRANCH_NAME=$(echo "$BRANCH_OUTPUT" | sed 's/\\\//_/g' | sed 's/[^a-zA-Z0-9_-]//g')
-                if [ -n "$TEMP_SANITIZED_BRANCH_NAME" ]; then CURRENT_BRANCH_NAME_SANITIZED="$TEMP_SANITIZED_BRANCH_NAME"; fi
-            elif [ "$BRANCH_OUTPUT" == "HEAD" ]; then
-                # For detached HEAD, try to get a short commit hash for uniqueness
-                COMMIT_HASH_SHORT=$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null)
-                if [ $? -eq 0 ] && [ -n "$COMMIT_HASH_SHORT" ]; then
-                    CURRENT_BRANCH_NAME_SANITIZED="detached_${COMMIT_HASH_SHORT}"
-                else
-                    CURRENT_BRANCH_NAME_SANITIZED="detached"
-                fi
-            fi
-        fi
-
-        DESKTOP_FILENAME_BASE="micro_x"
-        APP_NAME_BASE="micro_X"
-        FINAL_DESKTOP_FILENAME="${DESKTOP_FILENAME_BASE}.desktop"
-        FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS="$APP_NAME_BASE" 
-        FINAL_COMMENT_FOR_DESKTOP="Launch micro_X AI Shell"
-
-        if [ "$CURRENT_BRANCH_NAME_SANITIZED" != "unknown" ]; then
-            FINAL_DESKTOP_FILENAME="${DESKTOP_FILENAME_BASE}_${CURRENT_BRANCH_NAME_SANITIZED}.desktop"
-            FINAL_DISPLAY_NAME_FOR_DESKTOP="${APP_NAME_BASE} (${CURRENT_BRANCH_NAME_SANITIZED})" 
-            FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS="$FINAL_DISPLAY_NAME_FOR_DESKTOP" 
-            FINAL_COMMENT_FOR_DESKTOP="Launch micro_X AI Shell (${CURRENT_BRANCH_NAME_SANITIZED} instance)"
-        else
-            FINAL_DISPLAY_NAME_FOR_DESKTOP="$APP_NAME_BASE" 
-        fi
-        
-        FINAL_DESKTOP_FILE_PATH="$LOCAL_APPS_DIR/$FINAL_DESKTOP_FILENAME"
-        TEMP_DESKTOP_FILE=$(mktemp)
-        cp "$DESKTOP_FILE_TEMPLATE_SOURCE" "$TEMP_DESKTOP_FILE"
-
-        ESCAPED_LAUNCHER_PATH=$(echo "$MICRO_X_LAUNCHER_SH" | sed 's/\//\\\\
-//g')
-        sed -i "s|^Exec=.*|Exec=\"$ESCAPED_LAUNCHER_PATH\"|" "$TEMP_DESKTOP_FILE"
-        sed -i "s|^Name=.*|Name=$FINAL_DISPLAY_NAME_FOR_DESKTOP|" "$TEMP_DESKTOP_FILE"
-        sed -i "s|^Comment=.*|Comment=$FINAL_COMMENT_FOR_DESKTOP|" "$TEMP_DESKTOP_FILE"
-        
-        # Icon path handling (optional, if you have a project icon)
-        # if grep -q "^Icon=" "$TEMP_DESKTOP_FILE" && ! grep -q "^Icon=/" "$TEMP_DESKTOP_FILE" && ! grep -q "^Icon=~" "$TEMP_DESKTOP_FILE"; then
-        #    ICON_NAME=$(grep "^Icon=" "$TEMP_DESKTOP_FILE" | cut -d'=' -f2)
-        #    ABSOLUTE_ICON_PATH="$PROJECT_ROOT/$ICON_NAME" 
-        #    if [ -f "$ABSOLUTE_ICON_PATH" ]; then
-        #        ESCAPED_PROJECT_ROOT_ICON_PATH=$(echo "$ABSOLUTE_ICON_PATH" | sed 's/\//\\\\
-//g')
-        #        sed -i "s|^Icon=.*|Icon=$ESCAPED_PROJECT_ROOT_ICON_PATH|" "$TEMP_DESKTOP_FILE"
-        #    fi
-        # fi
-
-        echo "Copying modified desktop entry to $FINAL_DESKTOP_FILE_PATH..."
-        cp "$TEMP_DESKTOP_FILE" "$FINAL_DESKTOP_FILE_PATH"
-        rm "$TEMP_DESKTOP_FILE"
-
-        if command_exists update-desktop-database; then
-            echo "Updating desktop database..."
-            update-desktop-database "$LOCAL_APPS_DIR"
-        fi
-        echo "Desktop entry '$FINAL_DISPLAY_NAME_FOR_DESKTOP' installed."
-    else
-        echo "Skipping installation of desktop entry."
-    fi
-else
-    echo "INFO: $DESKTOP_FILE_TEMPLATE_SOURCE template not found. No desktop entry will be installed."
-fi
 echo ""
 
 # --- 5. Setup Complete ---
@@ -259,15 +184,15 @@ echo "--- Setup Complete! ---"
 echo ""
 echo "To run micro_X:"
 if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ] && [[ "$install_desktop_choice" =~ ^[Yy]$ ]]; then
-    echo "1. Look for '$FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS' in your desktop application menu."
+    echo "1. Look for $FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS in your desktop application menu."
     echo "   (It might take a few moments or a logout/login for it to appear)."
 fi
 echo "2. Alternatively, from the terminal:"
 echo "   If you have micro_X.sh in the project root ($PROJECT_ROOT):"
 echo "     cd \"$PROJECT_ROOT\" && ./micro_X.sh"
 echo "     (This will launch micro_X in a tmux session. The session name will be based on your current Git branch,"
-echo "      e.g., 'micro_x_main', 'micro_x_dev', or 'micro_x_detached_<hash>' if in detached HEAD state."
-echo "      If not in a Git repository, it will use a default name like 'micro_x_app')."
+echo "      e.g., micro_x_main, micro_x_dev, or micro_x_detached_<hash> if in detached HEAD state."
+echo "      If not in a Git repository, it will use a default name like micro_x_app)."
 echo ""
 echo "   If running main.py directly (micro_X.sh usually handles this):"
 echo "   a. Navigate to the project directory: cd \"$PROJECT_ROOT\" "
@@ -276,7 +201,7 @@ echo "   c. Run the main Python script: python3 main.py"
 echo ""
 echo "Make sure the Ollama application is running and the required models are available."
 echo "To attach to a running micro_X tmux session manually (e.g., if disconnected):"
-echo "  Use 'tmux ls' to list all running tmux sessions and identify the correct session name."
+echo "  Use tmux ls to list all running tmux sessions and identify the correct session name."
 echo "  Then, use: tmux attach-session -t <session_name>"
 echo "  For example: tmux attach-session -t micro_x_dev"
 echo "------------------------------------------"
