@@ -177,6 +177,41 @@ fi
 DESKTOP_FILE_TEMPLATE_SOURCE="$PROJECT_ROOT/micro_X.desktop"
 FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS="micro_X" # Default for instructions
 
+if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ]; then
+    read -p "Do you want to install a desktop entry to your local applications menu? (y/N) " install_desktop_choice
+    if [[ "$install_desktop_choice" =~ ^[Yy]$ ]] || [[ -z "$install_desktop_choice" ]]; then
+        CURRENT_BRANCH_NAME_SANITIZED="unknown"
+        if command_exists git && [ -d "$PROJECT_ROOT/.git" ]; then
+            BRANCH_OUTPUT=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)
+            if [ $? -eq 0 ] && [ -n "$BRANCH_OUTPUT" ] && [ "$BRANCH_OUTPUT" != "HEAD" ]; then
+                TEMP_SANITIZED_BRANCH_NAME=$(echo "$BRANCH_OUTPUT" | sed 's/\//_/g' | sed 's/[^a-zA-Z0-9_-]//g')
+                if [ -n "$TEMP_SANITIZED_BRANCH_NAME" ]; then CURRENT_BRANCH_NAME_SANITIZED="$TEMP_SANITIZED_BRANCH_NAME"; fi
+            elif [ "$BRANCH_OUTPUT" == "HEAD" ]; then
+                COMMIT_HASH_SHORT=$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null)
+                if [ $? -eq 0 ] && [ -n "$COMMIT_HASH_SHORT" ]; then
+                    CURRENT_BRANCH_NAME_SANITIZED="detached_${COMMIT_HASH_SHORT}"
+                else
+                    CURRENT_BRANCH_NAME_SANITIZED="detached"
+                fi
+            fi
+        fi
+        # Call the Python script to generate the desktop entry
+        GENERATED_DISPLAY_NAME=$(poetry run python "$PROJECT_ROOT/utils/generate_desktop_entry.py" \
+                                    --project_root "$PROJECT_ROOT" \
+                                    --branch_name "$CURRENT_BRANCH_NAME_SANITIZED")
+        if [ $? -eq 0 ] && [ -n "$GENERATED_DISPLAY_NAME" ]; then
+            FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS="$GENERATED_DISPLAY_NAME"
+            echo "Desktop entry installed."
+        else
+            echo "WARNING: Failed to generate desktop entry."
+        fi
+    else
+        echo "Skipping installation of desktop entry."
+    fi
+else
+    echo "INFO: $DESKTOP_FILE_TEMPLATE_SOURCE template not found. No desktop entry will be installed."
+fi
+
 echo ""
 
 # --- 5. Setup Complete ---
