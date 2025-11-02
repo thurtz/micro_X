@@ -4,6 +4,7 @@
 # MODIFIED to be called from a root setup.sh and accept PROJECT_ROOT
 # MODIFIED to create branch-specific .desktop files
 # MODIFIED to update tmux session naming in instructions to match micro_X.sh
+# MODIFIED to use Poetry for dependency management
 
 echo "--- micro_X Setup Script for Linux Mint (OS-Specific) ---"
 echo ""
@@ -41,22 +42,6 @@ if ! command_exists python3 || ! command_exists pip3; then
 else
     echo "Python 3 and PIP3 are already installed."
 fi
-
-# Python3-venv (specifically needed for python3 -m venv)
-echo "Checking for python3-venv package..."
-if ! dpkg -s python3-venv >/dev/null 2>&1; then
-    echo "python3-venv package not found. Attempting to install..."
-    sudo apt update
-    sudo apt install -y python3-venv
-    if ! dpkg -s python3-venv >/dev/null 2>&1; then
-        echo "ERROR: Failed to install python3-venv. Please install it manually and re-run this script."
-        exit 1
-    fi
-    echo "python3-venv installed."
-else
-    echo "python3-venv is already installed."
-fi
-
 
 # tmux
 echo "Checking for tmux..."
@@ -135,42 +120,38 @@ else
 fi
 echo ""
 
-# --- 3. Setting up micro_X Python Environment ---
-echo "--- Setting up Python Environment for micro_X ---"
+# --- 3. Setting up micro_X Python Environment with Poetry ---
+echo "--- Setting up Python Environment for micro_X with Poetry ---"
 
-if [ ! -f "$PROJECT_ROOT/main.py" ]; then
-    echo "ERROR: main.py not found in the project root ($PROJECT_ROOT)."
+# Install Poetry
+if ! command_exists poetry; then
+    echo "Poetry not found. Installing Poetry..."
+    curl -sSL https://install.python-poetry.org | python3 -
+    # Add poetry to path for the current session
+    export PATH="$HOME/.local/bin:$PATH"
+    if ! command_exists poetry; then
+        echo "ERROR: Poetry installation failed. Please install it manually and re-run this script."
+        echo "You might need to restart your shell or add $HOME/.local/bin to your PATH."
+        exit 1
+    fi
+    echo "Poetry installed."
+else
+    echo "Poetry is already installed."
+fi
+
+
+if [ ! -f "$PROJECT_ROOT/pyproject.toml" ]; then
+    echo "ERROR: pyproject.toml not found in the project root ($PROJECT_ROOT)."
     exit 1
 fi
 
-VENV_DIR="$PROJECT_ROOT/.venv"
-if [ -d "$VENV_DIR" ]; then
-    echo "Virtual environment '$VENV_DIR' already exists. Skipping creation."
-else
-    echo "Creating Python virtual environment in '$VENV_DIR'..."
-    python3 -m venv "$VENV_DIR"
-    if [ $? -ne 0 ]; then echo "ERROR: Failed to create virtual environment."; exit 1; fi
-    echo "Virtual environment created."
-fi
+echo "Configuring Poetry to create the virtual environment in the project directory..."
+poetry config virtualenvs.in-project true
 
-REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt"
-if [ ! -f "$REQUIREMENTS_FILE" ]; then
-    echo "Creating $REQUIREMENTS_FILE..."
-    cat <<EOF > "$REQUIREMENTS_FILE"
-prompt_toolkit>=3.0.0
-ollama>=0.1.0
-numpy>=1.20.0
-EOF
-    echo "$REQUIREMENTS_FILE created."
-else
-    echo "$REQUIREMENTS_FILE already exists."
-fi
-
-echo "Installing Python dependencies from $REQUIREMENTS_FILE into $VENV_DIR..."
-"$VENV_DIR/bin/pip" install -r "$REQUIREMENTS_FILE"
+echo "Installing Python dependencies with Poetry..."
+poetry install --no-root
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to install Python dependencies."
-    echo "Try: source $VENV_DIR/bin/activate && pip install -r $REQUIREMENTS_FILE"
+    echo "ERROR: Failed to install Python dependencies with Poetry."
     exit 1
 fi
 echo "Python dependencies installed."
@@ -207,7 +188,7 @@ if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ]; then
         if command_exists git && [ -d "$PROJECT_ROOT/.git" ]; then
             BRANCH_OUTPUT=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)
             if [ $? -eq 0 ] && [ -n "$BRANCH_OUTPUT" ] && [ "$BRANCH_OUTPUT" != "HEAD" ]; then
-                TEMP_SANITIZED_BRANCH_NAME=$(echo "$BRANCH_OUTPUT" | sed 's/\//_/g' | sed 's/[^a-zA-Z0-9_-]//g')
+                TEMP_SANITIZED_BRANCH_NAME=$(echo "$BRANCH_OUTPUT" | sed 's/\\\//_/g' | sed 's/[^a-zA-Z0-9_-]//g')
                 if [ -n "$TEMP_SANITIZED_BRANCH_NAME" ]; then CURRENT_BRANCH_NAME_SANITIZED="$TEMP_SANITIZED_BRANCH_NAME"; fi
             elif [ "$BRANCH_OUTPUT" == "HEAD" ]; then
                 # For detached HEAD, try to get a short commit hash for uniqueness
@@ -239,7 +220,8 @@ if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ]; then
         TEMP_DESKTOP_FILE=$(mktemp)
         cp "$DESKTOP_FILE_TEMPLATE_SOURCE" "$TEMP_DESKTOP_FILE"
 
-        ESCAPED_LAUNCHER_PATH=$(echo "$MICRO_X_LAUNCHER_SH" | sed 's/\//\\\//g')
+        ESCAPED_LAUNCHER_PATH=$(echo "$MICRO_X_LAUNCHER_SH" | sed 's/\//\\\\
+//g')
         sed -i "s|^Exec=.*|Exec=\"$ESCAPED_LAUNCHER_PATH\"|" "$TEMP_DESKTOP_FILE"
         sed -i "s|^Name=.*|Name=$FINAL_DISPLAY_NAME_FOR_DESKTOP|" "$TEMP_DESKTOP_FILE"
         sed -i "s|^Comment=.*|Comment=$FINAL_COMMENT_FOR_DESKTOP|" "$TEMP_DESKTOP_FILE"
@@ -249,7 +231,8 @@ if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ]; then
         #    ICON_NAME=$(grep "^Icon=" "$TEMP_DESKTOP_FILE" | cut -d'=' -f2)
         #    ABSOLUTE_ICON_PATH="$PROJECT_ROOT/$ICON_NAME" 
         #    if [ -f "$ABSOLUTE_ICON_PATH" ]; then
-        #        ESCAPED_PROJECT_ROOT_ICON_PATH=$(echo "$ABSOLUTE_ICON_PATH" | sed 's/\//\\\//g')
+        #        ESCAPED_PROJECT_ROOT_ICON_PATH=$(echo "$ABSOLUTE_ICON_PATH" | sed 's/\//\\\\
+//g')
         #        sed -i "s|^Icon=.*|Icon=$ESCAPED_PROJECT_ROOT_ICON_PATH|" "$TEMP_DESKTOP_FILE"
         #    fi
         # fi
@@ -287,10 +270,9 @@ echo "      e.g., 'micro_x_main', 'micro_x_dev', or 'micro_x_detached_<hash>' if
 echo "      If not in a Git repository, it will use a default name like 'micro_x_app')."
 echo ""
 echo "   If running main.py directly (micro_X.sh usually handles this):"
-echo "   a. Navigate to the project directory: cd \"$PROJECT_ROOT\""
-echo "   b. Activate the virtual environment: source $VENV_DIR/bin/activate"
-echo "   c. Run the main Python script: ./main.py (or python3 main.py)"
-echo "      (Note: Running main.py directly will not use the branch-specific tmux session naming from micro_X.sh)."
+echo "   a. Navigate to the project directory: cd \"$PROJECT_ROOT\" "
+echo "   b. Activate the virtual environment: poetry shell"
+echo "   c. Run the main Python script: python3 main.py"
 echo ""
 echo "Make sure the Ollama application is running and the required models are available."
 echo "To attach to a running micro_X tmux session manually (e.g., if disconnected):"

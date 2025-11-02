@@ -2,6 +2,7 @@
 
 # Script to set up the micro_X environment on FreeBSD
 # This is a "best-effort" script. Ollama must be installed manually.
+# MODIFIED to use Poetry for dependency management
 
 echo "--- micro_X Setup Script for FreeBSD (OS-Specific) ---"
 echo ""
@@ -102,23 +103,37 @@ for model in "${required_models[@]}"; do
 done
 echo ""
 
-# --- 4. Setting up micro_X Python Environment ---
-echo "--- Setting up Python Environment for micro_X ---"
-VENV_DIR="$PROJECT_ROOT/.venv"
-if [ -d "$VENV_DIR" ]; then
-    echo "Python virtual environment '$VENV_DIR' already exists."
+# --- 4. Setting up micro_X Python Environment with Poetry ---
+echo "--- Setting up Python Environment for micro_X with Poetry ---"
+
+# Install Poetry
+if ! command_exists poetry; then
+    echo "Poetry not found. Installing Poetry..."
+    curl -sSL https://install.python-poetry.org | python3 -
+    # Add poetry to path for the current session
+    export PATH="$HOME/.local/bin:$PATH"
+    if ! command_exists poetry; then
+        echo "ERROR: Poetry installation failed. Please install it manually and re-run this script."
+        echo "You might need to restart your shell or add $HOME/.local/bin to your PATH."
+        exit 1
+    fi
+    echo "Poetry installed."
 else
-    echo "Creating Python virtual environment in '$VENV_DIR'..."
-    python3 -m venv "$VENV_DIR"
-    if [ $? -ne 0 ]; then echo "ERROR: Failed to create virtual environment."; exit 1; fi
-    echo "Virtual environment created."
+    echo "Poetry is already installed."
 fi
 
-REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt"
-echo "Installing Python dependencies..."
-"$VENV_DIR/bin/pip" install -r "$REQUIREMENTS_FILE"
+if [ ! -f "$PROJECT_ROOT/pyproject.toml" ]; then
+    echo "ERROR: pyproject.toml not found in the project root ($PROJECT_ROOT)."
+    exit 1
+fi
+
+echo "Configuring Poetry to create the virtual environment in the project directory..."
+poetry config virtualenvs.in-project true
+
+echo "Installing Python dependencies with Poetry..."
+poetry install --no-root
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to install Python dependencies."
+    echo "ERROR: Failed to install Python dependencies with Poetry."
     exit 1
 fi
 echo "Python dependencies installed."
@@ -139,7 +154,8 @@ echo ""
 echo "To run micro_X:"
 echo "1. Ensure 'ollama serve' is running in a separate terminal."
 echo "2. Navigate to the project directory: cd \"$PROJECT_ROOT\""
-echo "3. Run the launch script: ./micro_X.sh"
+echo "3. Activate the virtual environment: poetry shell"
+echo "4. Run the main Python script: python3 main.py"
 echo ""
 echo "------------------------------------------"
 

@@ -2,6 +2,7 @@
 
 # Script to set up the micro_X environment on Termux (Android)
 # MODIFIED to be called from a root setup.sh and accept PROJECT_ROOT
+# MODIFIED to use Poetry for dependency management
 
 echo "--- micro_X Setup Script for Termux (OS-Specific) ---"
 echo ""
@@ -124,52 +125,37 @@ else
 fi
 echo ""
 
-# --- 4. Setting up micro_X Python Environment ---
-echo "--- Setting up Python Environment for micro_X ---"
+# --- 4. Setting up micro_X Python Environment with Poetry ---
+echo "--- Setting up Python Environment for micro_X with Poetry ---"
 
-# Check if main.py exists in the PROJECT_ROOT
-if [ ! -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
-    echo "ERROR: main.py not found in the project root ($PROJECT_ROOT)."
-    echo "Please ensure the main setup.sh script is run from the correct project root."
+# Install Poetry
+if ! command_exists poetry; then
+    echo "Poetry not found. Installing Poetry..."
+    curl -sSL https://install.python-poetry.org | python -
+    # Add poetry to path for the current session
+    export PATH="$HOME/.local/bin:$PATH"
+    if ! command_exists poetry; then
+        echo "ERROR: Poetry installation failed. Please install it manually and re-run this script."
+        echo "You might need to restart your shell or add $HOME/.local/bin to your PATH."
+        exit 1
+    fi
+    echo "Poetry installed."
+else
+    echo "Poetry is already installed."
+fi
+
+if [ ! -f "$PROJECT_ROOT/pyproject.toml" ]; then
+    echo "ERROR: pyproject.toml not found in the project root ($PROJECT_ROOT)."
     exit 1
 fi
 
-# Create a Virtual Environment in PROJECT_ROOT
-VENV_DIR="$PROJECT_ROOT/.venv" # MODIFIED
-if [ -d "$VENV_DIR" ]; then
-    echo "Python virtual environment '$VENV_DIR' already exists. Skipping creation."
-else
-    echo "Creating Python virtual environment in '$VENV_DIR'..."
-    python -m venv "$VENV_DIR" # In Termux, 'python' is typically python3
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to create virtual environment."
-        exit 1
-    fi
-    echo "Virtual environment created."
-fi
+echo "Configuring Poetry to create the virtual environment in the project directory..."
+poetry config virtualenvs.in-project true
 
-# Create requirements.txt if it doesn't exist in PROJECT_ROOT
-REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt" # MODIFIED
-if [ ! -f "$REQUIREMENTS_FILE" ]; then
-    echo "Creating $REQUIREMENTS_FILE..."
-    cat <<EOF > "$REQUIREMENTS_FILE"
-# Python dependencies for micro_X
-
-prompt_toolkit>=3.0.0
-ollama>=0.1.0
-numpy>=1.20.0
-EOF
-    echo "$REQUIREMENTS_FILE created."
-else
-    echo "$REQUIREMENTS_FILE already exists."
-fi
-
-# Install Python Dependencies into the virtual environment
-echo "Installing Python dependencies from $REQUIREMENTS_FILE into $VENV_DIR..."
-"$VENV_DIR/bin/pip" install -r "$REQUIREMENTS_FILE" # In venv, pip should point to the venv's pip
+echo "Installing Python dependencies with Poetry..."
+poetry install --no-root
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to install Python dependencies."
-    echo "Try activating the virtual environment manually ('source $VENV_DIR/bin/activate') and then run 'pip install -r $REQUIREMENTS_FILE'."
+    echo "ERROR: Failed to install Python dependencies with Poetry."
     exit 1
 fi
 echo "Python dependencies installed."
@@ -207,8 +193,8 @@ echo "     ./micro_X.sh"
 echo "     (This script should activate the virtual environment and start micro_X in tmux)."
 echo ""
 echo "   c. If running main.py directly (and micro_X.sh doesn't exist or you prefer manual):"
-echo "     source .venv/bin/activate"
-echo "     python main.py  # or ./main.py if executable bit is set"
+echo "     poetry shell"
+echo "     python main.py"
 echo ""
 echo "If you skipped model pulling, ensure you pull them with 'ollama pull <model_name>' while 'ollama serve' is active."
 echo "------------------------------------------"
