@@ -1,0 +1,170 @@
+#!/bin/sh
+
+# Script to set up the micro_X environment on NetBSD
+# This is a "best-effort" script. Ollama must be installed manually.
+# MODIFIED to use Poetry for dependency management
+
+echo "--- micro_X Setup Script for NetBSD (OS-Specific) ---"
+echo ""
+echo "IMPORTANT: This script will attempt to install standard packages using 'sudo pkgin install'."
+echo "           You will be prompted for your password."
+echo "           Ollama MUST be installed manually before you proceed."
+echo ""
+
+# --- Accept PROJECT_ROOT as the first argument ---
+if [ -z "$1" ]; then
+    echo "ERROR: This script expects PROJECT_ROOT as its first argument."
+    echo "Please run it via the main setup.sh script in the project root."
+    exit 1
+fi
+PROJECT_ROOT="$1"
+echo "Using Project Root: $PROJECT_ROOT"
+echo ""
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# --- 1. Prerequisites ---
+echo "--- Checking Prerequisites (using pkgin) ---"
+
+# Use sudo for privilege escalation
+if ! command_exists sudo; then
+    echo "ERROR: 'sudo' command not found. This script requires 'sudo' to install packages."
+    echo "Please install sudo or run the required commands manually."
+    exit 1
+fi
+
+# Check for pkgin
+if ! command_exists pkgin; then
+    echo "ERROR: 'pkgin' command not found. This script uses pkgin for a better user experience."
+    echo "Please install it ('sudo pkg_add pkgin') and run 'sudo pkgin update' before re-running this script."
+    exit 1
+fi
+
+
+# Python 3, PIP, Git, tmux
+# Note: Package names might need adjustment based on NetBSD packages.
+PACKAGES="python311 py311-pip git tmux"
+echo "Checking for packages: $PACKAGES..."
+for pkg in $PACKAGES; do
+    if ! pkgin list | grep -q "^$pkg"; then
+        echo "Package '$pkg' not found. Attempting to install..."
+        sudo pkgin install -y "$pkg"
+        if ! pkgin list | grep -q "^$pkg"; then
+            echo "ERROR: Failed to install '$pkg'. Please install it manually and re-run."
+            exit 1
+        fi
+    else
+        echo "Package '$pkg' is already installed."
+    fi
+done
+echo "Prerequisites checked/installed."
+echo ""
+
+# --- 2. Ollama on NetBSD - Instructions ---
+echo "--- Ollama on NetBSD (Manual Installation Required) ---"
+echo "This script CANNOT install Ollama automatically on NetBSD."
+echo "You must build it from source. This is a complex process."
+echo ""
+echo "High-level steps are:"
+echo "1. Install the Go compiler toolchain ('sudo pkgin install go')."
+echo "2. Install other build dependencies like 'cmake'."
+echo "3. Clone the Ollama git repository from GitHub."
+echo "4. Follow the instructions in the Ollama repository to build the 'ollama' binary."
+echo "5. Place the final 'ollama' binary in a directory in your PATH (e.g., /usr/pkg/bin/)."
+echo "6. Run 'ollama serve' in a separate terminal session."
+echo ""
+read -p "Have you already built and started the Ollama server in another terminal? (y/N) " ollama_host_ready
+if [ "$ollama_host_ready" != "y" ] && [ "$ollama_host_ready" != "Y" ]; then
+    echo "Setup cannot proceed without a running Ollama server. Exiting."
+    exit 1
+fi
+
+echo "Verifying connection to Ollama server..."
+if ! curl -s http://localhost:11434/ >/dev/null 2>&1; then
+    echo "ERROR: Could not connect to Ollama server at http://localhost:11434/"
+    echo "Please ensure 'ollama serve' is running correctly in another terminal."
+    exit 1
+fi
+echo "Successfully connected to Ollama server."
+echo ""
+
+
+# --- 3. Install Required Ollama Models ---
+echo "--- Installing Ollama Models ---"
+required_models=(
+    "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
+    "herawen/lisa"
+    "nomic-embed-text"
+    "qwen3:0.6b"
+)
+for model in "${required_models[@]}"; do
+    echo "Pulling Ollama model: $model ..."
+    ollama pull "$model"
+    if ollama list | grep -q "${model%%:*}"; then
+        echo "$model pulled successfully or already exists."
+    else
+        echo "WARNING: Failed to pull $model or could not verify. Please check manually."
+    fi
+done
+echo ""
+
+# --- 4. Setting up micro_X Python Environment with Poetry ---
+echo "--- Setting up Python Environment for micro_X with Poetry ---"
+
+# Install Poetry
+if ! command_exists poetry; then
+    echo "Poetry not found. Installing Poetry..."
+    curl -sSL https://install.python-poetry.org | python3.11 -
+    # Add poetry to path for the current session
+    export PATH="$HOME/.local/bin:$PATH"
+    if ! command_exists poetry; then
+        echo "ERROR: Poetry installation failed. Please install it manually and re-run this script."
+        echo "You might need to restart your shell or add $HOME/.local/bin to your PATH."
+        exit 1
+    fi
+    echo "Poetry installed."
+else
+    echo "Poetry is already installed."
+fi
+
+if [ ! -f "$PROJECT_ROOT/pyproject.toml" ]; then
+    echo "ERROR: pyproject.toml not found in the project root ($PROJECT_ROOT)."
+    exit 1
+fi
+
+echo "Configuring Poetry to create the virtual environment in the project directory..."
+poetry config virtualenvs.in-project true
+
+echo "Installing Python dependencies with Poetry..."
+poetry install --no-root
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to install Python dependencies with Poetry."
+    exit 1
+fi
+echo "Python dependencies installed."
+echo ""
+
+# --- 5. Make Scripts Executable ---
+echo "--- Making Scripts Executable ---"
+chmod +x "$PROJECT_ROOT/main.py"
+if [ -f "$PROJECT_ROOT/micro_X.sh" ]; then
+    chmod +x "$PROJECT_ROOT/micro_X.sh"
+fi
+echo "main.py and micro_X.sh are now executable."
+echo ""
+
+# --- 6. Setup Complete ---
+echo "--- NetBSD Setup for micro_X Complete! ---"
+echo ""
+echo "To run micro_X:"
+echo "1. Ensure 'ollama serve' is running in a separate terminal."
+echo "2. Navigate to the project directory: cd \"$PROJECT_ROOT\""
+echo "3. Activate the virtual environment: poetry shell"
+echo "4. Run the main Python script: python3.11 main.py"
+echo ""
+echo "------------------------------------------"
+
+exit 0
