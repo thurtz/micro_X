@@ -4,6 +4,7 @@
 # MODIFIED to be called from a root setup.sh and accept PROJECT_ROOT
 # MODIFIED to create branch-specific .desktop files
 # MODIFIED to update tmux session naming in instructions to match micro_X.sh
+# MODIFIED to use Poetry for dependency management
 
 echo "--- micro_X Setup Script for Linux Mint (OS-Specific) ---"
 echo ""
@@ -41,22 +42,6 @@ if ! command_exists python3 || ! command_exists pip3; then
 else
     echo "Python 3 and PIP3 are already installed."
 fi
-
-# Python3-venv (specifically needed for python3 -m venv)
-echo "Checking for python3-venv package..."
-if ! dpkg -s python3-venv >/dev/null 2>&1; then
-    echo "python3-venv package not found. Attempting to install..."
-    sudo apt update
-    sudo apt install -y python3-venv
-    if ! dpkg -s python3-venv >/dev/null 2>&1; then
-        echo "ERROR: Failed to install python3-venv. Please install it manually and re-run this script."
-        exit 1
-    fi
-    echo "python3-venv installed."
-else
-    echo "python3-venv is already installed."
-fi
-
 
 # tmux
 echo "Checking for tmux..."
@@ -135,42 +120,38 @@ else
 fi
 echo ""
 
-# --- 3. Setting up micro_X Python Environment ---
-echo "--- Setting up Python Environment for micro_X ---"
+# --- 3. Setting up micro_X Python Environment with Poetry ---
+echo "--- Setting up Python Environment for micro_X with Poetry ---"
 
-if [ ! -f "$PROJECT_ROOT/main.py" ]; then
-    echo "ERROR: main.py not found in the project root ($PROJECT_ROOT)."
+# Install Poetry
+if ! command_exists poetry; then
+    echo "Poetry not found. Installing Poetry..."
+    curl -sSL https://install.python-poetry.org | python3 -
+    # Add poetry to path for the current session
+    export PATH="$HOME/.local/bin:$PATH"
+    if ! command_exists poetry; then
+        echo "ERROR: Poetry installation failed. Please install it manually and re-run this script."
+        echo "You might need to restart your shell or add $HOME/.local/bin to your PATH."
+        exit 1
+    fi
+    echo "Poetry installed."
+else
+    echo "Poetry is already installed."
+fi
+
+
+if [ ! -f "$PROJECT_ROOT/pyproject.toml" ]; then
+    echo "ERROR: pyproject.toml not found in the project root ($PROJECT_ROOT)."
     exit 1
 fi
 
-VENV_DIR="$PROJECT_ROOT/.venv"
-if [ -d "$VENV_DIR" ]; then
-    echo "Virtual environment '$VENV_DIR' already exists. Skipping creation."
-else
-    echo "Creating Python virtual environment in '$VENV_DIR'..."
-    python3 -m venv "$VENV_DIR"
-    if [ $? -ne 0 ]; then echo "ERROR: Failed to create virtual environment."; exit 1; fi
-    echo "Virtual environment created."
-fi
+echo "Configuring Poetry to create the virtual environment in the project directory..."
+poetry config virtualenvs.in-project true
 
-REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt"
-if [ ! -f "$REQUIREMENTS_FILE" ]; then
-    echo "Creating $REQUIREMENTS_FILE..."
-    cat <<EOF > "$REQUIREMENTS_FILE"
-prompt_toolkit>=3.0.0
-ollama>=0.1.0
-numpy>=1.20.0
-EOF
-    echo "$REQUIREMENTS_FILE created."
-else
-    echo "$REQUIREMENTS_FILE already exists."
-fi
-
-echo "Installing Python dependencies from $REQUIREMENTS_FILE into $VENV_DIR..."
-"$VENV_DIR/bin/pip" install -r "$REQUIREMENTS_FILE"
+echo "Installing Python dependencies with Poetry..."
+poetry install --no-root
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to install Python dependencies."
-    echo "Try: source $VENV_DIR/bin/activate && pip install -r $REQUIREMENTS_FILE"
+    echo "ERROR: Failed to install Python dependencies with Poetry."
     exit 1
 fi
 echo "Python dependencies installed."
@@ -197,12 +178,8 @@ DESKTOP_FILE_TEMPLATE_SOURCE="$PROJECT_ROOT/micro_X.desktop"
 FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS="micro_X" # Default for instructions
 
 if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ]; then
-    echo "Found desktop entry template: $DESKTOP_FILE_TEMPLATE_SOURCE."
     read -p "Do you want to install a desktop entry to your local applications menu? (y/N) " install_desktop_choice
-    if [[ "$install_desktop_choice" =~ ^[Yy]$ ]]; then
-        LOCAL_APPS_DIR="$HOME/.local/share/applications"
-        mkdir -p "$LOCAL_APPS_DIR"
-
+    if [[ "$install_desktop_choice" =~ ^[Yy]$ ]] || [[ -z "$install_desktop_choice" ]]; then
         CURRENT_BRANCH_NAME_SANITIZED="unknown"
         if command_exists git && [ -d "$PROJECT_ROOT/.git" ]; then
             BRANCH_OUTPUT=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)
@@ -210,7 +187,6 @@ if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ]; then
                 TEMP_SANITIZED_BRANCH_NAME=$(echo "$BRANCH_OUTPUT" | sed 's/\//_/g' | sed 's/[^a-zA-Z0-9_-]//g')
                 if [ -n "$TEMP_SANITIZED_BRANCH_NAME" ]; then CURRENT_BRANCH_NAME_SANITIZED="$TEMP_SANITIZED_BRANCH_NAME"; fi
             elif [ "$BRANCH_OUTPUT" == "HEAD" ]; then
-                # For detached HEAD, try to get a short commit hash for uniqueness
                 COMMIT_HASH_SHORT=$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null)
                 if [ $? -eq 0 ] && [ -n "$COMMIT_HASH_SHORT" ]; then
                     CURRENT_BRANCH_NAME_SANITIZED="detached_${COMMIT_HASH_SHORT}"
@@ -219,56 +195,23 @@ if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ]; then
                 fi
             fi
         fi
-
-        DESKTOP_FILENAME_BASE="micro_x"
-        APP_NAME_BASE="micro_X"
-        FINAL_DESKTOP_FILENAME="${DESKTOP_FILENAME_BASE}.desktop"
-        FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS="$APP_NAME_BASE" 
-        FINAL_COMMENT_FOR_DESKTOP="Launch micro_X AI Shell"
-
-        if [ "$CURRENT_BRANCH_NAME_SANITIZED" != "unknown" ]; then
-            FINAL_DESKTOP_FILENAME="${DESKTOP_FILENAME_BASE}_${CURRENT_BRANCH_NAME_SANITIZED}.desktop"
-            FINAL_DISPLAY_NAME_FOR_DESKTOP="${APP_NAME_BASE} (${CURRENT_BRANCH_NAME_SANITIZED})" 
-            FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS="$FINAL_DISPLAY_NAME_FOR_DESKTOP" 
-            FINAL_COMMENT_FOR_DESKTOP="Launch micro_X AI Shell (${CURRENT_BRANCH_NAME_SANITIZED} instance)"
+        # Call the Python script to generate the desktop entry
+        GENERATED_DISPLAY_NAME=$(poetry run python "$PROJECT_ROOT/utils/generate_desktop_entry.py" \
+                                    --project_root "$PROJECT_ROOT" \
+                                    --branch_name "$CURRENT_BRANCH_NAME_SANITIZED")
+        if [ $? -eq 0 ] && [ -n "$GENERATED_DISPLAY_NAME" ]; then
+            FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS="$GENERATED_DISPLAY_NAME"
+            echo "Desktop entry installed."
         else
-            FINAL_DISPLAY_NAME_FOR_DESKTOP="$APP_NAME_BASE" 
+            echo "WARNING: Failed to generate desktop entry."
         fi
-        
-        FINAL_DESKTOP_FILE_PATH="$LOCAL_APPS_DIR/$FINAL_DESKTOP_FILENAME"
-        TEMP_DESKTOP_FILE=$(mktemp)
-        cp "$DESKTOP_FILE_TEMPLATE_SOURCE" "$TEMP_DESKTOP_FILE"
-
-        ESCAPED_LAUNCHER_PATH=$(echo "$MICRO_X_LAUNCHER_SH" | sed 's/\//\\\//g')
-        sed -i "s|^Exec=.*|Exec=\"$ESCAPED_LAUNCHER_PATH\"|" "$TEMP_DESKTOP_FILE"
-        sed -i "s|^Name=.*|Name=$FINAL_DISPLAY_NAME_FOR_DESKTOP|" "$TEMP_DESKTOP_FILE"
-        sed -i "s|^Comment=.*|Comment=$FINAL_COMMENT_FOR_DESKTOP|" "$TEMP_DESKTOP_FILE"
-        
-        # Icon path handling (optional, if you have a project icon)
-        # if grep -q "^Icon=" "$TEMP_DESKTOP_FILE" && ! grep -q "^Icon=/" "$TEMP_DESKTOP_FILE" && ! grep -q "^Icon=~" "$TEMP_DESKTOP_FILE"; then
-        #    ICON_NAME=$(grep "^Icon=" "$TEMP_DESKTOP_FILE" | cut -d'=' -f2)
-        #    ABSOLUTE_ICON_PATH="$PROJECT_ROOT/$ICON_NAME" 
-        #    if [ -f "$ABSOLUTE_ICON_PATH" ]; then
-        #        ESCAPED_PROJECT_ROOT_ICON_PATH=$(echo "$ABSOLUTE_ICON_PATH" | sed 's/\//\\\//g')
-        #        sed -i "s|^Icon=.*|Icon=$ESCAPED_PROJECT_ROOT_ICON_PATH|" "$TEMP_DESKTOP_FILE"
-        #    fi
-        # fi
-
-        echo "Copying modified desktop entry to $FINAL_DESKTOP_FILE_PATH..."
-        cp "$TEMP_DESKTOP_FILE" "$FINAL_DESKTOP_FILE_PATH"
-        rm "$TEMP_DESKTOP_FILE"
-
-        if command_exists update-desktop-database; then
-            echo "Updating desktop database..."
-            update-desktop-database "$LOCAL_APPS_DIR"
-        fi
-        echo "Desktop entry '$FINAL_DISPLAY_NAME_FOR_DESKTOP' installed."
     else
         echo "Skipping installation of desktop entry."
     fi
 else
     echo "INFO: $DESKTOP_FILE_TEMPLATE_SOURCE template not found. No desktop entry will be installed."
 fi
+
 echo ""
 
 # --- 5. Setup Complete ---
@@ -276,25 +219,24 @@ echo "--- Setup Complete! ---"
 echo ""
 echo "To run micro_X:"
 if [ -f "$DESKTOP_FILE_TEMPLATE_SOURCE" ] && [[ "$install_desktop_choice" =~ ^[Yy]$ ]]; then
-    echo "1. Look for '$FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS' in your desktop application menu."
+    echo "1. Look for $FINAL_DISPLAY_NAME_FOR_INSTRUCTIONS in your desktop application menu."
     echo "   (It might take a few moments or a logout/login for it to appear)."
 fi
 echo "2. Alternatively, from the terminal:"
 echo "   If you have micro_X.sh in the project root ($PROJECT_ROOT):"
 echo "     cd \"$PROJECT_ROOT\" && ./micro_X.sh"
 echo "     (This will launch micro_X in a tmux session. The session name will be based on your current Git branch,"
-echo "      e.g., 'micro_x_main', 'micro_x_dev', or 'micro_x_detached_<hash>' if in detached HEAD state."
-echo "      If not in a Git repository, it will use a default name like 'micro_x_app')."
+echo "      e.g., micro_x_main, micro_x_dev, or micro_x_detached_<hash> if in detached HEAD state."
+echo "      If not in a Git repository, it will use a default name like micro_x_app)."
 echo ""
 echo "   If running main.py directly (micro_X.sh usually handles this):"
-echo "   a. Navigate to the project directory: cd \"$PROJECT_ROOT\""
-echo "   b. Activate the virtual environment: source $VENV_DIR/bin/activate"
-echo "   c. Run the main Python script: ./main.py (or python3 main.py)"
-echo "      (Note: Running main.py directly will not use the branch-specific tmux session naming from micro_X.sh)."
+echo "   a. Navigate to the project directory: cd \"$PROJECT_ROOT\" "
+echo "   b. Activate the virtual environment: poetry shell"
+echo "   c. Run the main Python script: python3 main.py"
 echo ""
 echo "Make sure the Ollama application is running and the required models are available."
 echo "To attach to a running micro_X tmux session manually (e.g., if disconnected):"
-echo "  Use 'tmux ls' to list all running tmux sessions and identify the correct session name."
+echo "  Use tmux ls to list all running tmux sessions and identify the correct session name."
 echo "  Then, use: tmux attach-session -t <session_name>"
 echo "  For example: tmux attach-session -t micro_x_dev"
 echo "------------------------------------------"

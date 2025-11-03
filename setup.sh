@@ -47,6 +47,12 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         OS_NAME=$NAME
         if [[ "$ID" == "linuxmint"* || "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* || "$ID" == "ubuntu"* || "$ID" == "debian"* ]]; then
             OS_DETECTED="linux-mint-like" # Specific for Mint/Debian/Ubuntu
+        elif [[ "$ID" == "fedora" ]]; then
+            OS_DETECTED="fedora"
+        elif [[ "$ID" == "arch" || "$ID_LIKE" == *"arch"* ]]; then
+            OS_DETECTED="arch"
+        elif [[ "$ID" == "rhel" || "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"fedora"* ]]; then
+            OS_DETECTED="rhel"
         fi
     elif command_exists lsb_release; then
         OS_NAME=$(lsb_release -is)
@@ -58,6 +64,15 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 elif [[ "$OSTYPE" == "darwin"* ]]; then
     OS_DETECTED="macos"
     OS_NAME="macOS"
+elif [[ "$OSTYPE" == "openbsd"* ]]; then
+    OS_DETECTED="openbsd"
+    OS_NAME="OpenBSD"
+elif [[ "$OSTYPE" == "freebsd"* ]]; then
+    OS_DETECTED="freebsd"
+    OS_NAME="FreeBSD"
+elif [[ "$OSTYPE" == "netbsd"* ]]; then
+    OS_DETECTED="netbsd"
+    OS_NAME="NetBSD"
 fi
 
 # --- OS Selection Menu ---
@@ -98,6 +113,54 @@ if [[ -n "$OS_DETECTED" ]]; then
                 OS_DETECTED="" # Force menu
             fi
             ;;
+        "openbsd")
+            read -p "Detected OpenBSD. Use OpenBSD setup? (Y/n/menu): " choice
+            if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
+                SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_openbsd.sh"
+            elif [[ "$choice" =~ ^[Mm] ]]; then
+                OS_DETECTED="" # Force menu
+            fi
+            ;;
+        "fedora")
+            read -p "Detected Fedora. Use Fedora setup? (Y/n/menu): " choice
+            if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
+                SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_fedora.sh"
+            elif [[ "$choice" =~ ^[Mm] ]]; then
+                OS_DETECTED="" # Force menu
+            fi
+            ;;
+        "arch")
+            read -p "Detected Arch Linux. Use Arch setup? (Y/n/menu): " choice
+            if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
+                SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_arch.sh"
+            elif [[ "$choice" =~ ^[Mm] ]]; then
+                OS_DETECTED="" # Force menu
+            fi
+            ;;
+        "freebsd")
+            read -p "Detected FreeBSD. Use FreeBSD setup? (Y/n/menu): " choice
+            if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
+                SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_freebsd.sh"
+            elif [[ "$choice" =~ ^[Mm] ]]; then
+                OS_DETECTED="" # Force menu
+            fi
+            ;;
+        "netbsd")
+            read -p "Detected NetBSD. Use NetBSD setup? (Y/n/menu): " choice
+            if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
+                SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_netbsd.sh"
+            elif [[ "$choice" =~ ^[Mm] ]]; then
+                OS_DETECTED="" # Force menu
+            fi
+            ;;
+        "rhel")
+            read -p "Detected RHEL-like Linux. Use RHEL setup? (Y/n/menu): " choice
+            if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
+                SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_rhel.sh"
+            elif [[ "$choice" =~ ^[Mm] ]]; then
+                OS_DETECTED="" # Force menu
+            fi
+            ;;
         *)
             echo "Could not reliably auto-detect a specific setup script. Please choose manually."
             OS_DETECTED="" # Force menu
@@ -112,15 +175,27 @@ if [[ -z "$SELECTED_SCRIPT" ]] && [[ -z "$OS_DETECTED" ]]; then # If auto-detect
     echo "2. macOS"
     echo "3. Termux (Android)"
     echo "4. WSL (Windows Subsystem for Linux)"
-    echo "5. Exit"
-    read -p "Enter your choice (1-5): " menu_choice
+    echo "5. OpenBSD"
+    echo "6. Fedora"
+    echo "7. Arch Linux"
+    echo "8. FreeBSD"
+    echo "9. NetBSD"
+    echo "10. RHEL / CentOS"
+    echo "11. Exit"
+    read -p "Enter your choice (1-11): " menu_choice
 
     case "$menu_choice" in
         1) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_mint.sh" ;;
         2) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_mac.sh" ;;
         3) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_termux.sh" ;;
         4) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_wsl.sh" ;;
-        5) echo "Exiting setup."; exit 0 ;;
+        5) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_openbsd.sh" ;;
+        6) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_fedora.sh" ;;
+        7) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_arch.sh" ;;
+        8) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_freebsd.sh" ;;
+        9) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_netbsd.sh" ;;
+        10) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_rhel.sh" ;;
+        11) echo "Exiting setup."; exit 0 ;;
         *) echo "Invalid choice. Exiting."; exit 1 ;;
     esac
 fi
