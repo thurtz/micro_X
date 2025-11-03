@@ -3,7 +3,6 @@
 # Script to set up the micro_X environment within WSL (Windows Subsystem for Linux)
 # This script assumes Ollama is installed and running on the WINDOWS HOST.
 # MODIFIED to be called from a root setup.sh and accept PROJECT_ROOT
-# MODIFIED to use Poetry for dependency management
 
 echo "--- micro_X Setup Script for WSL (OS-Specific) ---"
 echo ""
@@ -110,37 +109,52 @@ if [[ ! "$models_pulled" =~ ^[Yy]$ ]]; then
 fi
 echo ""
 
-# --- 4. Setting up micro_X Python Environment in WSL with Poetry ---
-echo "--- Setting up Python Environment for micro_X (in WSL) with Poetry ---"
+# --- 4. Setting up micro_X Python Environment in WSL ---
+echo "--- Setting up Python Environment for micro_X (in WSL) ---"
 
-# Install Poetry
-if ! command_exists poetry; then
-    echo "Poetry not found. Installing Poetry..."
-    curl -sSL https://install.python-poetry.org | python3 -
-    # Add poetry to path for the current session
-    export PATH="$HOME/.local/bin:$PATH"
-    if ! command_exists poetry; then
-        echo "ERROR: Poetry installation failed. Please install it manually and re-run this script."
-        echo "You might need to restart your shell or add $HOME/.local/bin to your PATH."
-        exit 1
-    fi
-    echo "Poetry installed."
-else
-    echo "Poetry is already installed."
-fi
-
-if [ ! -f "$PROJECT_ROOT/pyproject.toml" ]; then
-    echo "ERROR: pyproject.toml not found in the project root ($PROJECT_ROOT)."
+# Check if main.py exists in PROJECT_ROOT
+if [ ! -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
+    echo "ERROR: main.py not found in the project root ($PROJECT_ROOT)."
+    echo "Please ensure the main setup.sh script is run from the correct project root."
     exit 1
 fi
 
-echo "Configuring Poetry to create the virtual environment in the project directory..."
-poetry config virtualenvs.in-project true
+# Create a Virtual Environment in PROJECT_ROOT
+VENV_DIR="$PROJECT_ROOT/.venv" # MODIFIED
+if [ -d "$VENV_DIR" ]; then
+    echo "Python virtual environment '$VENV_DIR' already exists. Skipping creation."
+else
+    echo "Creating Python virtual environment in '$VENV_DIR'..."
+    python3 -m venv "$VENV_DIR"
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to create virtual environment."
+        exit 1
+    fi
+    echo "Virtual environment created."
+fi
 
-echo "Installing Python dependencies with Poetry..."
-poetry install --no-root
+# Create requirements.txt if it doesn't exist in PROJECT_ROOT
+REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt" # MODIFIED
+if [ ! -f "$REQUIREMENTS_FILE" ]; then
+    echo "Creating $REQUIREMENTS_FILE..."
+    cat <<EOF > "$REQUIREMENTS_FILE"
+# Python dependencies for micro_X
+
+prompt_toolkit>=3.0.0
+ollama>=0.1.0
+numpy>=1.20.0
+EOF
+    echo "$REQUIREMENTS_FILE created."
+else
+    echo "$REQUIREMENTS_FILE already exists."
+fi
+
+# Install Python Dependencies into the virtual environment
+echo "Installing Python dependencies from $REQUIREMENTS_FILE into $VENV_DIR..."
+"$VENV_DIR/bin/pip3" install -r "$REQUIREMENTS_FILE"
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to install Python dependencies with Poetry."
+    echo "ERROR: Failed to install Python dependencies."
+    echo "Try activating the virtual environment manually ('source $VENV_DIR/bin/activate') and then run 'pip3 install -r $REQUIREMENTS_FILE'."
     exit 1
 fi
 echo "Python dependencies installed."
@@ -158,7 +172,7 @@ if [ -f "$MICRO_X_LAUNCHER_SH" ]; then
     chmod +x "$MICRO_X_LAUNCHER_SH"
     echo "micro_X.sh is now executable."
 else
-    echo "INFO: micro_X.sh (launch script) not. This script is recommended for running micro_X."
+    echo "INFO: micro_X.sh (launch script) not found. This script is recommended for running micro_X."
 fi
 echo ""
 
@@ -218,8 +232,8 @@ echo "   ./micro_X.sh"
 echo "   (The micro_X.sh script should activate the virtual environment)."
 echo ""
 echo "   If running main.py directly:"
-echo "     poetry shell"
-echo "     python3 main.py"
+echo "   source .venv/bin/activate"
+echo "   ./main.py  # or python3 main.py"
 echo ""
 echo "------------------------------------------"
 

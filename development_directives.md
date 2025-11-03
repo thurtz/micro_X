@@ -21,35 +21,7 @@ This file contains the rules and guidelines for the Gemini AI assistant when wor
 - Example: `git commit -m "feat: Add new feature" -m "Detailed description of the feature."`
 - Files listed in the `.gitignore` file are not tracked by Git and therefore cannot be committed. Do not attempt to commit these files.
 
-## 4. Dependency Management with Poetry
-
-- **Primary Tool**: All Python dependencies for the `micro_X` project must be managed exclusively through Poetry. The legacy `requirements.txt` files are deprecated and should not be used.
-
-- **Adding Dependencies**:
-    - To add a new **main (production)** dependency, use the command:
-        ```bash
-        poetry add <package-name>
-        ```
-    - To add a new **development** dependency (e.g., for testing, linting, or documentation), you must add it to the `dev` group:
-        ```bash
-        poetry add --group dev <package-name>
-        ```
-
-- **The Lock File**: The `poetry.lock` file, which ensures deterministic and reproducible builds, is a critical project file. It **must** be committed to the repository every time you add, update, or remove a dependency.
-
-- **Installation**: To install or update the project environment according to the `poetry.lock` file, simply run:
-    ```bash
-    poetry install
-    ```
-
-- **Running Commands**: To run a command within the Poetry-managed virtual environment, use `poetry run`. For example:
-    ```bash
-    poetry run python main.py
-    poetry run pytest
-    ```
-    Alternatively, you can activate the virtual environment directly with `poetry shell`.
-
-## 5. Utility Script Conventions
+## 4. Utility Script Conventions
 
 When creating a new utility script in the `utils/` directory, it must adhere to the following dual-component help system:
 
@@ -57,7 +29,7 @@ When creating a new utility script in the `utils/` directory, it must adhere to 
 
 2.  **`argparse` Implementation**: The script SHOULD also use the `argparse` module to handle its own command-line arguments, including its own `--help` flag. This allows the utility to be run with complex arguments and to provide detailed help for its own functionality (e.g., `/utils <script_name> --help`).
 
-## 6. Adding New Intents
+## 5. Adding New Intents
 
 Adding a new natural language intent is a two-step process:
 
@@ -65,7 +37,7 @@ Adding a new natural language intent is a two-step process:
 
 2.  **Map the Intent**: In `modules/shell_engine.py`, add a new entry to the `INTENT_COMMAND_MAP` dictionary. This entry maps the intent name from step 1 to the exact command that should be executed (e.g., `"show_weather": ("/utils get_weather --now", False)`).
 
-## 7. Setup Script Conventions
+## 6. Setup Script Conventions
 
 When creating or modifying OS-specific setup scripts in the `setup_scripts/` directory, the following conventions apply:
 
