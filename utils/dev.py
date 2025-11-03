@@ -159,16 +159,41 @@ def run_command(command, cwd, step_name, capture=False):
         print(f"❌ An unexpected error occurred during '{step_name}': {e}")
         return None
 
+def install_poetry_dependencies(target_dir, branch_name):
+    """Installs dependencies using Poetry in a non-interactive way."""
+    print(f"\n--- Installing dependencies for '{branch_name}' branch in '{os.path.basename(target_dir)}/' ---")
+
+    if not shutil.which("poetry"):
+        print("❌ Error: 'poetry' command not found. Please install Poetry and ensure it's in your PATH.")
+        return False
+
+    pyproject_path = os.path.join(target_dir, 'pyproject.toml')
+    if not os.path.isfile(pyproject_path):
+        print(f"❌ Error: 'pyproject.toml' not found in '{os.path.basename(target_dir)}'.")
+        return False
+
+    # Configure poetry to create the venv inside the project folder
+    config_command = ['poetry', 'config', 'virtualenvs.in-project', 'true']
+    if not run_command(config_command, target_dir, f"Configuring Poetry for {branch_name}"):
+        return False
+
+    # Install dependencies
+    install_command = ['poetry', 'install', '--no-root']
+    if not run_command(install_command, target_dir, f"Installing dependencies for {branch_name}"):
+        return False
+
+    return True
+
 def activate_dev_environment(project_root):
     """Clones and sets up the testing and dev branches."""
     print("🚀 Activating micro_X development environment...")
-    print("This process will be interactive as it runs the setup scripts.")
+    print("This process will be non-interactive and use Poetry for setup.")
 
     # --- START: Updated branch check logic ---
     print("\n[Step 1/5] Verifying current branch...")
     config = load_configuration(project_root)
     if not config:
-        return # Stop if config loading failed
+        return
 
     allowed_branches = config.get("integrity_check", {}).get("dev_activation_allowed_branches", ["main"])
 
@@ -214,22 +239,13 @@ def activate_dev_environment(project_root):
             print(f"Halting due to error cloning '{branch_name}'.")
             return
 
-    # 3. Install Dependencies for each branch
-    print("\n[Step 3/5] Installing dependencies via setup.sh...")
+    # 3. Install Dependencies for each branch using Poetry
+    print("\n[Step 3/5] Installing dependencies via Poetry...")
     for branch_name, target_dir in branches_to_clone:
-        print(f"\n--- Installing for '{branch_name}' branch in '{os.path.basename(target_dir)}/' ---")
         if not os.path.isdir(target_dir):
             print(f"--> Directory '{os.path.basename(target_dir)}' not found. Skipping dependency installation.")
             continue
-
-        setup_script_path = os.path.join(target_dir, 'setup.sh')
-        if not os.path.isfile(setup_script_path):
-            print(f"❌ Error: 'setup.sh' not found in '{os.path.basename(target_dir)}'. Cannot install dependencies.")
-            continue
-
-        os.chmod(setup_script_path, 0o755)
-        install_command = [setup_script_path]
-        if not run_command(install_command, target_dir, f"Running setup for {branch_name}"):
+        if not install_poetry_dependencies(target_dir, branch_name):
             print(f"Halting due to error installing dependencies for '{branch_name}'.")
             return
 
