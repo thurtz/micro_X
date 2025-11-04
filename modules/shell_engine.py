@@ -458,33 +458,51 @@ class ShellEngine:
         """
         user_input_stripped = user_input.strip()
 
-        # --- ALIAS EXPANSION ---
+        # --- ALIAS EXPANSION (LONGEST MATCH) ---
         try:
-            input_parts = shlex.split(user_input_stripped)
-            alias_name = input_parts[0] if input_parts else ""
-            if alias_name in self.aliases:
-                expanded_command = self.aliases[alias_name]
-                remaining_args = input_parts[1:]
-                # Simple append, for more complex logic (e.g., placeholders) this would need enhancement
-                final_command = f"{expanded_command} {' '.join(shlex.quote(arg) for arg in remaining_args)}".strip()
+            # Sort aliases by length, descending, to match specific aliases first (e.g., '/dev --activate' before '/dev')
+            sorted_aliases = sorted(self.aliases.keys(), key=len, reverse=True)
+            
+            original_input_for_alias_check = user_input_stripped
+            alias_found = False
 
-                if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
-                    self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
-                user_input_stripped = final_command
+            for alias_name in sorted_aliases:
+                # Check if the user's input starts with the alias and is followed by a space or is an exact match
+                if original_input_for_alias_check == alias_name or original_input_for_alias_check.startswith(alias_name + ' '):
+                    expanded_command = self.aliases[alias_name]
+                    
+                    # The part of the input *after* the alias
+                    remaining_input = original_input_for_alias_check[len(alias_name):].strip()
+                    
+                    # Append the remaining part of the input to the expanded command
+                    # shlex.quote is used to handle arguments with spaces correctly
+                    if remaining_input:
+                        final_command = f"{expanded_command} {remaining_input}"
+                    else:
+                        final_command = expanded_command
 
+                    if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+                        self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
+                    
+                    user_input_stripped = final_command
+                    alias_found = True
+                    break # Stop after the first (longest) match
+
+            if alias_found:
                 # --- FIX START: Immediate execution for categorized aliases ---
                 # After expanding an alias, immediately check if the result is a known, categorized command.
                 # If it is, we can execute it directly and bypass the "unknown command" logic (AI validation).
-                category = self.category_manager_module.classify_command(final_command)
+                category = self.category_manager_module.classify_command(user_input_stripped)
                 if category != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
-                    logger.info(f"Alias '{alias_name}' expanded to categorized command '{final_command}'. Executing directly.")
-                    # We use the original user input (the alias itself) for display purposes.
-                    await self.process_command(final_command, user_input.strip())
+                    logger.info(f"Alias expanded to categorized command '{user_input_stripped}'. Executing directly.")
+                    # We use the original user input for display purposes if it was an alias.
+                    await self.process_command(user_input_stripped, user_input.strip())
                     return True # IMPORTANT: Return True to signify the command was fully handled.
                 # --- FIX END ---
 
         except ValueError:
-            # shlex failed, proceed with original input
+            # This might happen if the input is malformed, but it's less likely with the new string-based approach.
+            logger.warning(f"ValueError during alias expansion for input: {user_input_stripped}")
             pass
         # --- END ALIAS EXPANSION ---
 

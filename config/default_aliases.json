@@ -3,6 +3,7 @@
   "/command": "/utils command",
   "/config": "/utils config_manager",
   "/dev": "/utils dev",
+  "/dev --activate": "python utils/dev.py --activate",
   "/docs": "/utils docs",
   "/docs --help": "python utils/docs.py --help",
   "/docs --lynx": "python utils/docs.py --lynx",
