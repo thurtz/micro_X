@@ -18,44 +18,142 @@ PROJECT_ROOT="$1"
 echo "Using Project Root: $PROJECT_ROOT"
 echo ""
 
+# --- Define Python Version and .python-version file ---
+PYTHON_VERSION="3.13.5" # Default Python version for the project
+PYTHON_VERSION_FILE="$PROJECT_ROOT/.python-version"
+
+if [ ! -f "$PYTHON_VERSION_FILE" ]; then
+    echo "Creating $PYTHON_VERSION_FILE with version $PYTHON_VERSION..."
+    echo "$PYTHON_VERSION" > "$PYTHON_VERSION_FILE"
+    echo ".python-version file created."
+else
+    PYTHON_VERSION=$(cat "$PYTHON_VERSION_FILE")
+    echo "Using Python version from $PYTHON_VERSION_FILE: $PYTHON_VERSION"
+fi
+echo ""
+
 
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Function to check if pyenv is installed
+check_pyenv_installed() {
+    if command_exists pyenv; then
+        echo "pyenv is already installed."
+        return 0
+    else
+        echo "pyenv is not installed."
+        return 1
+    fi
+}
+
+# Function to install pyenv from git
+install_pyenv_from_git() {
+    echo "Attempting to install pyenv from Git..."
+
+    # Install build dependencies for Python versions
+    echo "Installing pyenv build dependencies..."
+    sudo apt update
+    sudo apt install -y make build-essential libssl-dev zlib1g-dev \
+        libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm \
+        libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to install pyenv build dependencies. Please install them manually and re-run."
+        exit 1
+    fi
+
+    # Clone pyenv
+    if [ ! -d "$HOME/.pyenv" ]; then
+        git clone https://github.com/pyenv/pyenv.git "$HOME/.pyenv"
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to clone pyenv repository."
+            exit 1
+        fi
+    else
+        echo "$HOME/.pyenv already exists. Skipping cloning."
+    fi
+
+    # Add pyenv to shell environment (for bash)
+    if ! grep -q 'export PYENV_ROOT' "$HOME/.bashrc"; then
+        echo "Configuring pyenv in ~/.bashrc..."
+        echo 'export PYENV_ROOT="$HOME/.pyenv"' >> "$HOME/.bashrc"
+        echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> "$HOME/.bashrc"
+        echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n  eval "$(pyenv init --path)"\nfi' >> "$HOME/.bashrc"
+        echo "Please restart your terminal or run 'source ~/.bashrc' for pyenv to be fully active."
+    else
+        echo "pyenv configuration already present in ~/.bashrc."
+    fi
+
+    # Source bashrc to make pyenv available in the current script context
+    # This is tricky. For the current script to use pyenv, we need to source it.
+    # However, sourcing .bashrc can have side effects.
+    # A more robust way is to explicitly set PATH and run pyenv init.
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init --path)"
+    
+    if command_exists pyenv; then
+        echo "pyenv installed and configured successfully in current session."
+        return 0
+    else
+        echo "ERROR: pyenv command not found after installation attempt. Please check your setup."
+        exit 1
+    fi
+}
+
 # --- 1. Prerequisites ---
 echo "--- Checking Prerequisites ---"
 
-# Python 3 and PIP
-echo "Checking for Python 3 and PIP..."
-if ! command_exists python3 || ! command_exists pip3; then
-    echo "Python 3 and/or PIP3 not found. Attempting to install..."
+# Git (needed for branch detection for .desktop file and session name, and for pyenv)
+echo "Checking for git..."
+if ! command_exists git; then
+    echo "git not found. Attempting to install..."
     sudo apt update
-    sudo apt install -y python3 python3-pip python3-venv
-    if ! command_exists python3 || ! command_exists pip3; then
-        echo "ERROR: Failed to install Python 3 and/or PIP3. Please install them manually and re-run this script."
-        exit 1
+    sudo apt install -y git
+    if ! command_exists git; then
+        echo "ERROR: Failed to install git. Please install it manually. Branch-specific features might not work as expected."
+        exit 1 # Exit if git cannot be installed, as pyenv will depend on it
+    else
+        echo "git installed."
     fi
-    echo "Python 3 and PIP3 installed."
 else
-    echo "Python 3 and PIP3 are already installed."
+    echo "git is already installed."
 fi
 
-# Python3-venv (specifically needed for python3 -m venv)
-echo "Checking for python3-venv package..."
-if ! dpkg -s python3-venv >/dev/null 2>&1; then
-    echo "python3-venv package not found. Attempting to install..."
-    sudo apt update
-    sudo apt install -y python3-venv
-    if ! dpkg -s python3-venv >/dev/null 2>&1; then
-        echo "ERROR: Failed to install python3-venv. Please install it manually and re-run this script."
+# --- Python Version Management with pyenv ---
+echo "--- Setting up Python with pyenv ---"
+
+# Ensure pyenv is installed
+if ! check_pyenv_installed; then
+    install_pyenv_from_git
+    # After installation, ensure pyenv is available in the current shell
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init --path)"
+    if ! command_exists pyenv; then
+        echo "ERROR: pyenv not available after installation. Please restart your terminal and re-run the setup script."
         exit 1
     fi
-    echo "python3-venv installed."
-else
-    echo "python3-venv is already installed."
 fi
+
+# Install the required Python version using pyenv
+echo "Installing Python version $PYTHON_VERSION using pyenv..."
+if ! pyenv install --skip-existing "$PYTHON_VERSION"; then
+    echo "ERROR: Failed to install Python $PYTHON_VERSION using pyenv. Please check pyenv logs."
+    exit 1
+fi
+echo "Python $PYTHON_VERSION installed via pyenv."
+
+# Set the local Python version for the project
+echo "Setting local pyenv Python version to $PYTHON_VERSION..."
+if ! pyenv local "$PYTHON_VERSION"; then
+    echo "ERROR: Failed to set local pyenv Python version. Ensure pyenv is correctly initialized."
+    exit 1
+fi
+echo "Local pyenv Python version set to $PYTHON_VERSION."
 
 
 # tmux
@@ -147,8 +245,9 @@ VENV_DIR="$PROJECT_ROOT/.venv"
 if [ -d "$VENV_DIR" ]; then
     echo "Virtual environment '$VENV_DIR' already exists. Skipping creation."
 else
-    echo "Creating Python virtual environment in '$VENV_DIR'..."
-    python3 -m venv "$VENV_DIR"
+    echo "Creating Python virtual environment in '$VENV_DIR' using pyenv-managed Python..."
+    # Use 'python' which should now be managed by pyenv due to 'pyenv local'
+    python -m venv "$VENV_DIR"
     if [ $? -ne 0 ]; then echo "ERROR: Failed to create virtual environment."; exit 1; fi
     echo "Virtual environment created."
 fi
