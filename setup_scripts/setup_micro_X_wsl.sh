@@ -3,6 +3,7 @@
 # Script to set up the micro_X environment within WSL (Windows Subsystem for Linux)
 # This script assumes Ollama is installed and running on the WINDOWS HOST.
 # MODIFIED to be called from a root setup.sh and accept PROJECT_ROOT
+# UPDATED to use pyenv for Python version management.
 
 echo "--- micro_X Setup Script for WSL (OS-Specific) ---"
 echo ""
@@ -21,9 +22,86 @@ PROJECT_ROOT="$1"
 echo "Using Project Root: $PROJECT_ROOT"
 echo ""
 
+# --- Define Python Version and .python-version file ---
+PYTHON_VERSION="3.13.5" # Default Python version for the project
+PYTHON_VERSION_FILE="$PROJECT_ROOT/.python-version"
+
+if [ ! -f "$PYTHON_VERSION_FILE" ]; then
+    echo "Creating $PYTHON_VERSION_FILE with version $PYTHON_VERSION..."
+    echo "$PYTHON_VERSION" > "$PYTHON_VERSION_FILE"
+    echo ".python-version file created."
+else
+    PYTHON_VERSION=$(cat "$PYTHON_VERSION_FILE")
+    echo "Using Python version from $PYTHON_VERSION_FILE: $PYTHON_VERSION"
+fi
+echo ""
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+# Function to check if pyenv is installed
+check_pyenv_installed() {
+    if command_exists pyenv; then
+        echo "pyenv is already installed."
+        return 0
+    else
+        echo "pyenv is not installed."
+        return 1
+    fi
+}
+
+# Function to install pyenv from git
+install_pyenv_from_git() {
+    echo "Attempting to install pyenv from Git..."
+
+    # Install build dependencies for Python versions
+    echo "Installing pyenv build dependencies..."
+    sudo apt update
+    sudo apt install -y make build-essential libssl-dev zlib1g-dev \
+        libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm \
+        libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to install pyenv build dependencies. Please install them manually and re-run."
+        exit 1
+    fi
+
+    # Clone pyenv
+    if [ ! -d "$HOME/.pyenv" ]; then
+        git clone https://github.com/pyenv/pyenv.git "$HOME/.pyenv"
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to clone pyenv repository."
+            exit 1
+        fi
+    else
+        echo "$HOME/.pyenv already exists. Skipping cloning."
+    fi
+
+    # Add pyenv to shell environment (for bash)
+    if ! grep -q 'export PYENV_ROOT' "$HOME/.bashrc"; then
+        echo "Configuring pyenv in ~/.bashrc..."
+        echo 'export PYENV_ROOT="$HOME/.pyenv"' >> "$HOME/.bashrc"
+        echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> "$HOME/.bashrc"
+        echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n  eval "$(pyenv init --path)"\nfi' >> "$HOME/.bashrc"
+        echo "Please restart your terminal or run 'source ~/.bashrc' for pyenv to be fully active."
+    else
+        echo "pyenv configuration already present in ~/.bashrc."
+    fi
+
+    # Source bashrc to make pyenv available in the current script context
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init --path)"
+    
+    if command_exists pyenv; then
+        echo "pyenv installed and configured successfully in current session."
+        return 0
+    else
+        echo "ERROR: pyenv command not found after installation attempt. Please check your setup."
+        exit 1
+    fi
 }
 
 # --- 1. Prerequisites for WSL Environment ---
@@ -34,29 +112,19 @@ echo "Updating package list (sudo apt update)..."
 sudo apt update
 echo ""
 
-# Python 3, PIP, venv
-echo "Checking for Python 3, PIP, and venv..."
-PACKAGES_TO_INSTALL=""
-if ! command_exists python3; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL python3"; fi
-if ! command_exists pip3; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL python3-pip"; fi
-# Check for python3-venv specifically, as just python3-pip might not install it.
-if ! dpkg -s python3-venv >/dev/null 2>&1 && ! python3 -m venv --help >/dev/null 2>&1; then
-    PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL python3-venv"
-fi
-
-
-if [ -n "$PACKAGES_TO_INSTALL" ]; then
-    echo "The following Python-related packages are missing or not fully installed: $PACKAGES_TO_INSTALL"
-    echo "Attempting to install..."
-    sudo apt install -y $PACKAGES_TO_INSTALL
-    # Verify again
-    if ! command_exists python3 || ! command_exists pip3 || (! dpkg -s python3-venv >/dev/null 2>&1 && ! python3 -m venv --help >/dev/null 2>&1); then
-        echo "ERROR: Failed to install all required Python packages. Please install them manually and re-run."
+# Git (needed for pyenv)
+echo "Checking for git..."
+if ! command_exists git; then
+    echo "git not found. Attempting to install..."
+    sudo apt install -y git
+    if ! command_exists git; then
+        echo "ERROR: Failed to install git. Please install it manually."
         exit 1
+    else
+        echo "git installed."
     fi
-    echo "Python packages installed."
 else
-    echo "Python 3, PIP3, and python3-venv (or equivalent) are already installed."
+    echo "git is already installed."
 fi
 
 # tmux
@@ -74,7 +142,40 @@ else
 fi
 echo ""
 
-# --- 2. Ollama on Windows Host - Instructions ---
+# --- 2. Python Version Management with pyenv ---
+echo "--- Setting up Python with pyenv ---"
+
+# Ensure pyenv is installed
+if ! check_pyenv_installed; then
+    install_pyenv_from_git
+    # After installation, ensure pyenv is available in the current shell
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init --path)"
+    if ! command_exists pyenv; then
+        echo "ERROR: pyenv not available after installation. Please restart your terminal and re-run the setup script."
+        exit 1
+    fi
+fi
+
+# Install the required Python version using pyenv
+echo "Installing Python version $PYTHON_VERSION using pyenv..."
+if ! pyenv install --skip-existing "$PYTHON_VERSION"; then
+    echo "ERROR: Failed to install Python $PYTHON_VERSION using pyenv. Please check pyenv logs."
+    exit 1
+fi
+echo "Python $PYTHON_VERSION installed via pyenv."
+
+# Set the local Python version for the project
+echo "Setting local pyenv Python version to $PYTHON_VERSION..."
+if ! pyenv local "$PYTHON_VERSION"; then
+    echo "ERROR: Failed to set local pyenv Python version. Ensure pyenv is correctly initialized."
+    exit 1
+fi
+echo "Local pyenv Python version set to $PYTHON_VERSION."
+echo ""
+
+# --- 3. Ollama on Windows Host - Instructions ---
 echo "--- Ollama on Windows Host (Instructions) ---"
 echo "This script will NOT install Ollama on your Windows host."
 echo "Please ensure you have done the following on your WINDOWS machine:"
@@ -85,12 +186,10 @@ echo ""
 read -p "Have you installed and started Ollama on your WINDOWS host? (y/N) " ollama_host_ready
 if [[ ! "$ollama_host_ready" =~ ^[Yy]$ ]]; then
     echo "Ollama on Windows host is not ready. Please set it up and then re-run this script or proceed manually."
-    # Optionally exit, or let user proceed with WSL-side setup
-    # exit 1
 fi
 echo ""
 
-# --- 3. Ollama Model Pulling - Instructions ---
+# --- 4. Ollama Model Pulling - Instructions ---
 echo "--- Ollama Model Pulling (Instructions for Windows Host) ---"
 echo "The following Ollama models are required by micro_X:"
 required_models=(
@@ -109,37 +208,30 @@ if [[ ! "$models_pulled" =~ ^[Yy]$ ]]; then
 fi
 echo ""
 
-# --- 4. Setting up micro_X Python Environment in WSL ---
+# --- 5. Setting up micro_X Python Environment in WSL ---
 echo "--- Setting up Python Environment for micro_X (in WSL) ---"
 
-# Check if main.py exists in PROJECT_ROOT
-if [ ! -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
+if [ ! -f "$PROJECT_ROOT/main.py" ]; then
     echo "ERROR: main.py not found in the project root ($PROJECT_ROOT)."
-    echo "Please ensure the main setup.sh script is run from the correct project root."
     exit 1
 fi
 
-# Create a Virtual Environment in PROJECT_ROOT
-VENV_DIR="$PROJECT_ROOT/.venv" # MODIFIED
+VENV_DIR="$PROJECT_ROOT/.venv"
 if [ -d "$VENV_DIR" ]; then
-    echo "Python virtual environment '$VENV_DIR' already exists. Skipping creation."
+    echo "Virtual environment '$VENV_DIR' already exists. Skipping creation."
 else
-    echo "Creating Python virtual environment in '$VENV_DIR'..."
-    python3 -m venv "$VENV_DIR"
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to create virtual environment."
-        exit 1
-    fi
+    echo "Creating Python virtual environment in '$VENV_DIR' using pyenv-managed Python..."
+    # Use 'python' which should now be managed by pyenv due to 'pyenv local'
+    python -m venv "$VENV_DIR"
+    if [ $? -ne 0 ]; then echo "ERROR: Failed to create virtual environment."; exit 1; fi
     echo "Virtual environment created."
 fi
 
-# Create requirements.txt if it doesn't exist in PROJECT_ROOT
-REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt" # MODIFIED
+REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt"
 if [ ! -f "$REQUIREMENTS_FILE" ]; then
     echo "Creating $REQUIREMENTS_FILE..."
     cat <<EOF > "$REQUIREMENTS_FILE"
 # Python dependencies for micro_X
-
 prompt_toolkit>=3.0.0
 ollama>=0.1.0
 numpy>=1.20.0
@@ -149,25 +241,24 @@ else
     echo "$REQUIREMENTS_FILE already exists."
 fi
 
-# Install Python Dependencies into the virtual environment
 echo "Installing Python dependencies from $REQUIREMENTS_FILE into $VENV_DIR..."
-"$VENV_DIR/bin/pip3" install -r "$REQUIREMENTS_FILE"
+"$VENV_DIR/bin/pip" install -r "$REQUIREMENTS_FILE"
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to install Python dependencies."
-    echo "Try activating the virtual environment manually ('source $VENV_DIR/bin/activate') and then run 'pip3 install -r $REQUIREMENTS_FILE'."
+    echo "Try: source $VENV_DIR/bin/activate && pip install -r $REQUIREMENTS_FILE"
     exit 1
 fi
 echo "Python dependencies installed."
 echo ""
 
-# --- 5. Make Scripts Executable ---
+# --- 6. Make Scripts Executable ---
 echo "--- Making Scripts Executable (in WSL) ---"
-if [ -f "$PROJECT_ROOT/main.py" ]; then # MODIFIED
-    chmod +x "$PROJECT_ROOT/main.py" # MODIFIED
+if [ -f "$PROJECT_ROOT/main.py" ]; then
+    chmod +x "$PROJECT_ROOT/main.py"
     echo "main.py is now executable."
 fi
 
-MICRO_X_LAUNCHER_SH="$PROJECT_ROOT/micro_X.sh" # MODIFIED
+MICRO_X_LAUNCHER_SH="$PROJECT_ROOT/micro_X.sh"
 if [ -f "$MICRO_X_LAUNCHER_SH" ]; then
     chmod +x "$MICRO_X_LAUNCHER_SH"
     echo "micro_X.sh is now executable."
@@ -176,20 +267,20 @@ else
 fi
 echo ""
 
-# --- 6. OLLAMA_HOST Configuration Reminder ---
+# --- 7. OLLAMA_HOST Configuration Reminder ---
 echo "--- IMPORTANT: OLLAMA_HOST Configuration ---"
 echo "For micro_X in WSL to connect to Ollama on your Windows host, you MUST set the OLLAMA_HOST environment variable."
 echo "Typically, for WSL2, Ollama on Windows is accessible via http://localhost:11434 from within WSL."
 echo ""
 echo "You can set this variable temporarily before running micro_X:"
 echo "  export OLLAMA_HOST=http://localhost:11434"
-echo "  cd \"$PROJECT_ROOT\" && ./micro_X.sh" # MODIFIED to show context
+echo "  cd \"$PROJECT_ROOT\" && ./micro_X.sh"
 echo ""
 echo "For a permanent setting, add the export line to your WSL shell's configuration file"
 echo "(e.g., ~/.bashrc if using bash, or ~/.zshrc if using zsh), then source it or open a new terminal:"
 echo "  echo 'export OLLAMA_HOST=http://localhost:11434' >> ~/.bashrc"
-  echo "  source ~/.bashrc"
-  echo ""
+echo "  source ~/.bashrc"
+echo ""
 
 echo "Attempting to verify connectivity from WSL to Ollama on Windows..."
 if ! command_exists curl; then
@@ -208,32 +299,26 @@ else
     echo "   3. Is your Windows Firewall blocking connections from WSL? You may need to allow incoming connections on port 11434."
     echo "   You can proceed with the setup, but AI features will not work until this is resolved."
 fi
-
-echo "The micro_X.sh script in '$PROJECT_ROOT' might also be a good place to set this variable if it's not set globally." # MODIFIED
-
-echo "Verify connectivity from WSL to Ollama on Windows with: curl http://localhost:11434"
-echo "(You may need to install curl: sudo apt install curl)"
-echo "Also, ensure your Windows Firewall is not blocking connections to port 11434 from WSL."
 echo ""
 
-
-# --- 7. Setup Complete ---
+# --- 8. Setup Complete ---
 echo "--- WSL Setup for micro_X Complete! ---"
 echo ""
 echo "To run micro_X:"
 echo "1. Ensure Ollama is installed and RUNNING on your WINDOWS host."
 echo "2. Ensure you have pulled the required Ollama models on your WINDOWS host."
 echo "3. Open your WSL terminal."
-echo "4. Navigate to the micro_X directory: cd \"$PROJECT_ROOT\"" # MODIFIED
+echo "4. Navigate to the micro_X directory: cd \"$PROJECT_ROOT\""
 echo "5. Set the OLLAMA_HOST environment variable if not already set permanently:"
 echo "   export OLLAMA_HOST=http://localhost:11434"
 echo "6. If you have micro_X.sh (recommended):"
 echo "   ./micro_X.sh"
-echo "   (The micro_X.sh script should activate the virtual environment)."
+echo "   (This will launch micro_X in a tmux session and use the correct pyenv Python version)."
 echo ""
 echo "   If running main.py directly:"
-echo "   source .venv/bin/activate"
-echo "   ./main.py  # or python3 main.py"
+echo "   a. Navigate to the project directory: cd \"$PROJECT_ROOT\""
+echo "   b. Activate the virtual environment: source .venv/bin/activate"
+echo "   c. Run the main Python script: ./main.py (or python3 main.py)"
 echo ""
 echo "------------------------------------------"
 
