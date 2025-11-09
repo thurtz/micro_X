@@ -215,7 +215,6 @@ echo "--- Installing Ollama Models ---"
 if command_exists ollama; then
 required_models=(
     "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
-    "herawen/lisa"
     "nomic-embed-text"
     "qwen3:0.6b"
 )
