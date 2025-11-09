@@ -7,13 +7,13 @@
       "model": "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
     },
     "validator": {
-      "model": "herawen/lisa"
+      "model": "qwen3:0.6b"
     },
     "router": {
       "model": "qwen3:0.6b"
     },
     "explainer": {
-      "model": "herawen/lisa"
+      "model": "qwen3:0.6b"
     }
   },
   "timeouts": {
@@ -65,7 +65,7 @@
       "user_template": "Translate to a single Linux command: \"{human_input}\"."
     },
     "explainer": {
-      "system": "You are a helpful assistant that explains Linux commands in simple, clear terms. Describe what the command does, its main arguments/options shown, and any significant side effects or risks. Be concise. If the command is trivial, a very short explanation is fine. If it seems dangerous or complex, highlight that and possibly suggest an alternative command.",
+      "system": "You are a helpful assistant that explains Linux commands in simple, clear terms. Describe what the command does, its main arguments/options shown, and any significant side effects or risks. Be concise. If the command is trivial, a very short explanation is fine. If it seems dangerous or complex, highlight that and possibly suggest an alternative command. Do not include your thinking process or any XML-style tags like <think> in your final response.",
       "user_template": "Explain the following Linux command: '{command_text}'"
     }
   },

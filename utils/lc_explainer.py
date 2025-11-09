@@ -1,6 +1,7 @@
 # utils/lc_explainer.py
 
 import logging
+import re
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_ollama import ChatOllama
@@ -61,7 +62,10 @@ async def get_ai_explanation(command_to_explain: str, config_param: dict) -> str
         # 3. Invoke the chain
         logger.info(f"Invoking LangChain explainer (model: {model_name}) for: '{command_to_explain}'")
         
-        explanation = await chain.ainvoke({"command_text": command_to_explain})
+        raw_explanation = await chain.ainvoke({"command_text": command_to_explain})
+        
+        # Programmatically strip the <think> block as a fallback
+        explanation = re.sub(r"<think>.*?</think>", "", raw_explanation, flags=re.DOTALL).strip()
         
         logger.debug(f"LangChain Explainer response: {explanation}")
         return explanation if explanation else "AI Explainer returned an empty response."
