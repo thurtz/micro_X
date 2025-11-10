@@ -6,6 +6,7 @@ import subprocess
 import logging
 import ollama # Main Ollama library
 import time
+import os
 
 # --- Module-specific logger ---
 logger = logging.getLogger(__name__)
@@ -39,6 +40,17 @@ def _initialize_manager_if_needed(main_config=None, append_output_callback=None)
     if _config_cached and _append_output_func_cached:
         _is_initialized = True
         logger.debug("Ollama Manager initialized with config and append_output.")
+
+        # Configure Ollama client to use the specified host and port
+        ollama_service_config = _config_cached.get(OLLAMA_SERVICE_CONFIG_SECTION, {})
+        ollama_host = ollama_service_config.get("ollama_host", "http://localhost")
+        ollama_port = ollama_service_config.get("ollama_port", 11434)
+
+        # The ollama library uses the OLLAMA_HOST environment variable
+        # to determine the server address.
+        # It expects format like "host:port" or "http://host:port"
+        os.environ['OLLAMA_HOST'] = f"{ollama_host}:{ollama_port}"
+        logger.info(f"Set OLLAMA_HOST environment variable to: {os.environ['OLLAMA_HOST']}")
     else:
         logger.error("Ollama Manager cannot be fully initialized: main_config or append_output_callback missing.")
 
