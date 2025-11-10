@@ -186,12 +186,40 @@ else
     echo "git is already installed."
 fi
 
+# Function to install Ollama
+install_ollama() {
+    echo "Ollama not found. Do you want to install Ollama now? (y/n)"
+    read -p "Your choice: " choice
+    case "$choice" in
+        y|Y )
+            echo "Attempting to install Ollama using the official script..."
+            curl -fsSL https://ollama.com/install.sh | sh
+            if [ $? -ne 0 ]; then
+                echo "ERROR: Failed to install Ollama. Please try installing it manually from https://ollama.com/ and re-run this script."
+                return 1
+            else
+                echo "Ollama installed successfully. Please restart your terminal or log out/in for Ollama to be fully available."
+                return 0
+            fi
+            ;;
+        n|N )
+            echo "Skipping Ollama installation."
+            return 1
+            ;;
+        * )
+            echo "Invalid choice. Skipping Ollama installation."
+            return 1
+            ;;
+    esac
+}
+
 # Ollama
 echo "Checking for Ollama..."
 if ! command_exists ollama; then
-    echo "Ollama not found. This script cannot install Ollama automatically."
-    echo "Please visit https://ollama.com/ to download and install it for your system."
-    echo "After installing Ollama, ensure it is running, then re-run this script or manually pull the models."
+    install_ollama
+    if ! command_exists ollama; then
+        echo "WARNING: Ollama is not installed. micro_X AI features will not function without Ollama."
+    fi
 else
     echo "Ollama is installed."
     echo "Ensuring Ollama service is running (this might take a moment or require sudo if not running)..."
