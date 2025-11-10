@@ -171,6 +171,21 @@ else
     echo "tmux is already installed."
 fi
 
+# lynx
+echo "Checking for lynx..."
+if ! command_exists lynx; then
+    echo "lynx not found. Attempting to install..."
+    sudo apt update
+    sudo apt install -y lynx
+    if ! command_exists lynx; then
+        echo "ERROR: Failed to install lynx. Please install it manually and re-run this script."
+        exit 1
+    fi
+    echo "lynx installed."
+else
+    echo "lynx is already installed."
+fi
+
 # Git (needed for branch detection for .desktop file and session name)
 echo "Checking for git..."
 if ! command_exists git; then
