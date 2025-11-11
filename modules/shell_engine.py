@@ -48,6 +48,20 @@ class ShellEngine:
     input, managing state (like the current directory), and dispatching commands
     for execution based on their category.
     """
+    async def get_user_input_from_api(self, prompt: str) -> str:
+        """
+        API endpoint to request user input from a script.
+        This interacts with the UI manager to get input from the user.
+        """
+        logger.info(f"ShellEngine.get_user_input_from_api called with prompt: '{prompt}'")
+        if self.ui_manager:
+            # The `prompt_for_api_input` method is async and will return the user's input.
+            user_input = await self.ui_manager.prompt_for_api_input(prompt)
+            return user_input
+        else:
+            logger.error("ShellEngine.get_user_input_from_api: UIManager not available.")
+            return ""
+
     def __init__(self, config, ui_manager,
                  category_manager_module=None,
                  ai_handler_module=None,
@@ -410,34 +424,56 @@ class ShellEngine:
         command_to_execute_list = [sys.executable, script_path] + parts[2:]
         if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
             self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute_list)}", style_class='info')
-        
-        try:
-            self.current_process = await asyncio.create_subprocess_exec(
-                *command_to_execute_list,
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
-                cwd=self.PROJECT_ROOT
-            )
-            self.current_process_command = full_command_str
-            stdout, stderr = await self.current_process.communicate()
 
-            if stdout: self.ui_manager.append_output(f"Output from '{subcommand}.py':\n{stdout.decode(errors='replace').strip()}")
-            if stderr: self.ui_manager.append_output(f"Stderr from '{subcommand}.py':\n{stderr.decode(errors='replace').strip()}", style_class='warning')
-            
-            # Check if the process was killed externally
-            if self.current_process is None:
-                return
+        async def run_script_and_handle_output():
+            try:
+                env = os.environ.copy()
+                env["PYTHONPATH"] = self.PROJECT_ROOT
+                self.current_process = await asyncio.create_subprocess_exec(
+                    *command_to_execute_list,
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                    cwd=self.PROJECT_ROOT,
+                    env=env
+                )
+                self.current_process_command = full_command_str
 
-            if self.current_process.returncode == 0:
-                self.ui_manager.append_output(f"✅ Script '{subcommand}.py' completed.", style_class='success')
-                if subcommand == 'alias': self._reload_aliases()
-            else:
-                self.ui_manager.append_output(f"⚠️ Script '{subcommand}.py' exited with code {self.current_process.returncode}.", style_class='warning')
-        except Exception as e:
-            self.ui_manager.append_output(f"❌ Failed to execute script: {e}", style_class='error')
-        finally:
-            self.ui_manager.update_status_bar("")
-            self.current_process = None
-            self.current_process_command = ""
+                # Print the header once before the output starts
+                self.ui_manager.append_output(f"Output from '{subcommand}.py':", style_class='info')
+
+                async def read_stream(stream, style):
+                    while True:
+                        line = await stream.readline()
+                        if not line:
+                            break
+                        self.ui_manager.append_output(line.decode(errors='replace'), style_class=style)
+
+                # Create concurrent tasks to read stdout and stderr
+                stdout_task = asyncio.create_task(read_stream(self.current_process.stdout, 'default'))
+                stderr_task = asyncio.create_task(read_stream(self.current_process.stderr, 'warning'))
+
+                # Wait for the process to finish and for the streams to be fully read
+                await self.current_process.wait()
+                await asyncio.gather(stdout_task, stderr_task)
+                
+                # Check if the process was killed externally
+                if self.current_process is None:
+                    return
+
+                if self.current_process.returncode == 0:
+                    self.ui_manager.append_output(f"✅ Script '{subcommand}.py' completed.", style_class='success')
+                    if subcommand == 'alias': self._reload_aliases()
+                else:
+                    self.ui_manager.append_output(f"⚠️ Script '{subcommand}.py' exited with code {self.current_process.returncode}.", style_class='warning')
+            except Exception as e:
+                self.ui_manager.append_output(f"❌ Failed to execute script: {e}", style_class='error')
+            finally:
+                self.ui_manager.update_status_bar("")
+                self.current_process = None
+                self.current_process_command = ""
+                if self.main_restore_normal_input_ref:
+                    self.main_restore_normal_input_ref()
+
+        asyncio.create_task(run_script_and_handle_output())
 
     async def _handle_utils_command_async(self, full_command_str: str):
         await self._handle_script_command_async(full_command_str, self.UTILS_DIR_PATH, self.UTILS_DIR_NAME, "utils")

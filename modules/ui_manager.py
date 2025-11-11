@@ -55,6 +55,9 @@ class UIManager:
         self.hung_task_flow_active = False
         self.hung_task_flow_state = {}
 
+        self.api_input_flow_active = False
+        self.api_input_flow_state = {}
+
         self.is_in_edit_mode = False
 
         self.current_prompt_text = ""
@@ -89,6 +92,11 @@ class UIManager:
                 self.append_output("\n⚠️ Hung task prompt cancelled.", style_class='warning')
                 if 'future' in self.hung_task_flow_state and not self.hung_task_flow_state['future'].done():
                     self.hung_task_flow_state['future'].set_result({'action': 'cancel'})
+                event.app.invalidate()
+            elif self.api_input_flow_active:
+                self.append_output("\n⚠️ API input request cancelled.", style_class='warning')
+                if 'future' in self.api_input_flow_state and not self.api_input_flow_state['future'].done():
+                    self.api_input_flow_state['future'].set_result("") # Return empty string on cancel
                 event.app.invalidate()
             elif self.categorization_flow_active:
                 self.append_output("\n⚠️ Categorization cancelled by user.", style_class='warning')
@@ -127,6 +135,7 @@ class UIManager:
         def _handle_newline(event):
             if not self.categorization_flow_active and \
                not self.confirmation_flow_active and \
+               not self.api_input_flow_active and \
                not self.is_in_edit_mode:
                 if self.input_field and self.input_field.multiline:
                     event.current_buffer.insert_text('\n')
@@ -161,17 +170,17 @@ class UIManager:
 
         @self.kb.add('c-up')
         def _handle_ctrl_up(event):
-            if not self.categorization_flow_active and not self.confirmation_flow_active:
+            if not self.categorization_flow_active and not self.confirmation_flow_active and not self.api_input_flow_active:
                 event.current_buffer.cursor_up(count=1)
 
         @self.kb.add('c-down')
         def _handle_ctrl_down(event):
-            if not self.categorization_flow_active and not self.confirmation_flow_active:
+            if not self.categorization_flow_active and not self.confirmation_flow_active and not self.api_input_flow_active:
                 event.current_buffer.cursor_down(count=1)
 
         @self.kb.add('up')
         def _handle_up_arrow(event):
-            if self.categorization_flow_active or self.confirmation_flow_active:
+            if self.categorization_flow_active or self.confirmation_flow_active or self.api_input_flow_active:
                 pass # Do not interfere with flow-specific input handling if any
 
             buff = event.current_buffer
@@ -185,7 +194,7 @@ class UIManager:
 
         @self.kb.add('down')
         def _handle_down_arrow(event):
-            if self.categorization_flow_active or self.confirmation_flow_active:
+            if self.categorization_flow_active or self.confirmation_flow_active or self.api_input_flow_active:
                 pass # Do not interfere with flow-specific input handling if any
 
             buff = event.current_buffer
@@ -300,6 +309,44 @@ class UIManager:
                 accept_handler_func=self._handle_caution_confirmation_response,
                 is_confirmation=True
             )
+
+    # --- API Input Flow ---
+    async def prompt_for_api_input(self, prompt: str) -> str:
+        """Initiates a flow to get input from the user for an API request."""
+        logger.info(f"UIManager: Starting API input flow with prompt: '{prompt}'")
+        self.api_input_flow_active = True
+        self.api_input_flow_state = {
+            'future': asyncio.Future()
+        }
+
+        # Append the prompt to the output field so the user sees the question.
+        self.append_output(prompt, style_class='categorize-prompt')
+
+        self.set_flow_input_mode(
+            prompt_text="> ", # Use a generic prompt for the input line
+            accept_handler_func=self._handle_api_input_response,
+            is_api_input=True
+        )
+
+        try:
+            result = await self.api_input_flow_state['future']
+            # Also append the user's answer to the output to make it part of the history
+            self.append_output(result)
+            return result
+        finally:
+            self.api_input_flow_active = False
+            logger.info("UIManager: API input flow ended.")
+            # Restore normal input handler after the flow is complete
+            if self.main_restore_normal_input_ref:
+                self.main_restore_normal_input_ref()
+
+    def _handle_api_input_response(self, buff):
+        user_input = buff.text.strip()
+        future = self.api_input_flow_state.get('future')
+        if not future or future.done():
+            return
+        
+        future.set_result(user_input)
 
     # --- Categorization Flow Methods ---
     async def start_categorization_flow(self, command_initially_proposed: str,
@@ -789,7 +836,7 @@ class UIManager:
             self.app.invalidate()
 
     def _on_output_cursor_pos_changed(self, _=None):
-        if self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:
+        if self.categorization_flow_active or self.confirmation_flow_active or self.api_input_flow_active or self.is_in_edit_mode:
             if self.output_field and self.output_field.buffer:
                 self.output_field.buffer.cursor_position = len(self.output_field.buffer.text)
             return
@@ -843,7 +890,7 @@ class UIManager:
         # This line is the core of the re-rendering.
         buffer.set_document(Document(plain_text_output, cursor_position=len(plain_text_output)), bypass_readonly=True)
         
-        if self.auto_scroll or self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:
+        if self.auto_scroll or self.categorization_flow_active or self.confirmation_flow_active or self.api_input_flow_active or self.is_in_edit_mode:
             buffer.cursor_position = len(plain_text_output)
         else:
             # Restore previous cursor position if not auto-scrolling
@@ -961,19 +1008,27 @@ class UIManager:
                 if self.layout: self.app.layout.focus(self.input_field)
                 self.app.invalidate()
 
-    def set_flow_input_mode(self, prompt_text: str, accept_handler_func: callable, is_categorization: bool = False, is_confirmation: bool = False):
-        """Sets the UI for a special input flow (categorization or confirmation)."""
+    def set_flow_input_mode(self, prompt_text: str, accept_handler_func: callable, is_categorization: bool = False, is_confirmation: bool = False, is_api_input: bool = False):
+        """Sets the UI for a special input flow (categorization, confirmation, or API)."""
         logger.debug(f"UIManager: Setting flow input mode. Prompt: '{prompt_text}'")
         if is_categorization:
             self.categorization_flow_active = True
             self.confirmation_flow_active = False
+            self.api_input_flow_active = False
             self.is_in_edit_mode = False
-            self.append_output("ℹ️ Interaction active. Scrolling disabled until flow completes.", style_class='info', internal_call=True) # Added hint
+            self.append_output("ℹ️ Interaction active. Scrolling disabled until flow completes.", style_class='info', internal_call=True)
         elif is_confirmation:
             self.confirmation_flow_active = True
             self.categorization_flow_active = False
+            self.api_input_flow_active = False
             self.is_in_edit_mode = False
-            self.append_output("ℹ️ Interaction active. Scrolling disabled until flow completes.", style_class='info', internal_call=True) # Added hint
+            self.append_output("ℹ️ Interaction active. Scrolling disabled until flow completes.", style_class='info', internal_call=True)
+        elif is_api_input:
+            self.api_input_flow_active = True
+            self.categorization_flow_active = False
+            self.confirmation_flow_active = False
+            self.is_in_edit_mode = False
+            self.append_output("ℹ️ Script is requesting input. Scrolling disabled.", style_class='info', internal_call=True)
 
         self.current_prompt_text = prompt_text
         if self.input_field:

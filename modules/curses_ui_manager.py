@@ -47,9 +47,11 @@ class CursesUIManager:
         self.categorization_flow_active = False
         self.confirmation_flow_active = False
         self.hung_task_flow_active = False
+        self.api_input_flow_active = False
         self.categorization_flow_state = {}
         self.confirmation_flow_state = {}
         self.hung_task_flow_state = {}
+        self.api_input_flow_state = {}
         self.last_output_was_separator = False
         self.startup_separator_added = False
         self.initial_prompt_settled = False
@@ -129,10 +131,11 @@ class CursesUIManager:
         else:
             self._redraw()
 
-    def set_flow_input_mode(self, prompt_text: str, accept_handler_func, is_categorization: bool = False, is_confirmation: bool = False):
+    def set_flow_input_mode(self, prompt_text: str, accept_handler_func, is_categorization: bool = False, is_confirmation: bool = False, is_api_input: bool = False):
         """Sets the UI to a special flow input mode."""
         self.categorization_flow_active = is_categorization
         self.confirmation_flow_active = is_confirmation
+        self.api_input_flow_active = is_api_input
         self.is_in_edit_mode = False
         self.input_text = ""
         self.input_handler_callback = accept_handler_func
@@ -220,7 +223,7 @@ class CursesUIManager:
                     continue
 
                 if key in [curses.KEY_ENTER, 10, 13]:
-                    if self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode or self.hung_task_flow_active:
+                    if self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode or self.hung_task_flow_active or self.api_input_flow_active:
                         if self.input_handler_callback:
                             self.input_handler_callback(self.input_text)
                             await asyncio.sleep(0.001)
@@ -235,6 +238,10 @@ class CursesUIManager:
                         self.append_output("\n⚠️ Hung task prompt cancelled.", 'warning')
                         if 'future' in self.hung_task_flow_state and not self.hung_task_flow_state['future'].done():
                             self.hung_task_flow_state['future'].set_result({'action': 'cancel'})
+                    elif self.api_input_flow_active:
+                        self.append_output("\n⚠️ API input request cancelled.", 'warning')
+                        if 'future' in self.api_input_flow_state and not self.api_input_flow_state['future'].done():
+                            self.api_input_flow_state['future'].set_result("") # Return empty string on cancel
                     elif self.categorization_flow_active:
                         self.append_output("\n⚠️ Categorization cancelled by user.", 'warning')
                         logger.info("Categorization flow cancelled by Escape.")
@@ -317,6 +324,41 @@ class CursesUIManager:
             future.set_result({'action': 'cancel'})
         else:
             self.append_output("Invalid choice. Please enter K, I, or C.", 'error')
+
+    async def prompt_for_api_input(self, prompt: str) -> str:
+        """Initiates a flow to get input from the user for an API request."""
+        logger.info(f"CursesUIManager: Starting API input flow with prompt: '{prompt}'")
+        self.api_input_flow_active = True
+        self.api_input_flow_state = {
+            'future': asyncio.Future()
+        }
+
+        # Append the prompt to the output field so the user sees the question.
+        self.append_output(prompt, style_class='categorize-prompt')
+
+        self.set_flow_input_mode(
+            prompt_text="> ", # Use a generic prompt for the input line
+            accept_handler_func=self._handle_api_input_response,
+            is_api_input=True
+        )
+
+        try:
+            result = await self.api_input_flow_state['future']
+            # Also append the user's answer to the output to make it part of the history
+            self.append_output(result)
+            return result
+        finally:
+            self.api_input_flow_active = False
+            logger.info("CursesUIManager: API input flow ended.")
+            if self.main_restore_normal_input_ref:
+                self.main_restore_normal_input_ref()
+
+    def _handle_api_input_response(self, user_input: str):
+        future = self.api_input_flow_state.get('future')
+        if not future or future.done():
+            return
+        
+        future.set_result(user_input)
 
     async def prompt_for_command_confirmation(
         self,
