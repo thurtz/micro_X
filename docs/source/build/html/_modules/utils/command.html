@@ -78,6 +78,33 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 
+<span class="c1"># --- Help Text ---</span>
+<span class="n">HELP_TEXT</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">micro_X Help: Command Categorization</span>
+
+<span class="s2">micro_X categorizes commands to execute them in the most appropriate way. When you run an unknown command, you will be prompted to choose a category.</span>
+
+<span class="s2">Categories:</span>
+<span class="s2">  - simple: For quick commands with direct text output (e.g., ls, pwd, echo).</span>
+<span class="s2">  - semi_interactive: For commands that run longer or have a lot of output (e.g., apt update, ping). They run in a managed tmux window, with output shown upon completion.</span>
+<span class="s2">  - interactive_tui: For full-screen, interactive applications (e.g., nano, vim, htop, ssh). They take over the screen in a tmux window until you exit.</span>
+
+<span class="s2">Forcing Direct Command Execution:</span>
+<span class="s2">  To bypass all AI validation and natural language processing, prefix your command with an exclamation mark (!). This tells micro_X to treat the input as a direct command.</span>
+<span class="s2">  - If the command is already known and categorized, it will be executed immediately.</span>
+<span class="s2">  - If the command is new, this will skip the AI validation and directly open the categorization menu.</span>
+<span class="s2">  - Example (execute a known command): !ls -l</span>
+<span class="s2">  - Example (add a new command): !my-new-command --with-options</span>
+
+<span class="s2">/command &lt;subcommand&gt;</span>
+<span class="s2">  - The &#39;/command&#39; utility (an alias for &#39;/utils command&#39;) allows you to manage your saved categorizations.</span>
+<span class="s2">  - Usage:</span>
+<span class="s2">    /command list                    - Shows all categorized commands.</span>
+<span class="s2">    /command add &quot;&lt;cmd&gt;&quot; &lt;category&gt;  - Adds or updates a command&#39;s category.</span>
+<span class="s2">    /command remove &quot;&lt;cmd&gt;&quot;          - Removes a command from your user settings.</span>
+<span class="s2">    /command move &quot;&lt;cmd&gt;&quot; &lt;new_cat&gt;  - Moves a command to a different category.</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
 <span class="c1"># --- Path Setup ---</span>
 <span class="c1"># Add the project root to the Python path to allow importing from &#39;modules&#39;</span>
 <span class="k">try</span><span class="p">:</span>
@@ -100,6 +127,13 @@
 <a class="viewcode-back" href="../../api_reference.html#utils.command.main">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Main function to parse arguments and execute command management.&quot;&quot;&quot;</span>
+    <span class="k">class</span><span class="w"> </span><span class="nc">HelpAction</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option_strings</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="nb">super</span><span class="p">(</span><span class="n">HelpAction</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">option_strings</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">HELP_TEXT</span><span class="p">)</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">exit</span><span class="p">()</span>
+
     <span class="c1"># Initialize the category manager to load categories and set up paths</span>
     <span class="c1"># This is crucial for all other functions in the module to work correctly.</span>
     <span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)))</span>
@@ -107,16 +141,10 @@
 
     <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
         <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Manage command categorizations for micro_X.&quot;</span><span class="p">,</span>
-        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">RawTextHelpFormatter</span><span class="p">,</span>
-        <span class="n">epilog</span><span class="o">=</span><span class="p">(</span>
-            <span class="s2">&quot;Examples:</span><span class="se">\n</span><span class="s2">&quot;</span>
-            <span class="s2">&quot;  command.py --add </span><span class="se">\&quot;</span><span class="s2">htop</span><span class="se">\&quot;</span><span class="s2"> interactive_tui</span><span class="se">\n</span><span class="s2">&quot;</span>
-            <span class="s2">&quot;  command.py --remove </span><span class="se">\&quot;</span><span class="s2">htop</span><span class="se">\&quot;\n</span><span class="s2">&quot;</span>
-            <span class="s2">&quot;  command.py --move </span><span class="se">\&quot;</span><span class="s2">ls -l</span><span class="se">\&quot;</span><span class="s2"> simple</span><span class="se">\n</span><span class="s2">&quot;</span>
-            <span class="s2">&quot;  command.py --list</span><span class="se">\n\n</span><span class="s2">&quot;</span>
-            <span class="s2">&quot;Categories can be specified by name (simple, semi_interactive, interactive_tui) or by number (1, 2, 3).&quot;</span>
-        <span class="p">)</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span>
     <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-h&#39;</span><span class="p">,</span> <span class="s1">&#39;--help&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">HelpAction</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;show this help message and exit&#39;</span><span class="p">)</span>
+
     <span class="n">group</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_mutually_exclusive_group</span><span class="p">(</span><span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
         <span class="s1">&#39;--add&#39;</span><span class="p">,</span>
@@ -140,7 +168,11 @@
         <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;List all currently known commands and their categories.&quot;</span>
     <span class="p">)</span>
-    <span class="c1"># The &#39;run&#39; subcommand is handled by ShellEngine, so it&#39;s not needed here.</span>
+
+    <span class="c1"># If no arguments are provided, print help text</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">HELP_TEXT</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 
     <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
 

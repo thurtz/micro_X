@@ -49,7 +49,6 @@
 <li class="toctree-l2"><a class="reference internal" href="#module-modules.ai_handler">Modules</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#modules.ai_handler.explain_linux_command_with_ai"><code class="docutils literal notranslate"><span class="pre">explain_linux_command_with_ai()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#modules.ai_handler.get_validated_ai_command"><code class="docutils literal notranslate"><span class="pre">get_validated_ai_command()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#modules.ai_handler.is_valid_linux_command_according_to_ai"><code class="docutils literal notranslate"><span class="pre">is_valid_linux_command_according_to_ai()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#modules.category_manager.add_command_to_category"><code class="docutils literal notranslate"><span class="pre">add_command_to_category()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#modules.category_manager.classify_command"><code class="docutils literal notranslate"><span class="pre">classify_command()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#modules.category_manager.handle_command_subsystem_input"><code class="docutils literal notranslate"><span class="pre">handle_command_subsystem_input()</span></code></a></li>
@@ -69,6 +68,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#modules.curses_ui_manager.CursesUIManager.get_key_bindings"><code class="docutils literal notranslate"><span class="pre">CursesUIManager.get_key_bindings()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.curses_ui_manager.CursesUIManager.initialize_ui_elements"><code class="docutils literal notranslate"><span class="pre">CursesUIManager.initialize_ui_elements()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.curses_ui_manager.CursesUIManager.invalidate"><code class="docutils literal notranslate"><span class="pre">CursesUIManager.invalidate()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#modules.curses_ui_manager.CursesUIManager.prompt_for_api_input"><code class="docutils literal notranslate"><span class="pre">CursesUIManager.prompt_for_api_input()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.curses_ui_manager.CursesUIManager.prompt_for_command_confirmation"><code class="docutils literal notranslate"><span class="pre">CursesUIManager.prompt_for_command_confirmation()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.curses_ui_manager.CursesUIManager.prompt_for_hung_task"><code class="docutils literal notranslate"><span class="pre">CursesUIManager.prompt_for_hung_task()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.curses_ui_manager.CursesUIManager.run_async"><code class="docutils literal notranslate"><span class="pre">CursesUIManager.run_async()</span></code></a></li>
@@ -100,6 +100,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#modules.shell_engine.ShellEngine"><code class="docutils literal notranslate"><span class="pre">ShellEngine</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#modules.shell_engine.ShellEngine.execute_command_in_tmux"><code class="docutils literal notranslate"><span class="pre">ShellEngine.execute_command_in_tmux()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.shell_engine.ShellEngine.execute_shell_command"><code class="docutils literal notranslate"><span class="pre">ShellEngine.execute_shell_command()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#modules.shell_engine.ShellEngine.get_user_input_from_api"><code class="docutils literal notranslate"><span class="pre">ShellEngine.get_user_input_from_api()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.shell_engine.ShellEngine.handle_built_in_command"><code class="docutils literal notranslate"><span class="pre">ShellEngine.handle_built_in_command()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.shell_engine.ShellEngine.handle_cd_command"><code class="docutils literal notranslate"><span class="pre">ShellEngine.handle_cd_command()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.shell_engine.ShellEngine.kill_current_process"><code class="docutils literal notranslate"><span class="pre">ShellEngine.kill_current_process()</span></code></a></li>
@@ -114,6 +115,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#modules.ui_manager.UIManager.get_app_instance"><code class="docutils literal notranslate"><span class="pre">UIManager.get_app_instance()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.ui_manager.UIManager.get_key_bindings"><code class="docutils literal notranslate"><span class="pre">UIManager.get_key_bindings()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.ui_manager.UIManager.initialize_ui_elements"><code class="docutils literal notranslate"><span class="pre">UIManager.initialize_ui_elements()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#modules.ui_manager.UIManager.prompt_for_api_input"><code class="docutils literal notranslate"><span class="pre">UIManager.prompt_for_api_input()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.ui_manager.UIManager.prompt_for_caution_confirmation"><code class="docutils literal notranslate"><span class="pre">UIManager.prompt_for_caution_confirmation()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.ui_manager.UIManager.prompt_for_command_confirmation"><code class="docutils literal notranslate"><span class="pre">UIManager.prompt_for_command_confirmation()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#modules.ui_manager.UIManager.prompt_for_hung_task"><code class="docutils literal notranslate"><span class="pre">UIManager.prompt_for_hung_task()</span></code></a></li>
@@ -127,19 +129,17 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#module-utils.alias">Utils</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#utils.alias.get_project_root"><code class="docutils literal notranslate"><span class="pre">get_project_root()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.alias.handle_add_alias"><code class="docutils literal notranslate"><span class="pre">handle_add_alias()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.alias.handle_list_aliases"><code class="docutils literal notranslate"><span class="pre">handle_list_aliases()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.alias.handle_remove_alias"><code class="docutils literal notranslate"><span class="pre">handle_remove_alias()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#utils.alias.load_aliases"><code class="docutils literal notranslate"><span class="pre">load_aliases()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.alias.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#utils.alias.save_user_aliases"><code class="docutils literal notranslate"><span class="pre">save_user_aliases()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.command.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.config_manager.ConfigManagerHTTPRequestHandler"><code class="docutils literal notranslate"><span class="pre">ConfigManagerHTTPRequestHandler</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#utils.config_manager.ConfigManagerHTTPRequestHandler.do_POST"><code class="docutils literal notranslate"><span class="pre">ConfigManagerHTTPRequestHandler.do_POST()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.config_manager.find_free_port"><code class="docutils literal notranslate"><span class="pre">find_free_port()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#utils.config_manager.get_current_branch"><code class="docutils literal notranslate"><span class="pre">get_current_branch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.config_manager.get_dynamic_tmux_session_name"><code class="docutils literal notranslate"><span class="pre">get_dynamic_tmux_session_name()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.config_manager.get_preferred_port_for_branch"><code class="docutils literal notranslate"><span class="pre">get_preferred_port_for_branch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.config_manager.get_project_root"><code class="docutils literal notranslate"><span class="pre">get_project_root()</span></code></a></li>
@@ -149,13 +149,14 @@
 <li class="toctree-l3"><a class="reference internal" href="#utils.config_manager.start_server_thread"><code class="docutils literal notranslate"><span class="pre">start_server_thread()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.config_manager.stop_server_tmux_session"><code class="docutils literal notranslate"><span class="pre">stop_server_tmux_session()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.activate_dev_environment"><code class="docutils literal notranslate"><span class="pre">activate_dev_environment()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#utils.dev.get_project_root"><code class="docutils literal notranslate"><span class="pre">get_project_root()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#utils.dev.find_environment_root"><code class="docutils literal notranslate"><span class="pre">find_environment_root()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.load_configuration"><code class="docutils literal notranslate"><span class="pre">load_configuration()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.merge_configs"><code class="docutils literal notranslate"><span class="pre">merge_configs()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.run_command"><code class="docutils literal notranslate"><span class="pre">run_command()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.run_tests_for_branch"><code class="docutils literal notranslate"><span class="pre">run_tests_for_branch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.snapshot_for_branch"><code class="docutils literal notranslate"><span class="pre">snapshot_for_branch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#utils.dev.update_docs_for_branch"><code class="docutils literal notranslate"><span class="pre">update_docs_for_branch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.update_single_branch"><code class="docutils literal notranslate"><span class="pre">update_single_branch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.generate_snapshot.extract_api_documentation"><code class="docutils literal notranslate"><span class="pre">extract_api_documentation()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.generate_snapshot.generate_snapshot"><code class="docutils literal notranslate"><span class="pre">generate_snapshot()</span></code></a></li>
@@ -165,7 +166,6 @@
 <li class="toctree-l3"><a class="reference internal" href="#utils.generate_tree.generate_file_tree"><code class="docutils literal notranslate"><span class="pre">generate_file_tree()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.help.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.install_requirements.install_requirements"><code class="docutils literal notranslate"><span class="pre">install_requirements()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#utils.list_scripts.get_project_root"><code class="docutils literal notranslate"><span class="pre">get_project_root()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.list_scripts.get_scripts_from_directory"><code class="docutils literal notranslate"><span class="pre">get_scripts_from_directory()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.list_scripts.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.ollama_cli.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
@@ -184,6 +184,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#utils.setup_dev_env.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.update.get_file_hash"><code class="docutils literal notranslate"><span class="pre">get_file_hash()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.update.get_project_root"><code class="docutils literal notranslate"><span class="pre">get_project_root()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#utils.update.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.update.run_update"><code class="docutils literal notranslate"><span class="pre">run_update()</span></code></a></li>
 </ul>
 </li>
@@ -222,7 +223,7 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="modules.ai_handler.explain_linux_command_with_ai">
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modules.ai_handler.</span></span><span class="sig-name descname"><span class="pre">explain_linux_command_with_ai</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command_to_explain</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config_param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">append_output_func</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/modules/ai_handler.html#explain_linux_command_with_ai"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ai_handler.explain_linux_command_with_ai" title="Link to this definition"></a></dt>
-<dd><p>Uses an AI model to explain a given Linux command.</p>
+<dd><p>Wrapper that calls the LangChain-based explanation utility.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -241,52 +242,24 @@ message/None on error.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="modules.ai_handler.get_validated_ai_command">
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modules.ai_handler.</span></span><span class="sig-name descname"><span class="pre">get_validated_ai_command</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">human_query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config_param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">append_output_func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_app_func</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/modules/ai_handler.html#get_validated_ai_command"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ai_handler.get_validated_ai_command" title="Link to this definition"></a></dt>
-<dd><p>Translates a natural language query into a validated shell command.</p>
-<p>This function orchestrates a multi-step process:</p>
-<ol class="arabic simple">
-<li><p>It tries the ‘primary_translator’ AI to get a command.</p></li>
-<li><p>If successful, it validates the command using
-<cite>is_valid_linux_command_according_to_ai</cite>.</p></li>
-<li><p>If the primary translator or validation fails, it can fall back to a
-‘direct_translator’ AI if configured.</p></li>
-<li><p>This cycle repeats for a configured number of attempts.</p></li>
-</ol>
+<dd><p>Translates a natural language query into a validated shell command using the LangGraph agent.</p>
+<p>This function now acts as a simple wrapper, delegating the entire complex workflow
+of translation, validation, and retries to the LangGraph agent implemented in <cite>lc_agent.py</cite>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>human_query</strong> (<em>str</em>) – The user’s natural language query.</p></li>
 <li><p><strong>config_param</strong> (<em>dict</em>) – The main application configuration object.</p></li>
-<li><p><strong>append_output_func</strong> – A reference to UIManager.append_output for UI updates.</p></li>
-<li><p><strong>get_app_func</strong> – A reference to UIManager.get_app_instance for UI invalidation.</p></li>
+<li><p><strong>append_output_func</strong> – A reference to UIManager.append_output for UI updates (passed for compatibility).</p></li>
+<li><p><strong>get_app_func</strong> – A reference to UIManager.get_app_instance for UI invalidation (passed for compatibility).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>A tuple containing the validated command
-and the raw AI response. The command is None if no valid command could
-be produced.</p>
+and the raw AI response from the agent’s final step.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>tuple[str | None, str | None]</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="modules.ai_handler.is_valid_linux_command_according_to_ai">
-<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modules.ai_handler.</span></span><span class="sig-name descname"><span class="pre">is_valid_linux_command_according_to_ai</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config_param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/modules/ai_handler.html#is_valid_linux_command_according_to_ai"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ai_handler.is_valid_linux_command_according_to_ai" title="Link to this definition"></a></dt>
-<dd><p>Asks the Validator AI model if the given text is a likely Linux command.</p>
-<p>Performs multiple validation attempts as configured and returns a boolean
-based on a majority vote of the AI’s ‘yes’/’no’ responses.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>command_text</strong> – The string to validate.</p></li>
-<li><p><strong>config_param</strong> – The main application configuration object.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>True if the AI considers it a command, False if not.
-None if the result is inconclusive after all attempts.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -496,6 +469,12 @@ prompt_toolkit is not available.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="modules.curses_ui_manager.CursesUIManager.prompt_for_api_input">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">prompt_for_api_input</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prompt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/modules/curses_ui_manager.html#CursesUIManager.prompt_for_api_input"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.curses_ui_manager.CursesUIManager.prompt_for_api_input" title="Link to this definition"></a></dt>
+<dd><p>Initiates a flow to get input from the user for an API request.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="modules.curses_ui_manager.CursesUIManager.prompt_for_command_confirmation">
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">prompt_for_command_confirmation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command_to_confirm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">display_source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_input_accept_handler_ref</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/modules/curses_ui_manager.html#CursesUIManager.prompt_for_command_confirmation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.curses_ui_manager.CursesUIManager.prompt_for_command_confirmation" title="Link to this definition"></a></dt>
 <dd><p>Initiates the interactive flow for confirming an AI-generated command.</p>
@@ -521,7 +500,7 @@ prompt_toolkit is not available.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modules.curses_ui_manager.CursesUIManager.set_flow_input_mode">
-<span class="sig-name descname"><span class="pre">set_flow_input_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prompt_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accept_handler_func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_categorization</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_confirmation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/modules/curses_ui_manager.html#CursesUIManager.set_flow_input_mode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.curses_ui_manager.CursesUIManager.set_flow_input_mode" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">set_flow_input_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prompt_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accept_handler_func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_categorization</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_confirmation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_api_input</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/modules/curses_ui_manager.html#CursesUIManager.set_flow_input_mode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.curses_ui_manager.CursesUIManager.set_flow_input_mode" title="Link to this definition"></a></dt>
 <dd><p>Sets the UI to a special flow input mode.</p>
 </dd></dl>
 
@@ -725,6 +704,13 @@ for execution based on their category.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="modules.shell_engine.ShellEngine.get_user_input_from_api">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_user_input_from_api</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prompt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/modules/shell_engine.html#ShellEngine.get_user_input_from_api"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.shell_engine.ShellEngine.get_user_input_from_api" title="Link to this definition"></a></dt>
+<dd><p>API endpoint to request user input from a script.
+This interacts with the UI manager to get input from the user.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="modules.shell_engine.ShellEngine.handle_built_in_command">
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">handle_built_in_command</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">user_input</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/modules/shell_engine.html#ShellEngine.handle_built_in_command"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.shell_engine.ShellEngine.handle_built_in_command" title="Link to this definition"></a></dt>
 <dd><p>Handles built-in commands like /help, /exit, /update, /utils, /ollama, and /command.</p>
@@ -764,7 +750,7 @@ Returns the command if safe, None if blocked.</p>
 <dd><p>The main entry point for processing all user input that isn’t a simple built-in.</p>
 <p>It orchestrates the flow:</p>
 <ol class="arabic simple">
-<li><p>Handles <cite>/ai</cite> queries by calling the AI handler.</p></li>
+<li><p>Handles <cite>/translate</cite> queries by calling the AI handler.</p></li>
 <li><p>Processes direct command input from the user.</p></li>
 <li><p>For unknown commands, it uses the AI validator and may treat the input
 as a natural language query.</p></li>
@@ -785,7 +771,7 @@ the user chose to modify an AI suggestion.</p></li>
 
 <dl class="py class" id="module-modules.ui_manager">
 <dt class="sig sig-object py" id="modules.ui_manager.UIManager">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modules.ui_manager.</span></span><span class="sig-name descname"><span class="pre">UIManager</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/modules/ui_manager.html#UIManager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ui_manager.UIManager" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">modules.ui_manager.</span></span><span class="sig-name descname"><span class="pre">UIManager</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shell_engine_instance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/modules/ui_manager.html#UIManager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ui_manager.UIManager" title="Link to this definition"></a></dt>
 <dd><p>The main class for managing the application’s UI.</p>
 <p>Manages the entire <cite>prompt_toolkit</cite> Text User Interface (TUI),
 including input/output fields, keybindings, styling, and coordinating complex,
@@ -839,6 +825,12 @@ multi-step interactive user flows like command categorization and confirmation.<
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="modules.ui_manager.UIManager.prompt_for_api_input">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">prompt_for_api_input</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prompt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/modules/ui_manager.html#UIManager.prompt_for_api_input"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ui_manager.UIManager.prompt_for_api_input" title="Link to this definition"></a></dt>
+<dd><p>Initiates a flow to get input from the user for an API request.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="modules.ui_manager.UIManager.prompt_for_caution_confirmation">
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">prompt_for_caution_confirmation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command_to_confirm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/modules/ui_manager.html#UIManager.prompt_for_caution_confirmation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ui_manager.UIManager.prompt_for_caution_confirmation" title="Link to this definition"></a></dt>
 <dd><p>Initiates a simple Yes/No confirmation for potentially sensitive commands.</p>
@@ -880,8 +872,8 @@ multi-step interactive user flows like command categorization and confirmation.<
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modules.ui_manager.UIManager.set_flow_input_mode">
-<span class="sig-name descname"><span class="pre">set_flow_input_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prompt_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accept_handler_func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_categorization</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_confirmation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/modules/ui_manager.html#UIManager.set_flow_input_mode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ui_manager.UIManager.set_flow_input_mode" title="Link to this definition"></a></dt>
-<dd><p>Sets the UI for a special input flow (categorization or confirmation).</p>
+<span class="sig-name descname"><span class="pre">set_flow_input_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prompt_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accept_handler_func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_categorization</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_confirmation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_api_input</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/modules/ui_manager.html#UIManager.set_flow_input_mode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ui_manager.UIManager.set_flow_input_mode" title="Link to this definition"></a></dt>
+<dd><p>Sets the UI for a special input flow (categorization, confirmation, or API).</p>
 </dd></dl>
 
 <dl class="py method">
@@ -922,12 +914,6 @@ multi-step interactive user flows like command categorization and confirmation.<
 <section id="module-utils.alias">
 <span id="utils"></span><h2>Utils<a class="headerlink" href="#module-utils.alias" title="Link to this heading"></a></h2>
 <dl class="py function">
-<dt class="sig sig-object py" id="utils.alias.get_project_root">
-<span class="sig-prename descclassname"><span class="pre">utils.alias.</span></span><span class="sig-name descname"><span class="pre">get_project_root</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/alias.html#get_project_root"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.alias.get_project_root" title="Link to this definition"></a></dt>
-<dd><p>Determines the project root directory.</p>
-</dd></dl>
-
-<dl class="py function">
 <dt class="sig sig-object py" id="utils.alias.handle_add_alias">
 <span class="sig-prename descclassname"><span class="pre">utils.alias.</span></span><span class="sig-name descname"><span class="pre">handle_add_alias</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_aliases_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/alias.html#handle_add_alias"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.alias.handle_add_alias" title="Link to this definition"></a></dt>
 <dd><p>Handles the –add alias command, modifying only the user aliases.</p>
@@ -946,21 +932,9 @@ multi-step interactive user flows like command categorization and confirmation.<
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="utils.alias.load_aliases">
-<span class="sig-prename descclassname"><span class="pre">utils.alias.</span></span><span class="sig-name descname"><span class="pre">load_aliases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">aliases_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/alias.html#load_aliases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.alias.load_aliases" title="Link to this definition"></a></dt>
-<dd><p>Loads an alias file using the centralized config handler.</p>
-</dd></dl>
-
-<dl class="py function">
 <dt class="sig sig-object py" id="utils.alias.main">
 <span class="sig-prename descclassname"><span class="pre">utils.alias.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/alias.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.alias.main" title="Link to this definition"></a></dt>
 <dd><p>Main function to parse arguments and execute alias management.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="utils.alias.save_user_aliases">
-<span class="sig-prename descclassname"><span class="pre">utils.alias.</span></span><span class="sig-name descname"><span class="pre">save_user_aliases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">aliases_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aliases_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/alias.html#save_user_aliases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.alias.save_user_aliases" title="Link to this definition"></a></dt>
-<dd><p>Saves user aliases using the centralized config handler.</p>
 </dd></dl>
 
 <dl class="py function" id="module-utils.command">
@@ -984,6 +958,12 @@ multi-step interactive user flows like command categorization and confirmation.<
 <dt class="sig sig-object py" id="utils.config_manager.find_free_port">
 <span class="sig-prename descclassname"><span class="pre">utils.config_manager.</span></span><span class="sig-name descname"><span class="pre">find_free_port</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start_port</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_tries</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/utils/config_manager.html#find_free_port"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.config_manager.find_free_port" title="Link to this definition"></a></dt>
 <dd><p>Attempts to find a free port, starting from start_port.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utils.config_manager.get_current_branch">
+<span class="sig-prename descclassname"><span class="pre">utils.config_manager.</span></span><span class="sig-name descname"><span class="pre">get_current_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">project_root</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/utils/config_manager.html#get_current_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.config_manager.get_current_branch" title="Link to this definition"></a></dt>
+<dd><p>Gets the current Git branch name.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -1043,9 +1023,11 @@ If run directly from project root (e.g. for dev), it’s os.getcwd().</p>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="utils.dev.get_project_root">
-<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">get_project_root</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#get_project_root"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.get_project_root" title="Link to this definition"></a></dt>
-<dd><p>Determines the project root directory.</p>
+<dt class="sig sig-object py" id="utils.dev.find_environment_root">
+<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">find_environment_root</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#find_environment_root"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.find_environment_root" title="Link to this definition"></a></dt>
+<dd><p>Determines the root of the multi-branch environment by traversing upwards
+from the current script’s location. The root is the directory that IS the main
+branch and CONTAINS the testing and dev branch directories.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -1075,26 +1057,32 @@ and handles errors. Can optionally capture output.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="utils.dev.run_tests_for_branch">
-<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">run_tests_for_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">project_root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_project_root_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#run_tests_for_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.run_tests_for_branch" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">run_tests_for_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environment_root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_project_root_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#run_tests_for_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.run_tests_for_branch" title="Link to this definition"></a></dt>
 <dd><p>Runs the test suite for a specified branch installation.</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="utils.dev.snapshot_for_branch">
-<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">snapshot_for_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">project_root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_project_root_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#snapshot_for_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.snapshot_for_branch" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">snapshot_for_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environment_root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_project_root_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#snapshot_for_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.snapshot_for_branch" title="Link to this definition"></a></dt>
 <dd><p>Generates a snapshot from a specified branch, passing along extra arguments.</p>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="utils.dev.update_docs_for_branch">
+<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">update_docs_for_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environment_root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_project_root_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#update_docs_for_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.update_docs_for_branch" title="Link to this definition"></a></dt>
+<dd><p>Builds the documentation for a specified branch installation.</p>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="utils.dev.update_single_branch">
-<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">update_single_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">project_root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_dir_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#update_single_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.update_single_branch" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">update_single_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environment_root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_dir_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#update_single_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.update_single_branch" title="Link to this definition"></a></dt>
 <dd><p>Pulls the latest changes for a single specified branch installation.</p>
 </dd></dl>
 
 <dl class="py function" id="module-utils.generate_snapshot">
 <dt class="sig sig-object py" id="utils.generate_snapshot.extract_api_documentation">
 <span class="sig-prename descclassname"><span class="pre">utils.generate_snapshot.</span></span><span class="sig-name descname"><span class="pre">extract_api_documentation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/utils/generate_snapshot.html#extract_api_documentation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.generate_snapshot.extract_api_documentation" title="Link to this definition"></a></dt>
-<dd><p>Extracts the API documentation block from a module file.</p>
+<dd><p>Extracts docstrings from functions, coroutines, and classes in a Python file.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -1178,12 +1166,6 @@ If None (e.g., direct script run), prints to console.</p></li>
 </dd></dl>
 
 <dl class="py function" id="module-utils.list_scripts">
-<dt class="sig sig-object py" id="utils.list_scripts.get_project_root">
-<span class="sig-prename descclassname"><span class="pre">utils.list_scripts.</span></span><span class="sig-name descname"><span class="pre">get_project_root</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/list_scripts.html#get_project_root"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.list_scripts.get_project_root" title="Link to this definition"></a></dt>
-<dd><p>Determines the project root directory.</p>
-</dd></dl>
-
-<dl class="py function">
 <dt class="sig sig-object py" id="utils.list_scripts.get_scripts_from_directory">
 <span class="sig-prename descclassname"><span class="pre">utils.list_scripts.</span></span><span class="sig-name descname"><span class="pre">get_scripts_from_directory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">directory_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/list_scripts.html#get_scripts_from_directory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.list_scripts.get_scripts_from_directory" title="Link to this definition"></a></dt>
 <dd><p>Scans a directory for .py files and returns their base names.</p>
@@ -1296,6 +1278,12 @@ all developer (and by implication, runtime) dependencies.</p>
 <span class="sig-prename descclassname"><span class="pre">utils.update.</span></span><span class="sig-name descname"><span class="pre">get_project_root</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/update.html#get_project_root"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.update.get_project_root" title="Link to this definition"></a></dt>
 <dd><p>Determines the project root directory. Assumes this script is in a ‘utils’
 subdirectory of the project root.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utils.update.main">
+<span class="sig-prename descclassname"><span class="pre">utils.update.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/update.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.update.main" title="Link to this definition"></a></dt>
+<dd><p>Main function to parse arguments and execute logic.</p>
 </dd></dl>
 
 <dl class="py function">

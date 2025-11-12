@@ -10,7 +10,7 @@ micro_X uses tmux (a terminal multiplexer) to run commands categorized as semi_i
   * Your terminal will switch to show the interactive application in a new tmux window.  
   * To return to micro_X, simply exit the application normally (e.g., Ctrl+X in nano).  
 * **semi_interactive commands** (e.g., ping google.com):  
-  * These run in a tmux window, usually in the background.  
+  * These run in a new tmux window. micro_X waits for the command to finish.  
   * Their output is captured and displayed in the micro_X UI after the command completes or times out.
 
 You can manually attach to a running micro_X tmux session from another terminal if needed using tmux attach-session -t \<session_name\>.

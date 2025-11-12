@@ -49,12 +49,12 @@ This list covers core functionality, UI interactions, AI features, and recent re
      * \[ \] Trigger again. Choose "1". At "How to categorize?" prompt, press Ctrl+C. (Should cancel, return to normal prompt).  
      * \[ \] Trigger again. Choose "3" (Modify/Enter new). At "New command:" prompt, press Ctrl+C.  
      * \[ \] Trigger again. Choose "M" (Modify). At "Modified Cmd:" prompt, press Ctrl+C.  
-   * **Command Confirmation Flow:**  
-     * \[ \] Trigger confirmation (e.g., /ai list files).  
-     * \[ \] At "Action: \[Y\]es..." prompt, press Ctrl+C. (Should cancel, return to normal prompt).  
-     * \[ \] Trigger again. Choose "E" (Explain). After explanation, at "Action: \[Y\]es..." prompt, press Ctrl+C.  
-   * **Edit Mode (from Confirmation Flow):**  
-     * \[ \] Trigger confirmation (e.g., /ai show current date).  
+   *   **Command Confirmation Flow:**  
+        * \[ \] Trigger confirmation (e.g., /translate list files).  
+        * \[ \] At "Action: \[Y\]es..." prompt, press Ctrl+C. (Should cancel, return to normal prompt).  
+        * \[ \] Trigger again. Choose "E" (Explain). After explanation, at "Action: \[Y\]es..." prompt, press Ctrl+C.  
+      * **Edit Mode (from Confirmation Flow):**  
+        * \[ \] Trigger confirmation (e.g., /translate show current date).  
      * \[ \] Choose "M" (Modify). Input field should show the command.  
      * \[ \] Press Ctrl+C. (Should cancel edit mode, print "Command editing cancelled", return to normal prompt).  
 
@@ -72,17 +72,17 @@ This list covers core functionality, UI interactions, AI features, and recent re
 
 ## **III. AI Features & Flows:**
 
-### 1. **/ai Command Translation & Confirmation Flow:**  
-   * \[ \] /ai list text files  
+### 1. **/translate Command Translation & Confirmation Flow:**  
+   * \[ \] /translate list text files  
      * \[ \] Choose "Y" (Yes). If command is new, proceed to categorization.  
-   * \[ \] /ai find python files \-\> Choose "Ys" (Simple & Run). Verify execution and categorization.  
-   * \[ \] /ai show running processes \-\> Choose "Ym" (Semi-Interactive & Run). Verify.  
-   * \[ \] /ai open a text editor \-\> Choose "Yi" (TUI & Run). Verify.  
-   * \[ \] /ai what is my ip \-\> Choose "E" (Explain). Review explanation. Then choose "Y" to execute.  
-   * \[ \] /ai delete all .tmp files \-\> Choose "M" (Modify). Change command in input field (e.g., to ls \*.tmp). Press Enter. (Should execute modified command, potentially trigger categorization).  
-   * \[ \] /ai format my hard drive \-\> Choose "C" (Cancel). Verify command is not executed.  
-   * \[ \] /ai with an empty query (should show warning).  
-   * \[ \] /ai with a query the AI might refuse (e.g., /ai tell me a secret). Observe behavior.  
+   * \[ \] /translate find python files \-\> Choose "Ys" (Simple & Run). Verify execution and categorization.  
+   * \[ \] /translate show running processes \-\> Choose "Ym" (Semi-Interactive & Run). Verify.  
+   * \[ \] /translate open a text editor \-\> Choose "Yi" (TUI & Run). Verify.  
+   * \[ \] /translate what is my ip \-\> Choose "E" (Explain). Review explanation. Then choose "Y" to execute.  
+   * \[ \] /translate delete all .tmp files \-\> Choose "M" (Modify). Change command in input field (e.g., to ls \*.tmp). Press Enter. (Should execute modified command, potentially trigger categorization).  
+   * \[ \] /translate format my hard drive \-\> Choose "C" (Cancel). Verify command is not executed.  
+   * \[ \] /translate with an empty query (should show warning).  
+   * \[ \] /translate with a query the AI might refuse (e.g., /translate tell me a secret). Observe behavior.  
 
 ### 2. **Direct Unknown Command \-\> AI Validation \-\> Potential Translation/Categorization:**  
    * \[ \] Type a plausible but unknown command (e.g., list_large_files \--size 10M).  
@@ -98,7 +98,7 @@ This list covers core functionality, UI interactions, AI features, and recent re
 
 ### 3. **Ollama Service Not Ready:**  
    * \[ \] Stop Ollama service manually.  
-   * \[ \] Try /ai list files. Verify "Ollama service is not available" message and guidance.  
+   * \[ \] Try /translate list files. Verify "Ollama service is not available" message and guidance.  
    * \[ \] Try typing an unknown command. Verify message about Ollama not being available for validation/translation and that it proceeds to categorization.
 
 ## **IV. Command Categorization & Execution:**

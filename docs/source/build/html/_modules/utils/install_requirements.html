@@ -82,6 +82,25 @@
 <span class="c1"># --- Module-specific logger ---</span>
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
+<span class="n">HELP_TEXT</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">micro_X Help: Install Requirements</span>
+
+<span class="s2">This utility installs Python dependencies for the micro_X project.</span>
+
+<span class="s2">Usage:</span>
+<span class="s2">  /install_requirements [options]</span>
+
+<span class="s2">Options:</span>
+<span class="s2">  --runtime   - Install runtime dependencies from requirements.txt (default if no other type specified).</span>
+<span class="s2">  --dev       - Install development dependencies from requirements-dev.txt.</span>
+<span class="s2">  --all       - Install both runtime and development dependencies.</span>
+
+<span class="s2">Examples:</span>
+<span class="s2">  /install_requirements --runtime</span>
+<span class="s2">  /install_requirements --dev</span>
+<span class="s2">  /install_requirements --all</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
 <div class="viewcode-block" id="install_requirements">
 <a class="viewcode-back" href="../../api_reference.html#utils.install_requirements.install_requirements">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">install_requirements</span><span class="p">(</span>

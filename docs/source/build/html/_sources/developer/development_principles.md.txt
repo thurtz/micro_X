@@ -31,6 +31,16 @@ This document establishes a set of guiding principles and rules for the ongoing 
 2. **Justification of Changes:** All proposed changes will be accompanied by a clear explanation referencing the Quality Review, a direct user request, or these development principles.  
 3. **Comprehensive Change Logging:** All implemented changes will be logged in the docs/micro\_X\_Code\_Quality\_Review\_Accomplishments.md file, providing a clear audit trail of our progress.
 
+### D. Utility Script Development
+
+1.  **Dual-Environment Execution**: Utility scripts in the `utils/` directory should be written to function both within the micro_X shell and as standalone scripts in a standard shell.
+2.  **API Client Usage**: To achieve this, scripts can use the `utils.shared.api_client.get_input()` function for interactive prompts. This function automatically detects if the script is running inside micro_X by checking for the `MICROX_API_SOCKET` environment variable.
+    *   If the variable is present, it uses the micro_X API to prompt the user.
+    *   If the variable is absent, it falls back to using standard input (`sys.stdin`) and `stderr` for prompts, allowing it to run in any standard shell.
+3.  **Standalone Execution**: When running a utility script directly from a standard shell, it must be executed as a module to ensure Python's import system can correctly locate other modules within the project (like `api_client`).
+    *   **Correct**: `python -m utils.your_script_name`
+    *   **Incorrect**: `python utils/your_script_name.py`
+
 ## **4\. Review and Amendment**
 
 These principles are a living document. They can be reviewed, discussed, and amended at any time through our dialogue to better suit the project's evolving needs.

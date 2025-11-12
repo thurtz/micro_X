@@ -37,6 +37,9 @@ Running Tests:
   --run-tests-testing     - Runs the test suite in the testing branch environment.
   --run-tests-dev         - Runs the test suite in the dev branch environment.
   --run-tests-all         - Runs the test suites for all three branches.
+
+Documentation:
+  --update-docs           - Builds the documentation in the dev branch.
 """
 
 # --- Configuration ---
@@ -342,6 +345,28 @@ def run_tests_for_branch(environment_root, branch_name, branch_project_root_path
     
     run_command(test_command, branch_project_root_path, f"Running tests for {branch_name}")
 
+def update_docs_for_branch(environment_root, branch_name, branch_project_root_path):
+    """Builds the documentation for a specified branch installation."""
+    branch_dir_name = os.path.basename(branch_project_root_path)
+    print(f"📚 Building documentation for the '{branch_name}' environment...")
+    
+    if not os.path.isdir(branch_project_root_path):
+        print(f"❌ Error: Directory '{branch_dir_name}' not found.")
+        if branch_name != 'main':
+            print("   Please run '/dev --activate' first.")
+        return
+
+    python_executable = os.path.join(branch_project_root_path, '.venv', 'bin', 'python')
+    update_docs_script = os.path.join(branch_project_root_path, 'utils', 'update_docs.py')
+
+    if not os.path.isfile(python_executable) or not os.path.isfile(update_docs_script):
+        print(f"❌ Error: '{branch_dir_name}' environment is incomplete. Python executable or update_docs.py is missing.")
+        return
+
+    update_command = [python_executable, update_docs_script]
+    
+    run_command(update_command, branch_project_root_path, f"Building documentation for {branch_name}")
+
 def main():
     """Main function to parse arguments and execute logic."""
     class HelpAction(argparse.Action):
@@ -407,6 +432,10 @@ def main():
         "--run-tests-all", action="store_true",
         help="Runs the test suites for the main, testing, and dev branches."
     )
+    action_group.add_argument(
+        "--update-docs", action="store_true",
+        help="Builds the documentation in the dev branch."
+    )
 
     # If no arguments are provided, print help text
     if len(sys.argv) == 1:
@@ -467,6 +496,8 @@ def main():
         run_tests_for_branch(environment_root, "testing", os.path.join(environment_root, TESTING_BRANCH_DIR_NAME))
         run_tests_for_branch(environment_root, "dev", os.path.join(environment_root, DEV_BRANCH_DIR_NAME))
         print("\n✅ All test suites have been run.")
+    elif args.update_docs:
+        update_docs_for_branch(environment_root, "dev", os.path.join(environment_root, DEV_BRANCH_DIR_NAME))
 
 if __name__ == "__main__":
     main()

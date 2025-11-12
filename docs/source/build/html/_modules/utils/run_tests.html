@@ -81,6 +81,25 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span> <span class="c1"># Added for help argument handling</span>
 
+<span class="c1"># --- Help Text ---</span>
+<span class="n">HELP_TEXT</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">micro_X Help: /test Utility</span>
+
+<span class="s2">This utility runs the pytest test suite for the micro_X project and saves the sanitized results to the &#39;pytest_results&#39; directory.</span>
+
+<span class="s2">Usage:</span>
+<span class="s2">  /test</span>
+
+<span class="s2">The script will:</span>
+<span class="s2">- Automatically locate the pytest executable within the project&#39;s .venv.</span>
+<span class="s2">- Run all tests found in the &#39;tests/&#39; directory.</span>
+<span class="s2">- Sanitize the output by replacing local paths with placeholders like &lt;PROJECT_ROOT&gt; and &lt;HOME&gt;.</span>
+<span class="s2">- Save the full, sanitized output to:</span>
+<span class="s2">  - pytest_results/pytest_results.txt (for the latest run)</span>
+<span class="s2">  - pytest_results/pytest_results_&lt;timestamp&gt;.txt (as an archive)</span>
+<span class="s2">- Print a summary of the test results to the console.</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
 <span class="c1"># --- Configuration ---</span>
 <span class="n">RESULTS_DIR_NAME</span> <span class="o">=</span> <span class="s2">&quot;pytest_results&quot;</span>
 <span class="n">FIXED_RESULTS_FILENAME</span> <span class="o">=</span> <span class="s2">&quot;pytest_results.txt&quot;</span>
@@ -327,20 +346,25 @@
         <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(filename)s</span><span class="s1">:</span><span class="si">%(lineno)d</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span>
     <span class="p">)</span>
 
+    <span class="k">class</span><span class="w"> </span><span class="nc">HelpAction</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option_strings</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="nb">super</span><span class="p">(</span><span class="n">HelpAction</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">option_strings</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">HELP_TEXT</span><span class="p">)</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">exit</span><span class="p">()</span>
+
     <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
         <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Run pytest for the micro_X project and save sanitized results.&quot;</span><span class="p">,</span>
-        <span class="n">epilog</span><span class="o">=</span><span class="s2">&quot;This script is typically run via &#39;/utils run_tests&#39; from within the micro_X shell, &quot;</span>
-               <span class="s2">&quot;or directly for development purposes. It expects pytest to be installed in the &#39;.venv&#39; &quot;</span>
-               <span class="s2">&quot;of the project root.&quot;</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span>
     <span class="p">)</span>
-    <span class="c1"># This script doesn&#39;t take functional arguments other than -h/--help for now.</span>
-    <span class="c1"># If arguments were to be added (e.g., to pass to pytest), they&#39;d be defined here.</span>
-    <span class="c1"># parser.add_argument(&quot;--pytest-args&quot;, help=&quot;Additional arguments to pass to pytest&quot;, nargs=argparse.REMAINDER)</span>
-    
-    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span> <span class="c1"># Handles -h/--help</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-h&#39;</span><span class="p">,</span> <span class="s1">&#39;--help&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">HelpAction</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;show this help message and exit&#39;</span><span class="p">)</span>
 
-    <span class="n">exit_code</span> <span class="o">=</span> <span class="n">run_tests_main_logic</span><span class="p">()</span>
-    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">exit_code</span><span class="p">)</span>
+    <span class="c1"># If no arguments are provided, run the script, otherwise print help</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">exit_code</span> <span class="o">=</span> <span class="n">run_tests_main_logic</span><span class="p">()</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">exit_code</span><span class="p">)</span>
 </pre></div>
 
            </div>
