@@ -40,6 +40,7 @@ This document establishes a set of guiding principles and rules for the ongoing 
 3.  **Standalone Execution**: When running a utility script directly from a standard shell, it must be executed as a module to ensure Python's import system can correctly locate other modules within the project (like `api_client`).
     *   **Correct**: `python -m utils.your_script_name`
     *   **Incorrect**: `python utils/your_script_name.py`
+4.  **Building Documentation**: To build the documentation, use the `/dev --update-docs` command. This command ensures that the documentation is always built from the `dev` branch, even if you are currently on a different branch. It executes the build process within the `micro_X-dev` directory.
 
 ## **4\. Review and Amendment**
 
