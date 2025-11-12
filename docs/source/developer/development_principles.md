@@ -23,6 +23,7 @@ This document establishes a set of guiding principles and rules for the ongoing 
 
 1. **Test-Driven Changes:** All bug fixes must be accompanied by a new or updated test that replicates the bug and confirms the fix. Any new logic added during refactoring must be covered by corresponding unit tests.  
 2. **Documentation First:** All significant changes to behavior, architecture, or user-facing features must be documented *before* or *alongside* the code implementation. This includes keeping README.md, the User Guide, and this principles document up-to-date.  
+    *   **Building Documentation**: To build the documentation, use the `/dev --update-docs` command. This command ensures that the documentation is always built from the `dev` branch, even if you are currently on a different branch. It executes the build process within the `micro_X-dev` directory.
 3. **Adherence to Architecture:** New or modified code must respect the existing modular design of the project. Logic should be placed in the appropriate module (e.g., UI logic in ui\_manager, Git logic in git\_context\_manager). Developing micro_X commands should be done with prioritizing their integration as a utility and an alias rather than hardcoded in the base.
 
 ### **C. Collaboration and Process**
@@ -40,7 +41,6 @@ This document establishes a set of guiding principles and rules for the ongoing 
 3.  **Standalone Execution**: When running a utility script directly from a standard shell, it must be executed as a module to ensure Python's import system can correctly locate other modules within the project (like `api_client`).
     *   **Correct**: `python -m utils.your_script_name`
     *   **Incorrect**: `python utils/your_script_name.py`
-4.  **Building Documentation**: To build the documentation, use the `/dev --update-docs` command. This command ensures that the documentation is always built from the `dev` branch, even if you are currently on a different branch. It executes the build process within the `micro_X-dev` directory.
 
 ## **4\. Review and Amendment**
 
