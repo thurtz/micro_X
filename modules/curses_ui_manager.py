@@ -303,9 +303,11 @@ class CursesUIManager:
     def _ask_hung_task_choice(self, hung_command: str):
         self.append_output(f"\n⚠️ The command '{hung_command}' is taking a long time.", 'warning')
         self.append_output("   What would you like to do?", 'categorize-prompt')
-        self.append_output("   [K]ill the command | [I]gnore and continue waiting | [C]ancel your new command", 'categorize-prompt')
+        self.append_output("  [1] Kill the command", 'categorize-prompt')
+        self.append_output("  [2] Ignore and continue waiting", 'categorize-prompt')
+        self.append_output("  [3] Cancel your new command", 'categorize-prompt')
         self.set_flow_input_mode(
-            prompt_text="[Hung Task] Choice (K/I/C): ",
+            prompt_text="[Hung Task] Choice (1-3): ",
             accept_handler_func=self._handle_hung_task_response,
             is_confirmation=True
         )
@@ -316,14 +318,14 @@ class CursesUIManager:
         if not future or future.done():
             return
 
-        if response in ['k', 'kill']:
+        if response in ['1', 'k', 'kill']:
             future.set_result({'action': 'kill'})
-        elif response in ['i', 'ignore']:
+        elif response in ['2', 'i', 'ignore']:
             future.set_result({'action': 'ignore'})
-        elif response in ['c', 'cancel']:
+        elif response in ['3', 'c', 'cancel']:
             future.set_result({'action': 'cancel'})
         else:
-            self.append_output("Invalid choice. Please enter K, I, or C.", 'error')
+            self.append_output("Invalid choice. Please enter 1, 2, or 3.", 'error')
 
     async def prompt_for_api_input(self, prompt: str) -> str:
         """Initiates a flow to get input from the user for an API request."""
@@ -517,7 +519,11 @@ class CursesUIManager:
         proposed = self.categorization_flow_state['command_initially_proposed']
         original = self.categorization_flow_state['original_direct_input']
         self.append_output(f"\nSystem processed to: '{proposed}'\nOriginal input was: '{original}'", 'categorize-info')
-        self.append_output(f"Which version to categorize?\n  1: Processed ('{proposed}')\n  2: Original ('{original}')\n  3: Modify/Enter new command\n  4: Cancel categorization", 'categorize-prompt')
+        self.append_output("Which version to categorize?", 'categorize-prompt')
+        self.append_output(f"  [1] Processed ('{proposed}')", 'categorize-prompt')
+        self.append_output(f"  [2] Original ('{original}')", 'categorize-prompt')
+        self.append_output("  [3] Modify/Enter new command", 'categorize-prompt')
+        self.append_output("  [4] Cancel categorization", 'categorize-prompt')
         self.set_flow_input_mode(
             prompt_text="[Categorize] Choice (1-4): ",
             accept_handler_func=self._handle_step_0_5_response,
@@ -565,7 +571,13 @@ class CursesUIManager:
         cmd_display = self.categorization_flow_state['command_to_add_final']
         default_cat_name = self.config['behavior']['default_category_for_unclassified']
         self.append_output(f"\nCommand to categorize: '{cmd_display}'", 'categorize-info')
-        self.append_output(f"How to categorize this command?\n  1: simple | 2: semi_interactive | 3: interactive_tui\n  M: Modify command before categorizing\n  D: Execute as default '{default_cat_name}' (once, no save)\n  C: Cancel categorization & execution", 'categorize-prompt')
+        self.append_output("How to categorize this command?", 'categorize-prompt')
+        self.append_output("  [1] simple", 'categorize-prompt')
+        self.append_output("  [2] semi_interactive", 'categorize-prompt')
+        self.append_output("  [3] interactive_tui", 'categorize-prompt')
+        self.append_output("  [M] Modify command before categorizing", 'categorize-prompt')
+        self.append_output(f"  [D] Execute as default '{default_cat_name}' (once, no save)", 'categorize-prompt')
+        self.append_output("  [C] Cancel categorization & execution", 'categorize-prompt')
         self.set_flow_input_mode(
             prompt_text="[Categorize] Action (1-3/M/D/C): ",
             accept_handler_func=self._handle_step_1_main_action_response,
@@ -607,7 +619,9 @@ class CursesUIManager:
     def _ask_step_4_5_category_for_modified(self):
         cmd_to_categorize = self.categorization_flow_state['command_to_add_final']
         self.append_output(f"\nCategory for command: '{cmd_to_categorize}'", 'categorize-info')
-        self.append_output(f"  1: simple | 2: semi_interactive | 3: interactive_tui", 'categorize-prompt')
+        self.append_output("  [1] simple", 'categorize-prompt')
+        self.append_output("  [2] semi_interactive", 'categorize-prompt')
+        self.append_output("  [3] interactive_tui", 'categorize-prompt')
         self.set_flow_input_mode(
             prompt_text="[Categorize] Category (1-3): ",
             accept_handler_func=self._handle_step_4_5_response,

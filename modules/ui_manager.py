@@ -241,9 +241,11 @@ class UIManager:
     def _ask_hung_task_choice(self, hung_command: str):
         self.append_output(f"\n⚠️ The command '{hung_command}' is taking a long time.", style_class='warning')
         self.append_output("   What would you like to do?", style_class='categorize-prompt')
-        self.append_output("   [K]ill the command | [I]gnore and continue waiting | [C]ancel your new command", style_class='categorize-prompt')
+        self.append_output("  [1] Kill the command", style_class='categorize-prompt')
+        self.append_output("  [2] Ignore and continue waiting", style_class='categorize-prompt')
+        self.append_output("  [3] Cancel your new command", style_class='categorize-prompt')
         self.set_flow_input_mode(
-            prompt_text="[Hung Task] Choice (K/I/C): ",
+            prompt_text="[Hung Task] Choice (1-3): ",
             accept_handler_func=self._handle_hung_task_response,
             is_confirmation=True # Re-use confirmation flag to lock scrolling etc.
         )
@@ -254,14 +256,14 @@ class UIManager:
         if not future or future.done():
             return
 
-        if response in ['k', 'kill']:
+        if response in ['1', 'k', 'kill']:
             future.set_result({'action': 'kill'})
-        elif response in ['i', 'ignore']:
+        elif response in ['2', 'i', 'ignore']:
             future.set_result({'action': 'ignore'})
-        elif response in ['c', 'cancel']:
+        elif response in ['3', 'c', 'cancel']:
             future.set_result({'action': 'cancel'})
         else:
-            self.append_output("Invalid choice. Please enter K, I, or C.", style_class='error')
+            self.append_output("Invalid choice. Please enter 1, 2, or 3.", style_class='error')
             # No need to re-ask here, the prompt is still visible. The handler will just be called again.
 
     # --- Caution Confirmation Flow ---
@@ -405,7 +407,11 @@ class UIManager:
 
         if original and original.strip() != proposed.strip():
             append_output_func(f"\nSystem processed to: '{proposed}'\nOriginal input was: '{original}'", style_class='categorize-info')
-            append_output_func(f"Which version to categorize?\n  1: Processed ('{proposed}')\n  2: Original ('{original}')\n  3: Modify/Enter new command\n  4: Cancel categorization", style_class='categorize-prompt')
+            append_output_func("Which version to categorize?", style_class='categorize-prompt')
+            append_output_func(f"  [1] Processed ('{proposed}')", style_class='categorize-prompt')
+            append_output_func(f"  [2] Original ('{original}')", style_class='categorize-prompt')
+            append_output_func("  [3] Modify/Enter new command", style_class='categorize-prompt')
+            append_output_func("  [4] Cancel categorization", style_class='categorize-prompt')
             self.set_flow_input_mode(
                 prompt_text="[Categorize] Choice (1-4): ",
                 accept_handler_func=self._handle_step_0_5_response,
@@ -458,7 +464,13 @@ class UIManager:
         default_cat_name = self.config['behavior']['default_category_for_unclassified']
         logger.debug(f"UIManager._ask_step_1_main_action: Command for categorization: '{cmd_display}'")
         append_output_func(f"\nCommand to categorize: '{cmd_display}'", style_class='categorize-info')
-        append_output_func(f"How to categorize this command?\n  1: simple             ({CM_CATEGORY_DESCRIPTIONS['simple']})\n  2: semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n  3: interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})\n  M: Modify command before categorizing\n  D: Execute as default '{default_cat_name}' (once, no save)\n  C: Cancel categorization & execution", style_class='categorize-prompt')
+        append_output_func("How to categorize this command?", style_class='categorize-prompt')
+        append_output_func(f"  [1] simple             ({CM_CATEGORY_DESCRIPTIONS['simple']})", style_class='categorize-prompt')
+        append_output_func(f"  [2] semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})", style_class='categorize-prompt')
+        append_output_func(f"  [3] interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})", style_class='categorize-prompt')
+        append_output_func("  [M] Modify command before categorizing", style_class='categorize-prompt')
+        append_output_func(f"  [D] Execute as default '{default_cat_name}' (once, no save)", style_class='categorize-prompt')
+        append_output_func("  [C] Cancel categorization & execution", style_class='categorize-prompt')
         self.set_flow_input_mode(
             prompt_text="[Categorize] Action (1-3/M/D/C): ",
             accept_handler_func=self._handle_step_1_main_action_response,
@@ -543,7 +555,9 @@ class UIManager:
         cmd_to_categorize = self.categorization_flow_state['command_to_add_final']
         logger.debug(f"UIManager: Asking category for modified/final command: '{cmd_to_categorize}'")
         self.append_output(f"\nCategory for command: '{cmd_to_categorize}'", style_class='categorize-info')
-        self.append_output(f"  1: simple             ({CM_CATEGORY_DESCRIPTIONS['simple']})\n  2: semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n  3: interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})", style_class='categorize-prompt')
+        self.append_output(f"  [1] simple             ({CM_CATEGORY_DESCRIPTIONS['simple']})", style_class='categorize-prompt')
+        self.append_output(f"  [2] semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})", style_class='categorize-prompt')
+        self.append_output(f"  [3] interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})", style_class='categorize-prompt')
         self.set_flow_input_mode(
             prompt_text="[Categorize] Category (1-3): ",
             accept_handler_func=self._handle_step_4_5_response,
