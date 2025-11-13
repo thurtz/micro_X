@@ -60,13 +60,13 @@ micro_X provides a text-based user interface (TUI) where you can:
     *   **AI-Powered Command Validation:** Employs a configurable Ollama model to assess command validity.
     *   **AI-Powered Command Explanation:** Request an explanation for AI-generated commands to understand their purpose and potential impact.
     *   **Interactive Command Confirmation:** For AI-generated commands, micro_X prompts for user action:
-        *   `[Y]es`: Execute the command (will prompt for categorization if new).
-        *   `[Ys] Simple & Run`: Execute and categorize as 'simple'.
-        *   `[Ym] Semi-Interactive & Run`: Execute and categorize as 'semi_interactive'.
-        *   `[Yi] TUI & Run`: Execute and categorize as 'interactive_tui'.
-        *   `[E]xplain`: Ask AI to explain before deciding.
-        *   `[M]odify`: Load command into input field for editing.
-        *   `[C]ancel`: Do not execute.
+        *   `[1] Yes`: Execute the command (will prompt for categorization if new).
+        *   `[2] Simple & Run`: Execute and categorize as 'simple'.
+        *   `[3] Semi-Interactive & Run`: Execute and categorize as 'semi_interactive'.
+        *   `[4] TUI & Run`: Execute and categorize as 'interactive_tui'.
+        *   `[5] Explain`: Ask AI to explain before deciding.
+        *   `[6] Modify`: Load command into input field for editing.
+        *   `[7] Cancel`: Do not execute.
 
 *   **Command Categorization & Execution:**
     *   `simple`: Direct execution, output captured in micro_X.
