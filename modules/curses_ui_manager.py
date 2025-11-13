@@ -575,11 +575,11 @@ class CursesUIManager:
         self.append_output("  [1] simple", 'categorize-prompt')
         self.append_output("  [2] semi_interactive", 'categorize-prompt')
         self.append_output("  [3] interactive_tui", 'categorize-prompt')
-        self.append_output("  [M] Modify command before categorizing", 'categorize-prompt')
-        self.append_output(f"  [D] Execute as default '{default_cat_name}' (once, no save)", 'categorize-prompt')
-        self.append_output("  [C] Cancel categorization & execution", 'categorize-prompt')
+        self.append_output("  [4] Modify command before categorizing", 'categorize-prompt')
+        self.append_output(f"  [5] Execute as default '{default_cat_name}' (once, no save)", 'categorize-prompt')
+        self.append_output("  [6] Cancel categorization & execution", 'categorize-prompt')
         self.set_flow_input_mode(
-            prompt_text="[Categorize] Action (1-3/M/D/C): ",
+            prompt_text="[Categorize] Action (1-6): ",
             accept_handler_func=self._handle_step_1_main_action_response,
             is_categorization=True
         )
@@ -593,19 +593,19 @@ class CursesUIManager:
         chosen_category = CM_CATEGORY_MAP.get(response)
         if chosen_category:
             future_to_set.set_result({'action': 'categorize_and_execute', 'command': cmd_to_add, 'category': chosen_category})
-        elif response == 'm':
+        elif response in ['4', 'm']:
             self.append_output(f"\nCurrent command: '{cmd_to_add}'\nEnter your modified command below:", 'categorize-prompt')
             self.set_flow_input_mode(
                 prompt_text="[Categorize] Modified Cmd: ",
                 accept_handler_func=self._handle_step_4_modified_command_response,
                 is_categorization=True
             )
-        elif response == 'd':
+        elif response in ['5', 'd']:
             future_to_set.set_result({'action': 'execute_as_default'})
-        elif response == 'c':
+        elif response in ['6', 'c']:
             future_to_set.set_result({'action': 'cancel_execution'})
         else:
-            self.append_output("Invalid choice. Please enter 1-3, M, D, or C.", 'error')
+            self.append_output("Invalid choice. Please enter 1-6.", 'error')
             self._ask_step_1_main_action()
 
     def _handle_step_4_modified_command_response(self, buff):

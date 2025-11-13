@@ -468,11 +468,11 @@ class UIManager:
         append_output_func(f"  [1] simple             ({CM_CATEGORY_DESCRIPTIONS['simple']})", style_class='categorize-prompt')
         append_output_func(f"  [2] semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})", style_class='categorize-prompt')
         append_output_func(f"  [3] interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})", style_class='categorize-prompt')
-        append_output_func("  [M] Modify command before categorizing", style_class='categorize-prompt')
-        append_output_func(f"  [D] Execute as default '{default_cat_name}' (once, no save)", style_class='categorize-prompt')
-        append_output_func("  [C] Cancel categorization & execution", style_class='categorize-prompt')
+        append_output_func("  [4] Modify command before categorizing", style_class='categorize-prompt')
+        append_output_func(f"  [5] Execute as default '{default_cat_name}' (once, no save)", style_class='categorize-prompt')
+        append_output_func("  [6] Cancel categorization & execution", style_class='categorize-prompt')
         self.set_flow_input_mode(
-            prompt_text="[Categorize] Action (1-3/M/D/C): ",
+            prompt_text="[Categorize] Action (1-6): ",
             accept_handler_func=self._handle_step_1_main_action_response,
             is_categorization=True
         )
@@ -490,21 +490,21 @@ class UIManager:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'categorize_and_execute', 'command': cmd_to_add, 'category': chosen_category})
             valid_choice = True
-        elif response == 'm':
+        elif response in ['4', 'm']:
             self.categorization_flow_state['step'] = 4
             self._ask_step_4_enter_modified_command(base_command=cmd_to_add)
             valid_choice = True
-        elif response == 'd':
+        elif response in ['5', 'd']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_as_default'})
             valid_choice = True
-        elif response == 'c':
+        elif response in ['6', 'c']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'cancel_execution'})
             valid_choice = True
 
         if not valid_choice:
-            append_output_func("Invalid choice. Please enter 1-3, M, D, or C.", style_class='error')
+            append_output_func("Invalid choice. Please enter 1-6, M, D, or C.", style_class='error')
             self._ask_step_1_main_action()
             return
 
