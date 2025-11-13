@@ -238,6 +238,7 @@
     "python utils/setup_brew.py --install",
     "python utils/dev.py --activate",
     "python utils/dev.py --update-docs",
+    "python utils/dev.py --update-docs-kb",
     "python utils/update.py",
     "brew",
     "./setup.sh"
