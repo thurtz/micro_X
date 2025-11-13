@@ -392,11 +392,11 @@ class CursesUIManager:
         self.append_output(f"\n🤖 AI proposed command (from: {source}):", 'ai-query')
         self.append_output(f"    👉 {cmd}", 'executing')
         self.append_output(
-            "Action: [Y]es (Exec, prompt if new) | [Ys] Simple & Run | [Ym] Semi-Interactive & Run | [Yi] TUI & Run | [E]xplain | [M]odify | [C]ancel?",
+            "Action: [1] Yes (Exec, prompt if new) | [2] Simple & Run | [3] Semi-Interactive & Run | [4] TUI & Run | [5] Explain | [6] Modify | [7] Cancel?",
             'categorize-prompt'
         )
         self.set_flow_input_mode(
-            prompt_text="[Confirm AI Cmd] Choice (Y/Ys/Ym/Yi/E/M/C): ",
+            prompt_text="[Confirm AI Cmd] Choice (1-7): ",
             accept_handler_func=self._handle_confirmation_main_choice_response,
             is_confirmation=True
         )
@@ -407,24 +407,24 @@ class CursesUIManager:
         cmd_to_confirm = self.confirmation_flow_state['command_to_confirm']
         if not future_to_set or future_to_set.done():
             return
-        if response in ['y', 'yes']:
+        if response in ['1', 'y', 'yes']:
             future_to_set.set_result({'action': 'execute', 'command': cmd_to_confirm})
-        elif response == 'ys':
+        elif response == '2':
             future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'simple'})
-        elif response == 'ym':
+        elif response == '3':
             future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'semi_interactive'})
-        elif response == 'yi':
+        elif response == '4':
             future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'interactive_tui'})
-        elif response in ['e', 'explain']:
+        elif response in ['5', 'e', 'explain']:
             self.confirmation_flow_state['step'] = 'explain'
             self.input_text = ""
             asyncio.create_task(self._handle_explain_command_async())
-        elif response in ['m', 'modify']:
+        elif response in ['6', 'm', 'modify']:
             future_to_set.set_result({'action': 'edit_mode_engaged', 'command': cmd_to_confirm})
-        elif response in ['c', 'cancel', 'n', 'no']:
+        elif response in ['7', 'c', 'cancel', 'n', 'no']:
             future_to_set.set_result({'action': 'cancel'})
         else:
-            self.append_output("Invalid choice. Please enter Y, Ys, Ym, Yi, E, M, or C.", 'error')
+            self.append_output("Invalid choice. Please enter a number from 1 to 7.", 'error')
             self._ask_confirmation_main_choice()
             return
         self.input_text = ""
@@ -445,8 +445,13 @@ class CursesUIManager:
         cmd = self.confirmation_flow_state['command_to_confirm']
         self.append_output(f"\nCommand to consider: {cmd}", 'executing')
         self.append_output(
-            "Action: [Y]es (Exec, prompt if new) | [Ys] Simple & Run | [Ym] Semi-Interactive & Run | [Yi] TUI & Run | [M]odify | [C]ancel?",
+            "Action: [1] Yes (Exec, prompt if new) | [2] Simple & Run | [3] Semi-Interactive & Run | [4] TUI & Run | [5] Modify | [6] Cancel?",
             'categorize-prompt'
+        )
+        self.set_flow_input_mode(
+            prompt_text="[Confirm AI Cmd] Choice (1-6): ",
+            accept_handler_func=self._handle_confirmation_after_explain_response,
+            is_confirmation=True
         )
 
     def _handle_confirmation_after_explain_response(self, buff):
@@ -455,20 +460,20 @@ class CursesUIManager:
         cmd_to_confirm = self.confirmation_flow_state['command_to_confirm']
         if not future_to_set or future_to_set.done():
             return
-        if response in ['y', 'yes']:
+        if response in ['1', 'y', 'yes']:
             future_to_set.set_result({'action': 'execute', 'command': cmd_to_confirm})
-        elif response == 'ys':
+        elif response == '2':
             future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'simple'})
-        elif response == 'ym':
+        elif response == '3':
             future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'semi_interactive'})
-        elif response == 'yi':
+        elif response == '4':
             future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'interactive_tui'})
-        elif response in ['m', 'modify']:
+        elif response in ['5', 'm', 'modify']:
             future_to_set.set_result({'action': 'edit_mode_engaged', 'command': cmd_to_confirm})
-        elif response in ['c', 'cancel', 'n', 'no']:
+        elif response in ['6', 'c', 'cancel', 'n', 'no']:
             future_to_set.set_result({'action': 'cancel'})
         else:
-            self.append_output("Invalid choice. Please enter Y, Ys, Ym, Yi, M, or C.", 'error')
+            self.append_output("Invalid choice. Please enter a number from 1 to 6.", 'error')
             self._ask_confirmation_after_explain()
             return
         self.input_text = ""

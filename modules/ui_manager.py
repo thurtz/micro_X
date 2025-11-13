@@ -627,10 +627,10 @@ class UIManager:
         
         self.append_output(f"\n🤖 AI proposed command (from: {source}):", style_class='ai-query')
         self.append_output(f"    👉 {cmd}", style_class='executing')
-        self.append_output("Action: [Y]es (Exec, prompt if new) | [Ys] Simple & Run | [Ym] Semi-Interactive & Run | [Yi] TUI & Run | [E]xplain | [M]odify | [C]ancel?", style_class='categorize-prompt')
+        self.append_output("Action: [1] Yes (Exec, prompt if new) | [2] Simple & Run | [3] Semi-Interactive & Run | [4] TUI & Run | [5] Explain | [6] Modify | [7] Cancel?", style_class='categorize-prompt')
 
         self.set_flow_input_mode(
-            prompt_text="[Confirm AI Cmd] Choice (Y/Ys/Ym/Yi/E/M/C): ",
+            prompt_text="[Confirm AI Cmd] Choice (1-7): ",
             accept_handler_func=self._handle_confirmation_main_choice_response,
             is_confirmation=True
         )
@@ -643,37 +643,37 @@ class UIManager:
 
         logger.debug(f"UIManager: Confirmation main choice response: '{response}'")
 
-        if response in ['y', 'yes']:
+        if response in ['1', 'y', 'yes']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute', 'command': cmd_to_confirm})
             valid_choice_made = True
-        elif response == 'ys':
+        elif response == '2':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'simple'})
             valid_choice_made = True
-        elif response == 'ym':
+        elif response == '3':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'semi_interactive'})
             valid_choice_made = True
-        elif response == 'yi':
+        elif response == '4':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'interactive_tui'})
             valid_choice_made = True
-        elif response in ['e', 'explain']:
+        elif response in ['5', 'e', 'explain']:
             self.confirmation_flow_state['step'] = 'explain'
             asyncio.create_task(self._handle_explain_command_async())
             valid_choice_made = True
-        elif response in ['m', 'modify']:
+        elif response in ['6', 'm', 'modify']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'edit_mode_engaged', 'command': cmd_to_confirm})
             valid_choice_made = True
-        elif response in ['c', 'cancel', 'n', 'no']:
+        elif response in ['7', 'c', 'cancel', 'n', 'no']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'cancel'})
             valid_choice_made = True
 
         if not valid_choice_made:
-            self.append_output("Invalid choice. Please enter Y, Ys, Ym, Yi, E, M, or C.", style_class='error')
+            self.append_output("Invalid choice. Please enter a number from 1 to 7.", style_class='error')
             self._ask_confirmation_main_choice()
             return
 
@@ -697,10 +697,10 @@ class UIManager:
     def _ask_confirmation_after_explain(self):
         cmd = self.confirmation_flow_state['command_to_confirm']
         self.append_output(f"\nCommand to consider: {cmd}", style_class='executing')
-        self.append_output("Action: [Y]es (Exec, prompt if new) | [Ys] Simple & Run | [Ym] Semi-Interactive & Run | [Yi] TUI & Run | [M]odify | [C]ancel?", style_class='categorize-prompt')
+        self.append_output("Action: [1] Yes (Exec, prompt if new) | [2] Simple & Run | [3] Semi-Interactive & Run | [4] TUI & Run | [5] Modify | [6] Cancel?", style_class='categorize-prompt')
 
         self.set_flow_input_mode(
-            prompt_text="[Confirm AI Cmd] Choice (Y/Ys/Ym/Yi/M/C): ",
+            prompt_text="[Confirm AI Cmd] Choice (1-6): ",
             accept_handler_func=self._handle_confirmation_after_explain_response,
             is_confirmation=True
         )
@@ -712,33 +712,33 @@ class UIManager:
         valid_choice_made = False
         logger.debug(f"UIManager: Confirmation after explain response: '{response}'")
 
-        if response in ['y', 'yes']:
+        if response in ['1', 'y', 'yes']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute', 'command': cmd_to_confirm})
             valid_choice_made = True
-        elif response == 'ys':
+        elif response == '2':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'simple'})
             valid_choice_made = True
-        elif response == 'ym':
+        elif response == '3':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'semi_interactive'})
             valid_choice_made = True
-        elif response == 'yi':
+        elif response == '4':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'interactive_tui'})
             valid_choice_made = True
-        elif response in ['m', 'modify']:
+        elif response in ['5', 'm', 'modify']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'edit_mode_engaged', 'command': cmd_to_confirm})
             valid_choice_made = True
-        elif response in ['c', 'cancel', 'n', 'no']:
+        elif response in ['6', 'c', 'cancel', 'n', 'no']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'cancel'})
             valid_choice_made = True
 
         if not valid_choice_made:
-            self.append_output("Invalid choice. Please enter Y, Ys, Ym, Yi, M, or C.", style_class='error')
+            self.append_output("Invalid choice. Please enter a number from 1 to 6.", style_class='error')
             self._ask_confirmation_after_explain()
             return
 
