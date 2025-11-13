@@ -391,10 +391,14 @@ class CursesUIManager:
         source = self.confirmation_flow_state['display_source']
         self.append_output(f"\n🤖 AI proposed command (from: {source}):", 'ai-query')
         self.append_output(f"    👉 {cmd}", 'executing')
-        self.append_output(
-            "Action: [1] Yes (Exec, prompt if new) | [2] Simple & Run | [3] Semi-Interactive & Run | [4] TUI & Run | [5] Explain | [6] Modify | [7] Cancel?",
-            'categorize-prompt'
-        )
+        self.append_output("Action:", 'categorize-prompt')
+        self.append_output("  [1] Yes (Exec, prompt if new)", 'categorize-prompt')
+        self.append_output("  [2] Simple & Run", 'categorize-prompt')
+        self.append_output("  [3] Semi-Interactive & Run", 'categorize-prompt')
+        self.append_output("  [4] TUI & Run", 'categorize-prompt')
+        self.append_output("  [5] Explain", 'categorize-prompt')
+        self.append_output("  [6] Modify", 'categorize-prompt')
+        self.append_output("  [7] Cancel", 'categorize-prompt')
         self.set_flow_input_mode(
             prompt_text="[Confirm AI Cmd] Choice (1-7): ",
             accept_handler_func=self._handle_confirmation_main_choice_response,
@@ -444,10 +448,13 @@ class CursesUIManager:
     def _ask_confirmation_after_explain(self):
         cmd = self.confirmation_flow_state['command_to_confirm']
         self.append_output(f"\nCommand to consider: {cmd}", 'executing')
-        self.append_output(
-            "Action: [1] Yes (Exec, prompt if new) | [2] Simple & Run | [3] Semi-Interactive & Run | [4] TUI & Run | [5] Modify | [6] Cancel?",
-            'categorize-prompt'
-        )
+        self.append_output("Action:", 'categorize-prompt')
+        self.append_output("  [1] Yes (Exec, prompt if new)", 'categorize-prompt')
+        self.append_output("  [2] Simple & Run", 'categorize-prompt')
+        self.append_output("  [3] Semi-Interactive & Run", 'categorize-prompt')
+        self.append_output("  [4] TUI & Run", 'categorize-prompt')
+        self.append_output("  [5] Modify", 'categorize-prompt')
+        self.append_output("  [6] Cancel", 'categorize-prompt')
         self.set_flow_input_mode(
             prompt_text="[Confirm AI Cmd] Choice (1-6): ",
             accept_handler_func=self._handle_confirmation_after_explain_response,

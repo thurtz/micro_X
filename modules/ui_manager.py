@@ -627,7 +627,14 @@ class UIManager:
         
         self.append_output(f"\n🤖 AI proposed command (from: {source}):", style_class='ai-query')
         self.append_output(f"    👉 {cmd}", style_class='executing')
-        self.append_output("Action: [1] Yes (Exec, prompt if new) | [2] Simple & Run | [3] Semi-Interactive & Run | [4] TUI & Run | [5] Explain | [6] Modify | [7] Cancel?", style_class='categorize-prompt')
+        self.append_output("Action:", style_class='categorize-prompt')
+        self.append_output("  [1] Yes (Exec, prompt if new)", style_class='categorize-prompt')
+        self.append_output("  [2] Simple & Run", style_class='categorize-prompt')
+        self.append_output("  [3] Semi-Interactive & Run", style_class='categorize-prompt')
+        self.append_output("  [4] TUI & Run", style_class='categorize-prompt')
+        self.append_output("  [5] Explain", style_class='categorize-prompt')
+        self.append_output("  [6] Modify", style_class='categorize-prompt')
+        self.append_output("  [7] Cancel", style_class='categorize-prompt')
 
         self.set_flow_input_mode(
             prompt_text="[Confirm AI Cmd] Choice (1-7): ",
@@ -697,7 +704,13 @@ class UIManager:
     def _ask_confirmation_after_explain(self):
         cmd = self.confirmation_flow_state['command_to_confirm']
         self.append_output(f"\nCommand to consider: {cmd}", style_class='executing')
-        self.append_output("Action: [1] Yes (Exec, prompt if new) | [2] Simple & Run | [3] Semi-Interactive & Run | [4] TUI & Run | [5] Modify | [6] Cancel?", style_class='categorize-prompt')
+        self.append_output("Action:", style_class='categorize-prompt')
+        self.append_output("  [1] Yes (Exec, prompt if new)", style_class='categorize-prompt')
+        self.append_output("  [2] Simple & Run", style_class='categorize-prompt')
+        self.append_output("  [3] Semi-Interactive & Run", style_class='categorize-prompt')
+        self.append_output("  [4] TUI & Run", style_class='categorize-prompt')
+        self.append_output("  [5] Modify", style_class='categorize-prompt')
+        self.append_output("  [6] Cancel", style_class='categorize-prompt')
 
         self.set_flow_input_mode(
             prompt_text="[Confirm AI Cmd] Choice (1-6): ",
