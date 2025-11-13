@@ -156,7 +156,8 @@
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.run_command"><code class="docutils literal notranslate"><span class="pre">run_command()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.run_tests_for_branch"><code class="docutils literal notranslate"><span class="pre">run_tests_for_branch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.snapshot_for_branch"><code class="docutils literal notranslate"><span class="pre">snapshot_for_branch()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#utils.dev.update_docs_for_branch"><code class="docutils literal notranslate"><span class="pre">update_docs_for_branch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#utils.dev.update_docs"><code class="docutils literal notranslate"><span class="pre">update_docs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#utils.dev.update_docs_knowledge_base"><code class="docutils literal notranslate"><span class="pre">update_docs_knowledge_base()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.dev.update_single_branch"><code class="docutils literal notranslate"><span class="pre">update_single_branch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.generate_snapshot.extract_api_documentation"><code class="docutils literal notranslate"><span class="pre">extract_api_documentation()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.generate_snapshot.generate_snapshot"><code class="docutils literal notranslate"><span class="pre">generate_snapshot()</span></code></a></li>
@@ -1068,9 +1069,15 @@ and handles errors. Can optionally capture output.</p>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="utils.dev.update_docs_for_branch">
-<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">update_docs_for_branch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environment_root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_project_root_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#update_docs_for_branch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.update_docs_for_branch" title="Link to this definition"></a></dt>
-<dd><p>Builds the documentation for a specified branch installation.</p>
+<dt class="sig sig-object py" id="utils.dev.update_docs">
+<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">update_docs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environment_root</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#update_docs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.update_docs" title="Link to this definition"></a></dt>
+<dd><p>Builds the Sphinx documentation in the dev branch.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utils.dev.update_docs_knowledge_base">
+<span class="sig-prename descclassname"><span class="pre">utils.dev.</span></span><span class="sig-name descname"><span class="pre">update_docs_knowledge_base</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environment_root</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/dev.html#update_docs_knowledge_base"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.dev.update_docs_knowledge_base" title="Link to this definition"></a></dt>
+<dd><p>Updates the knowledge base for the micro_X documentation in the dev branch.</p>
 </dd></dl>
 
 <dl class="py function">

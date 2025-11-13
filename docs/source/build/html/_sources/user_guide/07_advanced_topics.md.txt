@@ -18,7 +18,7 @@ You can manually attach to a running micro_X tmux session from another terminal 
 ## **Security Considerations**
 
 * **AI-Generated Commands**: While micro_X includes AI validation, **AI can still generate unexpected or potentially harmful commands.**  
-  * **Review and Understand**: Always use the **\[E\]xplain** option in the command confirmation flow if you are unsure about a command's function.  
+  *   **Review and Understand**: Always use the **[5] Explain** option in the command confirmation flow if you are unsure about a command's function.    
   * **Modify or Cancel**: Do not hesitate to **\[M\]odify** commands to your exact needs or **\[C\]ancel** them if they seem suspicious.  
 * **User Responsibility**: You are ultimately responsible for the commands executed in your environment.
 

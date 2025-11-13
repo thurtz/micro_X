@@ -113,6 +113,7 @@
 
 <span class="s2">Documentation:</span>
 <span class="s2">  --update-docs           - Builds the documentation in the dev branch.</span>
+<span class="s2">  --update-docs-kb        - Updates the knowledge base for the micro_X documentation.</span>
 <span class="s2">&quot;&quot;&quot;</span>
 
 <span class="c1"># --- Configuration ---</span>
@@ -442,29 +443,68 @@
     <span class="n">run_command</span><span class="p">(</span><span class="n">test_command</span><span class="p">,</span> <span class="n">branch_project_root_path</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Running tests for </span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="update_docs_for_branch">
-<a class="viewcode-back" href="../../api_reference.html#utils.dev.update_docs_for_branch">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">update_docs_for_branch</span><span class="p">(</span><span class="n">environment_root</span><span class="p">,</span> <span class="n">branch_name</span><span class="p">,</span> <span class="n">branch_project_root_path</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Builds the documentation for a specified branch installation.&quot;&quot;&quot;</span>
-    <span class="n">branch_dir_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">branch_project_root_path</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📚 Building documentation for the &#39;</span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&#39; environment...&quot;</span><span class="p">)</span>
-    
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">branch_project_root_path</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: Directory &#39;</span><span class="si">{</span><span class="n">branch_dir_name</span><span class="si">}</span><span class="s2">&#39; not found.&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">branch_name</span> <span class="o">!=</span> <span class="s1">&#39;main&#39;</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   Please run &#39;/dev --activate&#39; first.&quot;</span><span class="p">)</span>
+<div class="viewcode-block" id="update_docs">
+<a class="viewcode-back" href="../../api_reference.html#utils.dev.update_docs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_docs</span><span class="p">(</span><span class="n">environment_root</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Builds the Sphinx documentation in the dev branch.&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;📚 Building documentation in the &#39;dev&#39; branch environment...&quot;</span><span class="p">)</span>
+
+    <span class="n">dev_branch_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">environment_root</span><span class="p">,</span> <span class="n">DEV_BRANCH_DIR_NAME</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">dev_branch_dir</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: &#39;dev&#39; branch directory not found at &#39;</span><span class="si">{</span><span class="n">dev_branch_dir</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   Please run &#39;/dev --activate&#39; first.&quot;</span><span class="p">)</span>
         <span class="k">return</span>
 
-    <span class="n">python_executable</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">branch_project_root_path</span><span class="p">,</span> <span class="s1">&#39;.venv&#39;</span><span class="p">,</span> <span class="s1">&#39;bin&#39;</span><span class="p">,</span> <span class="s1">&#39;python&#39;</span><span class="p">)</span>
-    <span class="n">update_docs_script</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">branch_project_root_path</span><span class="p">,</span> <span class="s1">&#39;utils&#39;</span><span class="p">,</span> <span class="s1">&#39;update_docs.py&#39;</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">python_executable</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">update_docs_script</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: &#39;</span><span class="si">{</span><span class="n">branch_dir_name</span><span class="si">}</span><span class="s2">&#39; environment is incomplete. Python executable or update_docs.py is missing.&quot;</span><span class="p">)</span>
+    <span class="c1"># Run make command in the dev branch directory</span>
+    <span class="n">docs_source_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dev_branch_dir</span><span class="p">,</span> <span class="s1">&#39;docs&#39;</span><span class="p">,</span> <span class="s1">&#39;source&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">docs_source_dir</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: Documentation source directory not found in &#39;dev&#39; branch at &#39;</span><span class="si">{</span><span class="n">docs_source_dir</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
         <span class="k">return</span>
 
-    <span class="n">update_command</span> <span class="o">=</span> <span class="p">[</span><span class="n">python_executable</span><span class="p">,</span> <span class="n">update_docs_script</span><span class="p">]</span>
+    <span class="n">make_command</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;make&#39;</span><span class="p">,</span> <span class="s1">&#39;-C&#39;</span><span class="p">,</span> <span class="n">docs_source_dir</span><span class="p">,</span> <span class="s1">&#39;html&#39;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">run_command</span><span class="p">(</span><span class="n">make_command</span><span class="p">,</span> <span class="n">dev_branch_dir</span><span class="p">,</span> <span class="s2">&quot;Building Sphinx documentation for dev branch&quot;</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">✅ Documentation build complete in the &#39;dev&#39; branch.&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   You can view the updated docs by running micro_X from the &#39;</span><span class="si">{</span><span class="n">DEV_BRANCH_DIR_NAME</span><span class="si">}</span><span class="s2">&#39; directory and using &#39;/docs&#39;.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="update_docs_knowledge_base">
+<a class="viewcode-back" href="../../api_reference.html#utils.dev.update_docs_knowledge_base">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_docs_knowledge_base</span><span class="p">(</span><span class="n">environment_root</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Updates the knowledge base for the micro_X documentation in the dev branch.&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;🧠 Updating documentation knowledge base in the &#39;dev&#39; branch environment...&quot;</span><span class="p">)</span>
+
+    <span class="n">dev_branch_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">environment_root</span><span class="p">,</span> <span class="n">DEV_BRANCH_DIR_NAME</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">dev_branch_dir</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: &#39;dev&#39; branch directory not found at &#39;</span><span class="si">{</span><span class="n">dev_branch_dir</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   Please run &#39;/dev --activate&#39; first.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">python_executable</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dev_branch_dir</span><span class="p">,</span> <span class="s1">&#39;.venv&#39;</span><span class="p">,</span> <span class="s1">&#39;bin&#39;</span><span class="p">,</span> <span class="s1">&#39;python&#39;</span><span class="p">)</span>
+    <span class="n">knowledge_script</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dev_branch_dir</span><span class="p">,</span> <span class="s1">&#39;utils&#39;</span><span class="p">,</span> <span class="s1">&#39;knowledge.py&#39;</span><span class="p">)</span>
+    <span class="n">docs_html_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dev_branch_dir</span><span class="p">,</span> <span class="s1">&#39;docs&#39;</span><span class="p">,</span> <span class="s1">&#39;source&#39;</span><span class="p">,</span> <span class="s1">&#39;build&#39;</span><span class="p">,</span> <span class="s1">&#39;html&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">python_executable</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">knowledge_script</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: &#39;dev&#39; environment is incomplete. Python executable or knowledge.py is missing.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
     
-    <span class="n">run_command</span><span class="p">(</span><span class="n">update_command</span><span class="p">,</span> <span class="n">branch_project_root_path</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Building documentation for </span><span class="si">{</span><span class="n">branch_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">docs_html_dir</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: Documentation HTML directory not found in &#39;dev&#39; branch at &#39;</span><span class="si">{</span><span class="n">docs_html_dir</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   Please run &#39;/dev --update-docs&#39; first to build the documentation.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">kb_command</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">python_executable</span><span class="p">,</span>
+        <span class="n">knowledge_script</span><span class="p">,</span>
+        <span class="s1">&#39;add-dir&#39;</span><span class="p">,</span>
+        <span class="n">docs_html_dir</span><span class="p">,</span>
+        <span class="s1">&#39;--name&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;micro_X_docs&#39;</span>
+    <span class="p">]</span>
+    
+    <span class="k">if</span> <span class="n">run_command</span><span class="p">(</span><span class="n">kb_command</span><span class="p">,</span> <span class="n">dev_branch_dir</span><span class="p">,</span> <span class="s2">&quot;Updating micro_X_docs knowledge base&quot;</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">✅ Documentation knowledge base update complete.&quot;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="main">
@@ -538,6 +578,10 @@
         <span class="s2">&quot;--update-docs&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
         <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Builds the documentation in the dev branch.&quot;</span>
     <span class="p">)</span>
+    <span class="n">action_group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--update-docs-kb&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Updates the knowledge base for the micro_X documentation.&quot;</span>
+    <span class="p">)</span>
 
     <span class="c1"># If no arguments are provided, print help text</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
@@ -599,7 +643,9 @@
         <span class="n">run_tests_for_branch</span><span class="p">(</span><span class="n">environment_root</span><span class="p">,</span> <span class="s2">&quot;dev&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">environment_root</span><span class="p">,</span> <span class="n">DEV_BRANCH_DIR_NAME</span><span class="p">))</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">✅ All test suites have been run.&quot;</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">update_docs</span><span class="p">:</span>
-        <span class="n">update_docs_for_branch</span><span class="p">(</span><span class="n">environment_root</span><span class="p">,</span> <span class="s2">&quot;dev&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">environment_root</span><span class="p">,</span> <span class="n">DEV_BRANCH_DIR_NAME</span><span class="p">))</span></div>
+        <span class="n">update_docs</span><span class="p">(</span><span class="n">environment_root</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">update_docs_kb</span><span class="p">:</span>
+        <span class="n">update_docs_knowledge_base</span><span class="p">(</span><span class="n">environment_root</span><span class="p">)</span></div>
 
 
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
