@@ -74,7 +74,9 @@
     "auto_start_serve": true,
     "startup_wait_seconds": 10,
     "server_check_retries": 5,
-    "server_check_interval_seconds": 2
+    "server_check_interval_seconds": 2,
+    "ollama_host": "localhost",
+    "ollama_port": 11434
   },
   "integrity_check": {
     "protected_branches": [

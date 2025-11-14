@@ -55,6 +55,9 @@ class UIManager:
         self.hung_task_flow_active = False
         self.hung_task_flow_state = {}
 
+        self.api_input_flow_active = False
+        self.api_input_flow_state = {}
+
         self.is_in_edit_mode = False
 
         self.current_prompt_text = ""
@@ -89,6 +92,11 @@ class UIManager:
                 self.append_output("\n⚠️ Hung task prompt cancelled.", style_class='warning')
                 if 'future' in self.hung_task_flow_state and not self.hung_task_flow_state['future'].done():
                     self.hung_task_flow_state['future'].set_result({'action': 'cancel'})
+                event.app.invalidate()
+            elif self.api_input_flow_active:
+                self.append_output("\n⚠️ API input request cancelled.", style_class='warning')
+                if 'future' in self.api_input_flow_state and not self.api_input_flow_state['future'].done():
+                    self.api_input_flow_state['future'].set_result("") # Return empty string on cancel
                 event.app.invalidate()
             elif self.categorization_flow_active:
                 self.append_output("\n⚠️ Categorization cancelled by user.", style_class='warning')
@@ -127,6 +135,7 @@ class UIManager:
         def _handle_newline(event):
             if not self.categorization_flow_active and \
                not self.confirmation_flow_active and \
+               not self.api_input_flow_active and \
                not self.is_in_edit_mode:
                 if self.input_field and self.input_field.multiline:
                     event.current_buffer.insert_text('\n')
@@ -161,17 +170,17 @@ class UIManager:
 
         @self.kb.add('c-up')
         def _handle_ctrl_up(event):
-            if not self.categorization_flow_active and not self.confirmation_flow_active:
+            if not self.categorization_flow_active and not self.confirmation_flow_active and not self.api_input_flow_active:
                 event.current_buffer.cursor_up(count=1)
 
         @self.kb.add('c-down')
         def _handle_ctrl_down(event):
-            if not self.categorization_flow_active and not self.confirmation_flow_active:
+            if not self.categorization_flow_active and not self.confirmation_flow_active and not self.api_input_flow_active:
                 event.current_buffer.cursor_down(count=1)
 
         @self.kb.add('up')
         def _handle_up_arrow(event):
-            if self.categorization_flow_active or self.confirmation_flow_active:
+            if self.categorization_flow_active or self.confirmation_flow_active or self.api_input_flow_active:
                 pass # Do not interfere with flow-specific input handling if any
 
             buff = event.current_buffer
@@ -185,7 +194,7 @@ class UIManager:
 
         @self.kb.add('down')
         def _handle_down_arrow(event):
-            if self.categorization_flow_active or self.confirmation_flow_active:
+            if self.categorization_flow_active or self.confirmation_flow_active or self.api_input_flow_active:
                 pass # Do not interfere with flow-specific input handling if any
 
             buff = event.current_buffer
@@ -232,9 +241,11 @@ class UIManager:
     def _ask_hung_task_choice(self, hung_command: str):
         self.append_output(f"\n⚠️ The command '{hung_command}' is taking a long time.", style_class='warning')
         self.append_output("   What would you like to do?", style_class='categorize-prompt')
-        self.append_output("   [K]ill the command | [I]gnore and continue waiting | [C]ancel your new command", style_class='categorize-prompt')
+        self.append_output("  [1] Kill the command", style_class='categorize-prompt')
+        self.append_output("  [2] Ignore and continue waiting", style_class='categorize-prompt')
+        self.append_output("  [3] Cancel your new command", style_class='categorize-prompt')
         self.set_flow_input_mode(
-            prompt_text="[Hung Task] Choice (K/I/C): ",
+            prompt_text="[Hung Task] Choice (1-3): ",
             accept_handler_func=self._handle_hung_task_response,
             is_confirmation=True # Re-use confirmation flag to lock scrolling etc.
         )
@@ -245,14 +256,14 @@ class UIManager:
         if not future or future.done():
             return
 
-        if response in ['k', 'kill']:
+        if response in ['1', 'k', 'kill']:
             future.set_result({'action': 'kill'})
-        elif response in ['i', 'ignore']:
+        elif response in ['2', 'i', 'ignore']:
             future.set_result({'action': 'ignore'})
-        elif response in ['c', 'cancel']:
+        elif response in ['3', 'c', 'cancel']:
             future.set_result({'action': 'cancel'})
         else:
-            self.append_output("Invalid choice. Please enter K, I, or C.", style_class='error')
+            self.append_output("Invalid choice. Please enter 1, 2, or 3.", style_class='error')
             # No need to re-ask here, the prompt is still visible. The handler will just be called again.
 
     # --- Caution Confirmation Flow ---
@@ -300,6 +311,44 @@ class UIManager:
                 accept_handler_func=self._handle_caution_confirmation_response,
                 is_confirmation=True
             )
+
+    # --- API Input Flow ---
+    async def prompt_for_api_input(self, prompt: str) -> str:
+        """Initiates a flow to get input from the user for an API request."""
+        logger.info(f"UIManager: Starting API input flow with prompt: '{prompt}'")
+        self.api_input_flow_active = True
+        self.api_input_flow_state = {
+            'future': asyncio.Future()
+        }
+
+        # Append the prompt to the output field so the user sees the question.
+        self.append_output(prompt, style_class='categorize-prompt')
+
+        self.set_flow_input_mode(
+            prompt_text="> ", # Use a generic prompt for the input line
+            accept_handler_func=self._handle_api_input_response,
+            is_api_input=True
+        )
+
+        try:
+            result = await self.api_input_flow_state['future']
+            # Also append the user's answer to the output to make it part of the history
+            self.append_output(result)
+            return result
+        finally:
+            self.api_input_flow_active = False
+            logger.info("UIManager: API input flow ended.")
+            # Restore normal input handler after the flow is complete
+            if self.main_restore_normal_input_ref:
+                self.main_restore_normal_input_ref()
+
+    def _handle_api_input_response(self, buff):
+        user_input = buff.text.strip()
+        future = self.api_input_flow_state.get('future')
+        if not future or future.done():
+            return
+        
+        future.set_result(user_input)
 
     # --- Categorization Flow Methods ---
     async def start_categorization_flow(self, command_initially_proposed: str,
@@ -358,7 +407,11 @@ class UIManager:
 
         if original and original.strip() != proposed.strip():
             append_output_func(f"\nSystem processed to: '{proposed}'\nOriginal input was: '{original}'", style_class='categorize-info')
-            append_output_func(f"Which version to categorize?\n  1: Processed ('{proposed}')\n  2: Original ('{original}')\n  3: Modify/Enter new command\n  4: Cancel categorization", style_class='categorize-prompt')
+            append_output_func("Which version to categorize?", style_class='categorize-prompt')
+            append_output_func(f"  [1] Processed ('{proposed}')", style_class='categorize-prompt')
+            append_output_func(f"  [2] Original ('{original}')", style_class='categorize-prompt')
+            append_output_func("  [3] Modify/Enter new command", style_class='categorize-prompt')
+            append_output_func("  [4] Cancel categorization", style_class='categorize-prompt')
             self.set_flow_input_mode(
                 prompt_text="[Categorize] Choice (1-4): ",
                 accept_handler_func=self._handle_step_0_5_response,
@@ -411,9 +464,15 @@ class UIManager:
         default_cat_name = self.config['behavior']['default_category_for_unclassified']
         logger.debug(f"UIManager._ask_step_1_main_action: Command for categorization: '{cmd_display}'")
         append_output_func(f"\nCommand to categorize: '{cmd_display}'", style_class='categorize-info')
-        append_output_func(f"How to categorize this command?\n  1: simple             ({CM_CATEGORY_DESCRIPTIONS['simple']})\n  2: semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n  3: interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})\n  M: Modify command before categorizing\n  D: Execute as default '{default_cat_name}' (once, no save)\n  C: Cancel categorization & execution", style_class='categorize-prompt')
+        append_output_func("How to categorize this command?", style_class='categorize-prompt')
+        append_output_func(f"  [1] simple             ({CM_CATEGORY_DESCRIPTIONS['simple']})", style_class='categorize-prompt')
+        append_output_func(f"  [2] semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})", style_class='categorize-prompt')
+        append_output_func(f"  [3] interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})", style_class='categorize-prompt')
+        append_output_func("  [4] Modify command before categorizing", style_class='categorize-prompt')
+        append_output_func(f"  [5] Execute as default '{default_cat_name}' (once, no save)", style_class='categorize-prompt')
+        append_output_func("  [6] Cancel categorization & execution", style_class='categorize-prompt')
         self.set_flow_input_mode(
-            prompt_text="[Categorize] Action (1-3/M/D/C): ",
+            prompt_text="[Categorize] Action (1-6): ",
             accept_handler_func=self._handle_step_1_main_action_response,
             is_categorization=True
         )
@@ -431,21 +490,21 @@ class UIManager:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'categorize_and_execute', 'command': cmd_to_add, 'category': chosen_category})
             valid_choice = True
-        elif response == 'm':
+        elif response in ['4', 'm']:
             self.categorization_flow_state['step'] = 4
             self._ask_step_4_enter_modified_command(base_command=cmd_to_add)
             valid_choice = True
-        elif response == 'd':
+        elif response in ['5', 'd']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_as_default'})
             valid_choice = True
-        elif response == 'c':
+        elif response in ['6', 'c']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'cancel_execution'})
             valid_choice = True
 
         if not valid_choice:
-            append_output_func("Invalid choice. Please enter 1-3, M, D, or C.", style_class='error')
+            append_output_func("Invalid choice. Please enter 1-6, M, D, or C.", style_class='error')
             self._ask_step_1_main_action()
             return
 
@@ -496,7 +555,9 @@ class UIManager:
         cmd_to_categorize = self.categorization_flow_state['command_to_add_final']
         logger.debug(f"UIManager: Asking category for modified/final command: '{cmd_to_categorize}'")
         self.append_output(f"\nCategory for command: '{cmd_to_categorize}'", style_class='categorize-info')
-        self.append_output(f"  1: simple             ({CM_CATEGORY_DESCRIPTIONS['simple']})\n  2: semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})\n  3: interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})", style_class='categorize-prompt')
+        self.append_output(f"  [1] simple             ({CM_CATEGORY_DESCRIPTIONS['simple']})", style_class='categorize-prompt')
+        self.append_output(f"  [2] semi_interactive   ({CM_CATEGORY_DESCRIPTIONS['semi_interactive']})", style_class='categorize-prompt')
+        self.append_output(f"  [3] interactive_tui    ({CM_CATEGORY_DESCRIPTIONS['interactive_tui']})", style_class='categorize-prompt')
         self.set_flow_input_mode(
             prompt_text="[Categorize] Category (1-3): ",
             accept_handler_func=self._handle_step_4_5_response,
@@ -580,10 +641,17 @@ class UIManager:
         
         self.append_output(f"\n🤖 AI proposed command (from: {source}):", style_class='ai-query')
         self.append_output(f"    👉 {cmd}", style_class='executing')
-        self.append_output("Action: [Y]es (Exec, prompt if new) | [Ys] Simple & Run | [Ym] Semi-Interactive & Run | [Yi] TUI & Run | [E]xplain | [M]odify | [C]ancel?", style_class='categorize-prompt')
+        self.append_output("Action:", style_class='categorize-prompt')
+        self.append_output("  [1] Yes (Exec, prompt if new)", style_class='categorize-prompt')
+        self.append_output("  [2] Simple & Run", style_class='categorize-prompt')
+        self.append_output("  [3] Semi-Interactive & Run", style_class='categorize-prompt')
+        self.append_output("  [4] TUI & Run", style_class='categorize-prompt')
+        self.append_output("  [5] Explain", style_class='categorize-prompt')
+        self.append_output("  [6] Modify", style_class='categorize-prompt')
+        self.append_output("  [7] Cancel", style_class='categorize-prompt')
 
         self.set_flow_input_mode(
-            prompt_text="[Confirm AI Cmd] Choice (Y/Ys/Ym/Yi/E/M/C): ",
+            prompt_text="[Confirm AI Cmd] Choice (1-7): ",
             accept_handler_func=self._handle_confirmation_main_choice_response,
             is_confirmation=True
         )
@@ -596,37 +664,37 @@ class UIManager:
 
         logger.debug(f"UIManager: Confirmation main choice response: '{response}'")
 
-        if response in ['y', 'yes']:
+        if response in ['1', 'y', 'yes']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute', 'command': cmd_to_confirm})
             valid_choice_made = True
-        elif response == 'ys':
+        elif response == '2':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'simple'})
             valid_choice_made = True
-        elif response == 'ym':
+        elif response == '3':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'semi_interactive'})
             valid_choice_made = True
-        elif response == 'yi':
+        elif response == '4':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'interactive_tui'})
             valid_choice_made = True
-        elif response in ['e', 'explain']:
+        elif response in ['5', 'e', 'explain']:
             self.confirmation_flow_state['step'] = 'explain'
             asyncio.create_task(self._handle_explain_command_async())
             valid_choice_made = True
-        elif response in ['m', 'modify']:
+        elif response in ['6', 'm', 'modify']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'edit_mode_engaged', 'command': cmd_to_confirm})
             valid_choice_made = True
-        elif response in ['c', 'cancel', 'n', 'no']:
+        elif response in ['7', 'c', 'cancel', 'n', 'no']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'cancel'})
             valid_choice_made = True
 
         if not valid_choice_made:
-            self.append_output("Invalid choice. Please enter Y, Ys, Ym, Yi, E, M, or C.", style_class='error')
+            self.append_output("Invalid choice. Please enter a number from 1 to 7.", style_class='error')
             self._ask_confirmation_main_choice()
             return
 
@@ -650,10 +718,16 @@ class UIManager:
     def _ask_confirmation_after_explain(self):
         cmd = self.confirmation_flow_state['command_to_confirm']
         self.append_output(f"\nCommand to consider: {cmd}", style_class='executing')
-        self.append_output("Action: [Y]es (Exec, prompt if new) | [Ys] Simple & Run | [Ym] Semi-Interactive & Run | [Yi] TUI & Run | [M]odify | [C]ancel?", style_class='categorize-prompt')
+        self.append_output("Action:", style_class='categorize-prompt')
+        self.append_output("  [1] Yes (Exec, prompt if new)", style_class='categorize-prompt')
+        self.append_output("  [2] Simple & Run", style_class='categorize-prompt')
+        self.append_output("  [3] Semi-Interactive & Run", style_class='categorize-prompt')
+        self.append_output("  [4] TUI & Run", style_class='categorize-prompt')
+        self.append_output("  [5] Modify", style_class='categorize-prompt')
+        self.append_output("  [6] Cancel", style_class='categorize-prompt')
 
         self.set_flow_input_mode(
-            prompt_text="[Confirm AI Cmd] Choice (Y/Ys/Ym/Yi/M/C): ",
+            prompt_text="[Confirm AI Cmd] Choice (1-6): ",
             accept_handler_func=self._handle_confirmation_after_explain_response,
             is_confirmation=True
         )
@@ -665,33 +739,33 @@ class UIManager:
         valid_choice_made = False
         logger.debug(f"UIManager: Confirmation after explain response: '{response}'")
 
-        if response in ['y', 'yes']:
+        if response in ['1', 'y', 'yes']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute', 'command': cmd_to_confirm})
             valid_choice_made = True
-        elif response == 'ys':
+        elif response == '2':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'simple'})
             valid_choice_made = True
-        elif response == 'ym':
+        elif response == '3':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'semi_interactive'})
             valid_choice_made = True
-        elif response == 'yi':
+        elif response == '4':
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'execute_and_categorize', 'command': cmd_to_confirm, 'category': 'interactive_tui'})
             valid_choice_made = True
-        elif response in ['m', 'modify']:
+        elif response in ['5', 'm', 'modify']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'edit_mode_engaged', 'command': cmd_to_confirm})
             valid_choice_made = True
-        elif response in ['c', 'cancel', 'n', 'no']:
+        elif response in ['6', 'c', 'cancel', 'n', 'no']:
             if future_to_set and not future_to_set.done():
                 future_to_set.set_result({'action': 'cancel'})
             valid_choice_made = True
 
         if not valid_choice_made:
-            self.append_output("Invalid choice. Please enter Y, Ys, Ym, Yi, M, or C.", style_class='error')
+            self.append_output("Invalid choice. Please enter a number from 1 to 6.", style_class='error')
             self._ask_confirmation_after_explain()
             return
 
@@ -789,7 +863,7 @@ class UIManager:
             self.app.invalidate()
 
     def _on_output_cursor_pos_changed(self, _=None):
-        if self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:
+        if self.categorization_flow_active or self.confirmation_flow_active or self.api_input_flow_active or self.is_in_edit_mode:
             if self.output_field and self.output_field.buffer:
                 self.output_field.buffer.cursor_position = len(self.output_field.buffer.text)
             return
@@ -843,7 +917,7 @@ class UIManager:
         # This line is the core of the re-rendering.
         buffer.set_document(Document(plain_text_output, cursor_position=len(plain_text_output)), bypass_readonly=True)
         
-        if self.auto_scroll or self.categorization_flow_active or self.confirmation_flow_active or self.is_in_edit_mode:
+        if self.auto_scroll or self.categorization_flow_active or self.confirmation_flow_active or self.api_input_flow_active or self.is_in_edit_mode:
             buffer.cursor_position = len(plain_text_output)
         else:
             # Restore previous cursor position if not auto-scrolling
@@ -961,19 +1035,27 @@ class UIManager:
                 if self.layout: self.app.layout.focus(self.input_field)
                 self.app.invalidate()
 
-    def set_flow_input_mode(self, prompt_text: str, accept_handler_func: callable, is_categorization: bool = False, is_confirmation: bool = False):
-        """Sets the UI for a special input flow (categorization or confirmation)."""
+    def set_flow_input_mode(self, prompt_text: str, accept_handler_func: callable, is_categorization: bool = False, is_confirmation: bool = False, is_api_input: bool = False):
+        """Sets the UI for a special input flow (categorization, confirmation, or API)."""
         logger.debug(f"UIManager: Setting flow input mode. Prompt: '{prompt_text}'")
         if is_categorization:
             self.categorization_flow_active = True
             self.confirmation_flow_active = False
+            self.api_input_flow_active = False
             self.is_in_edit_mode = False
-            self.append_output("ℹ️ Interaction active. Scrolling disabled until flow completes.", style_class='info', internal_call=True) # Added hint
+            self.append_output("ℹ️ Interaction active. Scrolling disabled until flow completes.", style_class='info', internal_call=True)
         elif is_confirmation:
             self.confirmation_flow_active = True
             self.categorization_flow_active = False
+            self.api_input_flow_active = False
             self.is_in_edit_mode = False
-            self.append_output("ℹ️ Interaction active. Scrolling disabled until flow completes.", style_class='info', internal_call=True) # Added hint
+            self.append_output("ℹ️ Interaction active. Scrolling disabled until flow completes.", style_class='info', internal_call=True)
+        elif is_api_input:
+            self.api_input_flow_active = True
+            self.categorization_flow_active = False
+            self.confirmation_flow_active = False
+            self.is_in_edit_mode = False
+            self.append_output("ℹ️ Script is requesting input. Scrolling disabled.", style_class='info', internal_call=True)
 
         self.current_prompt_text = prompt_text
         if self.input_field:

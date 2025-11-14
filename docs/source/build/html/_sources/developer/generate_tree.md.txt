@@ -31,14 +31,15 @@ Here's a breakdown of its key aspects:
 ## **3. Configuration and Parameters (generate_file_tree function):**
 
 * **startpath (str):** The mandatory root directory from which the tree generation begins.  
+* **output_filepath (str):** The full path to the file where the tree will be saved.  
 * **display_root_name (str, optional):** Allows specifying a custom name to be displayed for the root of the tree. Defaults to "micro_X".  
 * **ignore_dirs (list, optional):** Allows passing a custom list of directory names to ignore. If None, a comprehensive default list (suitable for Python projects) is used.  
-* **ignore_files (list, optional):** Allows passing a custom list of file names/patterns to ignore. If None, a default list (common temporary/system files) is used.
+* **ignore_files (list, optional):** Allows passing a custom list of file names/patterns to ignore (supports `fnmatch` for wildcard matching). If None, a default list (common temporary/system files) is used.
 
 ## **4. Output:**
 
-* The script prints the generated file tree directly to the standard output (console).  
-* The output is a text-based representation, with directories typically ending in a path separator (/ or \ depending on the OS, though the script explicitly adds / for directories).
+* The script saves the generated file tree to the file specified by the `output_filepath` parameter.  
+* The output is a text-based representation, with directories typically ending in a path separator (e.g., `__pycache__/`).
 
 ## **5. Execution (if __name__ == "__main__": block):**
 

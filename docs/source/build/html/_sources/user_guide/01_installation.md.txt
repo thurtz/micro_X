@@ -11,7 +11,6 @@ For the best experience, all users should start by installing the main branch. T
    cd micro_X
 
 2. **Run the Setup Script**:  
-   chmod +x setup.sh  
    ./setup.sh
 
    The script will guide you through installing all necessary dependencies for your operating system, including Python, tmux, and the required Ollama models.

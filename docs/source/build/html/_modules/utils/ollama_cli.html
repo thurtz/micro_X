@@ -98,6 +98,22 @@
 <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">)</span>
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
+<span class="c1"># --- Help Text ---</span>
+<span class="n">HELP_TEXT</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">micro_X Help: /ollama Utility</span>
+
+<span class="s2">This utility manages the Ollama service, which is used to run local AI models.</span>
+
+<span class="s2">Usage:</span>
+<span class="s2">  /ollama &lt;subcommand&gt;</span>
+
+<span class="s2">Subcommands:</span>
+<span class="s2">  start     - Starts the managed Ollama service if it&#39;s not already running.</span>
+<span class="s2">  stop      - Stops the managed Ollama service.</span>
+<span class="s2">  restart   - Restarts the managed Ollama service.</span>
+<span class="s2">  status    - Shows the current status of the Ollama service.</span>
+<span class="s2">  help      - Shows this help message.</span>
+<span class="s2">&quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="print_for_manager">
 <a class="viewcode-back" href="../../api_reference.html#utils.ollama_cli.print_for_manager">[docs]</a>
@@ -131,22 +147,20 @@
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: Failed to load application configuration: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
         <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
 
+    <span class="k">class</span><span class="w"> </span><span class="nc">HelpAction</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option_strings</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="nb">super</span><span class="p">(</span><span class="n">HelpAction</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">option_strings</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">HELP_TEXT</span><span class="p">)</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">exit</span><span class="p">()</span>
 
     <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
         <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Manage the Ollama service for the micro_X shell.&quot;</span><span class="p">,</span>
-        <span class="n">epilog</span><span class="o">=</span><span class="s2">&quot;This utility interacts with the Ollama service, potentially using tmux for management.&quot;</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span>
     <span class="p">)</span>
-    <span class="c1"># Use a subparsers approach for clearer command structure</span>
-    <span class="n">subparsers</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s1">&#39;subcommand&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Available subcommands&#39;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-h&#39;</span><span class="p">,</span> <span class="s1">&#39;--help&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">HelpAction</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;show this help message and exit&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;subcommand&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;?&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;help&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Available subcommands: start, stop, restart, status, help&#39;</span><span class="p">)</span>
 
-    <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;start&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Start the managed Ollama service if it&#39;s not running.&quot;</span><span class="p">)</span>
-    <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;stop&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Stop the managed Ollama service.&quot;</span><span class="p">)</span>
-    <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;restart&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Restart the managed Ollama service.&quot;</span><span class="p">)</span>
-    <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;status&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Show the current status of the Ollama service.&quot;</span><span class="p">)</span>
-    <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;help&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Show this help message.&quot;</span><span class="p">)</span>
-
-    <span class="c1"># In a real scenario, sys.argv would be used. For direct calls, you might pass args.</span>
-    <span class="c1"># When run from shell_engine, the arguments after &#39;ollama_cli.py&#39; are parsed.</span>
     <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
 
     <span class="c1"># The ollama_manager functions now require the config and a callback.</span>
@@ -160,7 +174,7 @@
     <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">subcommand</span> <span class="o">==</span> <span class="s1">&#39;status&#39;</span><span class="p">:</span>
         <span class="k">await</span> <span class="n">ollama_manager</span><span class="o">.</span><span class="n">get_ollama_status_info</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">print_for_manager</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">subcommand</span> <span class="o">==</span> <span class="s1">&#39;help&#39;</span><span class="p">:</span>
-        <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">()</span></div>
+        <span class="nb">print</span><span class="p">(</span><span class="n">HELP_TEXT</span><span class="p">)</span></div>
 
 
 

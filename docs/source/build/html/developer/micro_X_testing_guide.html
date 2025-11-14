@@ -54,6 +54,7 @@
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-startup-integrity-check-hardening"><strong>Change Log: Startup Integrity Check Hardening</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-tmux-interaction-hardening"><strong>Change Log: tmux Interaction Hardening</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-ai-handler-test-suite-hardening"><strong>Change Log: AI Handler Test Suite Hardening</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-documentation-and-user-experience-improvements"><strong>Change Log: Documentation and User Experience Improvements</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review.html"><strong>micro_X Code Quality Assessment for Testing Branch Promotion</strong></a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#"><strong>Comprehensive Testing List for micro_X</strong></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#i-core-shell-functionality-basic-commands"><strong>I. Core Shell Functionality &amp; Basic Commands:</strong></a><ul>
@@ -71,7 +72,7 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#iii-ai-features-flows"><strong>III. AI Features &amp; Flows:</strong></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#ai-command-translation-confirmation-flow">1. <strong>/ai Command Translation &amp; Confirmation Flow:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#translate-command-translation-confirmation-flow">1. <strong>/translate Command Translation &amp; Confirmation Flow:</strong></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#direct-unknown-command-ai-validation-potential-translation-categorization">2. <strong>Direct Unknown Command -&gt; AI Validation -&gt; Potential Translation/Categorization:</strong></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#ollama-service-not-ready">3. <strong>Ollama Service Not Ready:</strong></a></li>
 </ul>
@@ -199,19 +200,18 @@
 </li>
 <li><p><strong>Command Confirmation Flow:</strong></p>
 <ul>
-<li><p>[ ] Trigger confirmation (e.g., /ai list files).</p></li>
+<li><p>[ ] Trigger confirmation (e.g., /translate list files).</p></li>
 <li><p>[ ] At “Action: [Y]es…” prompt, press Ctrl+C. (Should cancel, return to normal prompt).</p></li>
 <li><p>[ ] Trigger again. Choose “E” (Explain). After explanation, at “Action: [Y]es…” prompt, press Ctrl+C.</p></li>
 </ul>
 </li>
-<li><p><strong>Edit Mode (from Confirmation Flow):</strong></p>
-<ul>
-<li><p>[ ] Trigger confirmation (e.g., /ai show current date).</p></li>
-<li><p>[ ] Choose “M” (Modify). Input field should show the command.</p></li>
-<li><p>[ ] Press Ctrl+C. (Should cancel edit mode, print “Command editing cancelled”, return to normal prompt).</p></li>
 </ul>
-</li>
-</ul>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>  * **Edit Mode (from Confirmation Flow):**  
+    * \[ \] Trigger confirmation (e.g., /translate show current date).  
+ * \[ \] Choose &quot;M&quot; (Modify). Input field should show the command.  
+ * \[ \] Press Ctrl+C. (Should cancel edit mode, print &quot;Command editing cancelled&quot;, return to normal prompt).  
+</pre></div>
+</div>
 </section>
 <section id="input-field-behavior">
 <h3>2. <strong>Input Field Behavior:</strong><a class="headerlink" href="#input-field-behavior" title="Link to this heading"></a></h3>
@@ -234,22 +234,22 @@
 </section>
 <section id="iii-ai-features-flows">
 <h2><strong>III. AI Features &amp; Flows:</strong><a class="headerlink" href="#iii-ai-features-flows" title="Link to this heading"></a></h2>
-<section id="ai-command-translation-confirmation-flow">
-<h3>1. <strong>/ai Command Translation &amp; Confirmation Flow:</strong><a class="headerlink" href="#ai-command-translation-confirmation-flow" title="Link to this heading"></a></h3>
+<section id="translate-command-translation-confirmation-flow">
+<h3>1. <strong>/translate Command Translation &amp; Confirmation Flow:</strong><a class="headerlink" href="#translate-command-translation-confirmation-flow" title="Link to this heading"></a></h3>
 <ul class="simple">
-<li><p>[ ] /ai list text files</p>
+<li><p>[ ] /translate list text files</p>
 <ul>
 <li><p>[ ] Choose “Y” (Yes). If command is new, proceed to categorization.</p></li>
 </ul>
 </li>
-<li><p>[ ] /ai find python files -&gt; Choose “Ys” (Simple &amp; Run). Verify execution and categorization.</p></li>
-<li><p>[ ] /ai show running processes -&gt; Choose “Ym” (Semi-Interactive &amp; Run). Verify.</p></li>
-<li><p>[ ] /ai open a text editor -&gt; Choose “Yi” (TUI &amp; Run). Verify.</p></li>
-<li><p>[ ] /ai what is my ip -&gt; Choose “E” (Explain). Review explanation. Then choose “Y” to execute.</p></li>
-<li><p>[ ] /ai delete all .tmp files -&gt; Choose “M” (Modify). Change command in input field (e.g., to ls *.tmp). Press Enter. (Should execute modified command, potentially trigger categorization).</p></li>
-<li><p>[ ] /ai format my hard drive -&gt; Choose “C” (Cancel). Verify command is not executed.</p></li>
-<li><p>[ ] /ai with an empty query (should show warning).</p></li>
-<li><p>[ ] /ai with a query the AI might refuse (e.g., /ai tell me a secret). Observe behavior.</p></li>
+<li><p>[ ] /translate find python files -&gt; Choose “Ys” (Simple &amp; Run). Verify execution and categorization.</p></li>
+<li><p>[ ] /translate show running processes -&gt; Choose “Ym” (Semi-Interactive &amp; Run). Verify.</p></li>
+<li><p>[ ] /translate open a text editor -&gt; Choose “Yi” (TUI &amp; Run). Verify.</p></li>
+<li><p>[ ] /translate what is my ip -&gt; Choose “E” (Explain). Review explanation. Then choose “Y” to execute.</p></li>
+<li><p>[ ] /translate delete all .tmp files -&gt; Choose “M” (Modify). Change command in input field (e.g., to ls *.tmp). Press Enter. (Should execute modified command, potentially trigger categorization).</p></li>
+<li><p>[ ] /translate format my hard drive -&gt; Choose “C” (Cancel). Verify command is not executed.</p></li>
+<li><p>[ ] /translate with an empty query (should show warning).</p></li>
+<li><p>[ ] /translate with a query the AI might refuse (e.g., /translate tell me a secret). Observe behavior.</p></li>
 </ul>
 </section>
 <section id="direct-unknown-command-ai-validation-potential-translation-categorization">
@@ -280,7 +280,7 @@
 <h3>3. <strong>Ollama Service Not Ready:</strong><a class="headerlink" href="#ollama-service-not-ready" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>[ ] Stop Ollama service manually.</p></li>
-<li><p>[ ] Try /ai list files. Verify “Ollama service is not available” message and guidance.</p></li>
+<li><p>[ ] Try /translate list files. Verify “Ollama service is not available” message and guidance.</p></li>
 <li><p>[ ] Try typing an unknown command. Verify message about Ollama not being available for validation/translation and that it proceeds to categorization.</p></li>
 </ul>
 </section>

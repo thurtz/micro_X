@@ -62,6 +62,7 @@
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-startup-integrity-check-hardening"><strong>Change Log: Startup Integrity Check Hardening</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-tmux-interaction-hardening"><strong>Change Log: tmux Interaction Hardening</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-ai-handler-test-suite-hardening"><strong>Change Log: AI Handler Test Suite Hardening</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-documentation-and-user-experience-improvements"><strong>Change Log: Documentation and User Experience Improvements</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review.html"><strong>micro_X Code Quality Assessment for Testing Branch Promotion</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_testing_guide.html"><strong>Comprehensive Testing List for micro_X</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="review_of_micro_X_project.html"><strong>Expert Review of the micro_X Project</strong></a></li>
@@ -143,16 +144,17 @@
 <h2><strong>3. Configuration and Parameters (generate_file_tree function):</strong><a class="headerlink" href="#configuration-and-parameters-generate-file-tree-function" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><strong>startpath (str):</strong> The mandatory root directory from which the tree generation begins.</p></li>
+<li><p><strong>output_filepath (str):</strong> The full path to the file where the tree will be saved.</p></li>
 <li><p><strong>display_root_name (str, optional):</strong> Allows specifying a custom name to be displayed for the root of the tree. Defaults to “micro_X”.</p></li>
 <li><p><strong>ignore_dirs (list, optional):</strong> Allows passing a custom list of directory names to ignore. If None, a comprehensive default list (suitable for Python projects) is used.</p></li>
-<li><p><strong>ignore_files (list, optional):</strong> Allows passing a custom list of file names/patterns to ignore. If None, a default list (common temporary/system files) is used.</p></li>
+<li><p><strong>ignore_files (list, optional):</strong> Allows passing a custom list of file names/patterns to ignore (supports <code class="docutils literal notranslate"><span class="pre">fnmatch</span></code> for wildcard matching). If None, a default list (common temporary/system files) is used.</p></li>
 </ul>
 </section>
 <section id="output">
 <h2><strong>4. Output:</strong><a class="headerlink" href="#output" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>The script prints the generated file tree directly to the standard output (console).</p></li>
-<li><p>The output is a text-based representation, with directories typically ending in a path separator (/ or \ depending on the OS, though the script explicitly adds / for directories).</p></li>
+<li><p>The script saves the generated file tree to the file specified by the <code class="docutils literal notranslate"><span class="pre">output_filepath</span></code> parameter.</p></li>
+<li><p>The output is a text-based representation, with directories typically ending in a path separator (e.g., <code class="docutils literal notranslate"><span class="pre">__pycache__/</span></code>).</p></li>
 </ul>
 </section>
 <section id="execution-if-name-main-block">

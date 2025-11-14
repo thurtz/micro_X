@@ -53,6 +53,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#a-feature-and-behavior-integrity"><strong>A. Feature and Behavior Integrity</strong></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#b-code-quality-and-maintenance"><strong>B. Code Quality and Maintenance</strong></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#c-collaboration-and-process"><strong>C. Collaboration and Process</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#d-utility-script-development">D. Utility Script Development</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#review-and-amendment"><strong>4. Review and Amendment</strong></a></li>
@@ -65,6 +66,7 @@
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-startup-integrity-check-hardening"><strong>Change Log: Startup Integrity Check Hardening</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-tmux-interaction-hardening"><strong>Change Log: tmux Interaction Hardening</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-ai-handler-test-suite-hardening"><strong>Change Log: AI Handler Test Suite Hardening</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review_Accomplishments.html#change-log-documentation-and-user-experience-improvements"><strong>Change Log: Documentation and User Experience Improvements</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review.html"><strong>micro_X Code Quality Assessment for Testing Branch Promotion</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_testing_guide.html"><strong>Comprehensive Testing List for micro_X</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="review_of_micro_X_project.html"><strong>Expert Review of the micro_X Project</strong></a></li>
@@ -127,7 +129,11 @@
 <h3><strong>B. Code Quality and Maintenance</strong><a class="headerlink" href="#b-code-quality-and-maintenance" title="Link to this heading"></a></h3>
 <ol class="arabic simple">
 <li><p><strong>Test-Driven Changes:</strong> All bug fixes must be accompanied by a new or updated test that replicates the bug and confirms the fix. Any new logic added during refactoring must be covered by corresponding unit tests.</p></li>
-<li><p><strong>Documentation First:</strong> All significant changes to behavior, architecture, or user-facing features must be documented <em>before</em> or <em>alongside</em> the code implementation. This includes keeping README.md, the User Guide, and this principles document up-to-date.</p></li>
+<li><p><strong>Documentation First:</strong> All significant changes to behavior, architecture, or user-facing features must be documented <em>before</em> or <em>alongside</em> the code implementation. This includes keeping README.md, the User Guide, and this principles document up-to-date.</p>
+<ul class="simple">
+<li><p><strong>Building Documentation</strong>: To build the documentation, use the <code class="docutils literal notranslate"><span class="pre">/dev</span> <span class="pre">--update-docs</span></code> command. This command ensures that the documentation is always built from the <code class="docutils literal notranslate"><span class="pre">dev</span></code> branch, even if you are currently on a different branch. It executes the build process within the <code class="docutils literal notranslate"><span class="pre">micro_X-dev</span></code> directory.</p></li>
+</ul>
+</li>
 <li><p><strong>Adherence to Architecture:</strong> New or modified code must respect the existing modular design of the project. Logic should be placed in the appropriate module (e.g., UI logic in ui_manager, Git logic in git_context_manager). Developing micro_X commands should be done with prioritizing their integration as a utility and an alias rather than hardcoded in the base.</p></li>
 </ol>
 </section>
@@ -137,6 +143,24 @@
 <li><p><strong>Explicit Confirmation for Changes:</strong> I (the AI assistant) will always ask for explicit user confirmation before making changes to the codebase.</p></li>
 <li><p><strong>Justification of Changes:</strong> All proposed changes will be accompanied by a clear explanation referencing the Quality Review, a direct user request, or these development principles.</p></li>
 <li><p><strong>Comprehensive Change Logging:</strong> All implemented changes will be logged in the docs/micro_X_Code_Quality_Review_Accomplishments.md file, providing a clear audit trail of our progress.</p></li>
+</ol>
+</section>
+<section id="d-utility-script-development">
+<h3>D. Utility Script Development<a class="headerlink" href="#d-utility-script-development" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Dual-Environment Execution</strong>: Utility scripts in the <code class="docutils literal notranslate"><span class="pre">utils/</span></code> directory should be written to function both within the micro_X shell and as standalone scripts in a standard shell.</p></li>
+<li><p><strong>API Client Usage</strong>: To achieve this, scripts can use the <code class="docutils literal notranslate"><span class="pre">utils.shared.api_client.get_input()</span></code> function for interactive prompts. This function automatically detects if the script is running inside micro_X by checking for the <code class="docutils literal notranslate"><span class="pre">MICROX_API_SOCKET</span></code> environment variable.</p>
+<ul class="simple">
+<li><p>If the variable is present, it uses the micro_X API to prompt the user.</p></li>
+<li><p>If the variable is absent, it falls back to using standard input (<code class="docutils literal notranslate"><span class="pre">sys.stdin</span></code>) and <code class="docutils literal notranslate"><span class="pre">stderr</span></code> for prompts, allowing it to run in any standard shell.</p></li>
+</ul>
+</li>
+<li><p><strong>Standalone Execution</strong>: When running a utility script directly from a standard shell, it must be executed as a module to ensure Python’s import system can correctly locate other modules within the project (like <code class="docutils literal notranslate"><span class="pre">api_client</span></code>).</p>
+<ul class="simple">
+<li><p><strong>Correct</strong>: <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">utils.your_script_name</span></code></p></li>
+<li><p><strong>Incorrect</strong>: <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">utils/your_script_name.py</span></code></p></li>
+</ul>
+</li>
 </ol>
 </section>
 </section>

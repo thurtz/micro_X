@@ -77,19 +77,40 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
 
-<span class="c1"># --- Configuration ---</span>
-<span class="n">UTILS_DIR_NAME</span> <span class="o">=</span> <span class="s2">&quot;utils&quot;</span>
-<span class="n">USER_SCRIPTS_DIR_NAME</span> <span class="o">=</span> <span class="s2">&quot;user_scripts&quot;</span>
-
-<span class="c1"># --- Helper Functions ---</span>
-<div class="viewcode-block" id="get_project_root">
-<a class="viewcode-back" href="../../api_reference.html#utils.list_scripts.get_project_root">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">get_project_root</span><span class="p">():</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Determines the project root directory.&quot;&quot;&quot;</span>
+<span class="c1"># --- Path Setup ---</span>
+<span class="c1"># Add the utils directory to the Python path to allow importing from &#39;shared&#39;</span>
+<span class="k">try</span><span class="p">:</span>
     <span class="n">script_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span>
-    <span class="c1"># Assumes this script is in project_root/utils/</span>
-    <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">script_path</span><span class="p">))</span></div>
+    <span class="n">utils_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">script_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">utils_dir</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">utils_dir</span><span class="p">)</span>
+    <span class="c1"># Now we can safely import from shared</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">shared.helpers</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_project_root</span><span class="p">,</span> <span class="n">load_json_file</span><span class="p">,</span> <span class="n">format_aliases_list</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">shared.consts</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: Could not import the shared module. Ensure this script is run from within the micro_X project structure.&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Details: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
 
+<span class="n">HELP_TEXT</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">micro_X Help: List Scripts &amp; Aliases</span>
+
+<span class="s2">This utility lists all available built-in utilities, custom user scripts, and aliases.</span>
+
+<span class="s2">Usage:</span>
+<span class="s2">  /list [options]</span>
+
+<span class="s2">Options:</span>
+<span class="s2">  --type &lt;type&gt;   - Filter by type. Available types: all, scripts, utils, aliases.</span>
+<span class="s2">                    Defaults to &#39;all&#39;.</span>
+<span class="s2">  --name &lt;name&gt;   - Filter by name (case-insensitive substring match).</span>
+
+<span class="s2">Examples:</span>
+<span class="s2">  /list</span>
+<span class="s2">  /list --type scripts</span>
+<span class="s2">  /list --type utils --name git</span>
+<span class="s2">  /list --type aliases</span>
+<span class="s2">&quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="get_scripts_from_directory">
 <a class="viewcode-back" href="../../api_reference.html#utils.list_scripts.get_scripts_from_directory">[docs]</a>
@@ -115,35 +136,68 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Main function to list all available scripts.&quot;&quot;&quot;</span>
     <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
-        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Lists all available built-in utilities and custom user scripts for micro_X.&quot;</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Lists all available built-in utilities, custom user scripts, and aliases for micro_X.&quot;</span>
     <span class="p">)</span>
-    <span class="c1"># This script doesn&#39;t need arguments, but argparse provides -h/--help handling.</span>
-    <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;--type&#39;</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;all&#39;</span><span class="p">,</span> <span class="s1">&#39;scripts&#39;</span><span class="p">,</span> <span class="s1">&#39;utils&#39;</span><span class="p">,</span> <span class="s1">&#39;aliases&#39;</span><span class="p">],</span>
+        <span class="n">default</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Filter by type: &quot;all&quot;, &quot;scripts&quot;, &quot;utils&quot;, or &quot;aliases&quot;.&#39;</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;--name&#39;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Filter by name (case-insensitive substring match).&#39;</span>
+    <span class="p">)</span>
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
 
     <span class="n">project_root</span> <span class="o">=</span> <span class="n">get_project_root</span><span class="p">()</span>
     <span class="n">utils_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="n">UTILS_DIR_NAME</span><span class="p">)</span>
     <span class="n">user_scripts_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="n">USER_SCRIPTS_DIR_NAME</span><span class="p">)</span>
+    <span class="n">config_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="n">CONFIG_DIR_NAME</span><span class="p">)</span>
+    <span class="n">default_aliases_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config_dir</span><span class="p">,</span> <span class="n">DEFAULT_ALIASES_FILENAME</span><span class="p">)</span>
+    <span class="n">user_aliases_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config_dir</span><span class="p">,</span> <span class="n">USER_ALIASES_FILENAME</span><span class="p">)</span>
 
     <span class="n">util_scripts</span> <span class="o">=</span> <span class="n">get_scripts_from_directory</span><span class="p">(</span><span class="n">utils_path</span><span class="p">)</span>
     <span class="n">user_scripts</span> <span class="o">=</span> <span class="n">get_scripts_from_directory</span><span class="p">(</span><span class="n">user_scripts_path</span><span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Available Scripts in micro_X&quot;</span><span class="p">)</span>
+    <span class="n">default_aliases</span> <span class="o">=</span> <span class="n">load_json_file</span><span class="p">(</span><span class="n">default_aliases_path</span><span class="p">)</span>
+    <span class="n">user_aliases</span> <span class="o">=</span> <span class="n">load_json_file</span><span class="p">(</span><span class="n">user_aliases_path</span><span class="p">)</span>
+    <span class="n">all_aliases</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">default_aliases</span><span class="p">,</span> <span class="o">**</span><span class="n">user_aliases</span><span class="p">}</span> <span class="c1"># User aliases override defaults</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Available Commands in micro_X&quot;</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">30</span><span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">--- Built-in Utilities (run with /utils &lt;name&gt;) ---&quot;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">util_scripts</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">script</span> <span class="ow">in</span> <span class="n">util_scripts</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - </span><span class="si">{</span><span class="n">script</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  (No utilities found)&quot;</span><span class="p">)</span>
+    <span class="n">name_filter</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">name</span> <span class="k">else</span> <span class="kc">None</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">--- User Scripts (run with /run &lt;name&gt;) ---&quot;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">user_scripts</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">script</span> <span class="ow">in</span> <span class="n">user_scripts</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - </span><span class="si">{</span><span class="n">script</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  (No scripts found in &#39;</span><span class="si">{</span><span class="n">USER_SCRIPTS_DIR_NAME</span><span class="si">}</span><span class="s2">/&#39; directory)&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  You can add your own .py files to this directory.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;all&#39;</span><span class="p">,</span> <span class="s1">&#39;utils&#39;</span><span class="p">]:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">--- Built-in Utilities (run with /utils &lt;name&gt;) ---&quot;</span><span class="p">)</span>
+        <span class="n">filtered_utils</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">util_scripts</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">name_filter</span> <span class="ow">or</span> <span class="n">name_filter</span> <span class="ow">in</span> <span class="n">s</span><span class="o">.</span><span class="n">lower</span><span class="p">()]</span>
+        <span class="k">if</span> <span class="n">filtered_utils</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">script</span> <span class="ow">in</span> <span class="n">filtered_utils</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - </span><span class="si">{</span><span class="n">script</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  (No utilities found matching criteria)&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;all&#39;</span><span class="p">,</span> <span class="s1">&#39;scripts&#39;</span><span class="p">]:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">--- User Scripts (run with /run &lt;name&gt;) ---&quot;</span><span class="p">)</span>
+        <span class="n">filtered_scripts</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">user_scripts</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">name_filter</span> <span class="ow">or</span> <span class="n">name_filter</span> <span class="ow">in</span> <span class="n">s</span><span class="o">.</span><span class="n">lower</span><span class="p">()]</span>
+        <span class="k">if</span> <span class="n">filtered_scripts</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">script</span> <span class="ow">in</span> <span class="n">filtered_scripts</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - </span><span class="si">{</span><span class="n">script</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  (No scripts found in &#39;</span><span class="si">{</span><span class="n">USER_SCRIPTS_DIR_NAME</span><span class="si">}</span><span class="s2">/&#39; directory matching criteria)&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">name_filter</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  You can add your own .py files to this directory.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;all&#39;</span><span class="p">,</span> <span class="s1">&#39;aliases&#39;</span><span class="p">]:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">filtered_aliases</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">alias</span><span class="p">:</span> <span class="n">command</span> <span class="k">for</span> <span class="n">alias</span><span class="p">,</span> <span class="n">command</span> <span class="ow">in</span> <span class="n">all_aliases</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">name_filter</span> <span class="ow">or</span> <span class="n">name_filter</span> <span class="ow">in</span> <span class="n">alias</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">or</span> <span class="n">name_filter</span> <span class="ow">in</span> <span class="n">command</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="p">}</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">format_aliases_list</span><span class="p">(</span><span class="n">filtered_aliases</span><span class="p">,</span> <span class="n">user_aliases</span><span class="p">))</span>
 
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">30</span><span class="p">)</span></div>
 

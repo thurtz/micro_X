@@ -198,5 +198,5 @@ micro_X-dev/
 gemini_startup_prompt.txt
 
 # Knowledge base files
-knowledge_bases/
-knowledge_base/
+knowledge_bases/*
+!knowledge_bases/micro_X_docs/
