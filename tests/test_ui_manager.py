@@ -328,8 +328,8 @@ class TestUIConfirmationFlow:
         await simulate_input_sequence( # Call as module-level function
             ui_manager_instance,
             [
-                ('_handle_confirmation_main_choice_response', 'e'),      
-                ('_handle_confirmation_after_explain_response', 'y') 
+                ('_handle_confirmation_main_choice_response', '5'),      
+                ('_handle_confirmation_after_explain_response', '1') 
             ]
         )
 
@@ -361,7 +361,7 @@ class TestUIConfirmationFlow:
         await simulate_input_sequence( # Call as module-level function
             ui_manager_instance,
             [
-                ('_handle_confirmation_main_choice_response', 'ys') 
+                ('_handle_confirmation_main_choice_response', '2') 
             ]
         )
         result = await flow_task
@@ -382,7 +382,7 @@ class TestUIConfirmationFlow:
         await simulate_input_sequence( # Call as module-level function
             ui_manager_instance,
             [
-                ('_handle_confirmation_main_choice_response', 'm') 
+                ('_handle_confirmation_main_choice_response', '6') 
             ]
         )
         result = await flow_task
@@ -406,7 +406,7 @@ class TestUIConfirmationFlow:
         await simulate_input_sequence( # Call as module-level function
             ui_manager_instance,
             [
-                ('_handle_confirmation_main_choice_response', 'c') 
+                ('_handle_confirmation_main_choice_response', '7') 
             ]
         )
         result = await flow_task

@@ -51,8 +51,9 @@
 <li class="toctree-l2"><a class="reference internal" href="04_command_categorization.html"><strong>4. Command Categorization</strong></a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#"><strong>5. Management &amp; Utilities</strong></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#managing-the-ollama-service-ollama"><strong>Managing the Ollama Service (/ollama)</strong></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#managing-runtime-ai-configuration-config"><strong>Managing Runtime AI Configuration (/config)</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#web-based-configuration-manager-config"><strong>Web-Based Configuration Manager (/config)</strong></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#updating-micro-x-update"><strong>Updating micro_X (/update)</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#querying-the-documentation-docs"><strong>Querying the Documentation (/docs)</strong></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#using-utility-scripts-utils"><strong>Using Utility Scripts (/utils)</strong></a></li>
 </ul>
 </li>
@@ -104,15 +105,12 @@
 <li><p><strong>/ollama help</strong>: Displays help information for these subcommands.</p></li>
 </ul>
 </section>
-<section id="managing-runtime-ai-configuration-config">
-<h2><strong>Managing Runtime AI Configuration (/config)</strong><a class="headerlink" href="#managing-runtime-ai-configuration-config" title="Link to this heading"></a></h2>
-<p>You can view and modify parts of the AI configuration without restarting micro_X.</p>
+<section id="web-based-configuration-manager-config">
+<h2><strong>Web-Based Configuration Manager (/config)</strong><a class="headerlink" href="#web-based-configuration-manager-config" title="Link to this heading"></a></h2>
+<p>For an easy way to view and edit your user configuration files, you can use the web-based configuration manager.</p>
 <ul class="simple">
-<li><p><strong>/config list</strong>: Shows the current models and options for each AI role.</p></li>
-<li><p><strong>/config get &lt;key.path&gt;</strong>: Displays the value of a specific configuration key.</p></li>
-<li><p><strong>/config set &lt;key.path&gt; &lt;value&gt;</strong>: Sets a new value for a configuration key at runtime.</p></li>
-<li><p><strong>/config save</strong>: Saves the current runtime AI model configurations to your user_config.json file.</p></li>
-<li><p><strong>/config help</strong>: Shows usage instructions.</p></li>
+<li><p><strong>/config –start</strong>: Starts a local web server and opens a page in your browser for editing <code class="docutils literal notranslate"><span class="pre">user_config.json</span></code> and <code class="docutils literal notranslate"><span class="pre">user_command_categories.json</span></code>.</p></li>
+<li><p><strong>/config –stop</strong>: Stops the configuration manager’s web server.</p></li>
 </ul>
 </section>
 <section id="updating-micro-x-update">
@@ -121,19 +119,30 @@
 /update</p>
 <p>If changes are downloaded, you will be prompted to restart micro_X for them to take effect.</p>
 </section>
+<section id="querying-the-documentation-docs">
+<h2><strong>Querying the Documentation (/docs)</strong><a class="headerlink" href="#querying-the-documentation-docs" title="Link to this heading"></a></h2>
+<p>You can search the project’s documentation using natural language queries.</p>
+<ul class="simple">
+<li><p><strong>/docs –query <question></strong>: Queries the documentation knowledge base and returns relevant excerpts.</p></li>
+<li><p><strong>/docs –query <question> –rag</strong>: Queries the documentation with a language model to generate a natural language response.</p></li>
+</ul>
+</section>
 <section id="using-utility-scripts-utils">
 <h2><strong>Using Utility Scripts (/utils)</strong><a class="headerlink" href="#using-utility-scripts-utils" title="Link to this heading"></a></h2>
 <p>micro_X comes with helpful utility scripts located in the utils/ directory.</p>
-<ul>
+<ul class="simple">
 <li><p><strong>/utils list</strong>: Displays a list of available utility scripts.</p></li>
 <li><p><strong>/utils &lt;script_name&gt; [args…]</strong>: Executes the specified utility script.</p>
 <ul>
 <li><p><em>Example</em>: /utils generate_tree</p></li>
+</ul>
+</li>
+</ul>
+<p><strong>Note:</strong> While you can run utility scripts directly, it is recommended to use their corresponding aliases (e.g., <code class="docutils literal notranslate"><span class="pre">/tree</span></code> instead of <code class="docutils literal notranslate"><span class="pre">/utils</span> <span class="pre">generate_tree</span></code>) for a better experience. The aliases are designed to be more memorable and provide a consistent interface.</p>
+<ul>
 <li><p><strong>Web Config Manager</strong>: A key utility is the web-based configuration manager. Launch it with:<br />
 /utils config_manager –start</p>
 <p>This will start a local web server and open a page in your browser for editing your configuration files.</p>
-</li>
-</ul>
 </li>
 </ul>
 </section>

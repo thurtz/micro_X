@@ -97,6 +97,14 @@
 <li class="toctree-l3"><a class="reference internal" href="#id8"><strong>3. Solution Implemented</strong></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#change-log-documentation-and-user-experience-improvements"><strong>Change Log: Documentation and User Experience Improvements</strong></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#date-2025-10-09"><strong>Date: 2025-10-09</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#this-document-details-a-series-of-changes-made-to-improve-the-documentation-and-user-experience-of-micro-x"><strong>This document details a series of changes made to improve the documentation and user experience of micro_X.</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#issues-addressed"><strong>1. Issues Addressed</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#summary-of-changes"><strong>2. Summary of Changes</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id9"><strong>3. Impact</strong></a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_Code_Quality_Review.html"><strong>micro_X Code Quality Assessment for Testing Branch Promotion</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="micro_X_testing_guide.html"><strong>Comprehensive Testing List for micro_X</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="review_of_micro_X_project.html"><strong>Expert Review of the micro_X Project</strong></a></li>
@@ -319,6 +327,51 @@
 <li><p><code class="docutils literal notranslate"><span class="pre">echo</span></code></p></li>
 </ul>
 </li>
+</ul>
+</section>
+</section>
+<section id="change-log-documentation-and-user-experience-improvements">
+<h1><strong>Change Log: Documentation and User Experience Improvements</strong><a class="headerlink" href="#change-log-documentation-and-user-experience-improvements" title="Link to this heading"></a></h1>
+<section id="date-2025-10-09">
+<h2><strong>Date: 2025-10-09</strong><a class="headerlink" href="#date-2025-10-09" title="Link to this heading"></a></h2>
+</section>
+<section id="this-document-details-a-series-of-changes-made-to-improve-the-documentation-and-user-experience-of-micro-x">
+<h2><strong>This document details a series of changes made to improve the documentation and user experience of micro_X.</strong><a class="headerlink" href="#this-document-details-a-series-of-changes-made-to-improve-the-documentation-and-user-experience-of-micro-x" title="Link to this heading"></a></h2>
+</section>
+<section id="issues-addressed">
+<h2><strong>1. Issues Addressed</strong><a class="headerlink" href="#issues-addressed" title="Link to this heading"></a></h2>
+<p>This series of changes addresses several discrepancies found between the project’s documentation and its actual behavior. The goal is to ensure that the documentation is accurate, clear, and helpful for both end-users and developers.</p>
+</section>
+<section id="summary-of-changes">
+<h2><strong>2. Summary of Changes</strong><a class="headerlink" href="#summary-of-changes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Created <code class="docutils literal notranslate"><span class="pre">user_scripts/</span></code> directory:</strong> The <code class="docutils literal notranslate"><span class="pre">user_scripts/</span></code> directory, which is expected by the code for user-defined scripts, was missing. It has been created and a <code class="docutils literal notranslate"><span class="pre">.placeholder</span></code> file has been added to ensure it is tracked by git.</p></li>
+<li><p><strong>Updated <code class="docutils literal notranslate"><span class="pre">README.md</span></code>:</strong> The <code class="docutils literal notranslate"><span class="pre">README.md</span></code> file has been updated to:</p>
+<ul>
+<li><p>Clarify that any unknown command is automatically sent to the AI for translation.</p></li>
+<li><p>Clarify that the <code class="docutils literal notranslate"><span class="pre">/translate</span></code> command can be used to force a query to be treated as a natural language command.</p></li>
+<li><p>Update the description of the <code class="docutils literal notranslate"><span class="pre">/config</span></code> command to reflect its current functionality (starting and stopping the web server).</p></li>
+<li><p>Remove the “Runtime AI Configuration” section from the “Key Features” section.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated User Guide:</strong> The user guide has been updated to be more accurate and consistent with the current implementation:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/source/user_guide/01_installation.md</span></code>: Removed the redundant <code class="docutils literal notranslate"><span class="pre">chmod</span> <span class="pre">+x</span> <span class="pre">setup.sh</span></code> command.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/source/user_guide/03_ai_features.md</span></code>: Clarified the AI translation functionality, explaining the difference between automatic and forced translation.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/source/user_guide/04_command_categorization.md</span></code>: Corrected the categorization prompt to match the current implementation.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/source/user_guide/05_management_and_utils.md</span></code>: Updated the description of the <code class="docutils literal notranslate"><span class="pre">/config</span></code> command and added a note recommending the use of aliases over direct script execution.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/source/user_guide/07_advanced_topics.md</span></code>: Corrected the description of <code class="docutils literal notranslate"><span class="pre">semi_interactive</span></code> commands.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="id9">
+<h2><strong>3. Impact</strong><a class="headerlink" href="#id9" title="Link to this heading"></a></h2>
+<p>These changes improve the overall quality and usability of the project by:</p>
+<ul class="simple">
+<li><p><strong>Reducing Confusion:</strong> The documentation now accurately reflects the behavior of the application, reducing potential confusion for users.</p></li>
+<li><p><strong>Improving User Experience:</strong> The creation of the <code class="docutils literal notranslate"><span class="pre">user_scripts/</span></code> directory and the clarification of command functionalities make the application easier to use.</p></li>
+<li><p><strong>Enhancing Developer Experience:</strong> The updated documentation makes it easier for developers to understand the project and contribute to it.</p></li>
 </ul>
 </section>
 </section>

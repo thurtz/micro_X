@@ -37,6 +37,10 @@ Running Tests:
   --run-tests-testing     - Runs the test suite in the testing branch environment.
   --run-tests-dev         - Runs the test suite in the dev branch environment.
   --run-tests-all         - Runs the test suites for all three branches.
+
+Documentation:
+  --update-docs           - Builds the documentation in the dev branch.
+  --update-docs-kb        - Updates the knowledge base for the micro_X documentation.
 """
 
 # --- Configuration ---
@@ -342,6 +346,64 @@ def run_tests_for_branch(environment_root, branch_name, branch_project_root_path
     
     run_command(test_command, branch_project_root_path, f"Running tests for {branch_name}")
 
+def update_docs(environment_root):
+    """Builds the Sphinx documentation in the dev branch."""
+    print("📚 Building documentation in the 'dev' branch environment...")
+
+    dev_branch_dir = os.path.join(environment_root, DEV_BRANCH_DIR_NAME)
+
+    if not os.path.isdir(dev_branch_dir):
+        print(f"❌ Error: 'dev' branch directory not found at '{dev_branch_dir}'.")
+        print("   Please run '/dev --activate' first.")
+        return
+
+    # Run make command in the dev branch directory
+    docs_source_dir = os.path.join(dev_branch_dir, 'docs', 'source')
+    if not os.path.isdir(docs_source_dir):
+        print(f"❌ Error: Documentation source directory not found in 'dev' branch at '{docs_source_dir}'")
+        return
+
+    make_command = ['make', '-C', docs_source_dir, 'html']
+    if run_command(make_command, dev_branch_dir, "Building Sphinx documentation for dev branch"):
+        print("\n✅ Documentation build complete in the 'dev' branch.")
+        print(f"   You can view the updated docs by running micro_X from the '{DEV_BRANCH_DIR_NAME}' directory and using '/docs'.")
+
+def update_docs_knowledge_base(environment_root):
+    """Updates the knowledge base for the micro_X documentation in the dev branch."""
+    print("🧠 Updating documentation knowledge base in the 'dev' branch environment...")
+
+    dev_branch_dir = os.path.join(environment_root, DEV_BRANCH_DIR_NAME)
+
+    if not os.path.isdir(dev_branch_dir):
+        print(f"❌ Error: 'dev' branch directory not found at '{dev_branch_dir}'.")
+        print("   Please run '/dev --activate' first.")
+        return
+
+    python_executable = os.path.join(dev_branch_dir, '.venv', 'bin', 'python')
+    knowledge_script = os.path.join(dev_branch_dir, 'utils', 'knowledge.py')
+    docs_html_dir = os.path.join(dev_branch_dir, 'docs', 'source', 'build', 'html')
+
+    if not os.path.isfile(python_executable) or not os.path.isfile(knowledge_script):
+        print(f"❌ Error: 'dev' environment is incomplete. Python executable or knowledge.py is missing.")
+        return
+    
+    if not os.path.isdir(docs_html_dir):
+        print(f"❌ Error: Documentation HTML directory not found in 'dev' branch at '{docs_html_dir}'.")
+        print("   Please run '/dev --update-docs' first to build the documentation.")
+        return
+
+    kb_command = [
+        python_executable,
+        knowledge_script,
+        'add-dir',
+        docs_html_dir,
+        '--name',
+        'micro_X_docs'
+    ]
+    
+    if run_command(kb_command, dev_branch_dir, "Updating micro_X_docs knowledge base"):
+        print("\n✅ Documentation knowledge base update complete.")
+
 def main():
     """Main function to parse arguments and execute logic."""
     class HelpAction(argparse.Action):
@@ -407,6 +469,14 @@ def main():
         "--run-tests-all", action="store_true",
         help="Runs the test suites for the main, testing, and dev branches."
     )
+    action_group.add_argument(
+        "--update-docs", action="store_true",
+        help="Builds the documentation in the dev branch."
+    )
+    action_group.add_argument(
+        "--update-docs-kb", action="store_true",
+        help="Updates the knowledge base for the micro_X documentation."
+    )
 
     # If no arguments are provided, print help text
     if len(sys.argv) == 1:
@@ -467,6 +537,10 @@ def main():
         run_tests_for_branch(environment_root, "testing", os.path.join(environment_root, TESTING_BRANCH_DIR_NAME))
         run_tests_for_branch(environment_root, "dev", os.path.join(environment_root, DEV_BRANCH_DIR_NAME))
         print("\n✅ All test suites have been run.")
+    elif args.update_docs:
+        update_docs(environment_root)
+    elif args.update_docs_kb:
+        update_docs_knowledge_base(environment_root)
 
 if __name__ == "__main__":
     main()

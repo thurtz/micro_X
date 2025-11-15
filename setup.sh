@@ -33,12 +33,8 @@ OS_NAME=""
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     OS_DETECTED="linux" # Default for linux-gnu
     # Check for WSL first, as it's a specific environment on top of a Linux distro
-    if grep -qi microsoft /proc/version || [[ -n "$WSL_DISTRO_NAME" ]]; then
-        OS_DETECTED="wsl"
-        OS_NAME="WSL ($WSL_DISTRO_NAME)"
-    # Then check for Termux, another specific environment
-    elif [[ -n "$TERMUX_VERSION" ]]; then
-        OS_DETECTED="termux"
+            # Check for Termux, another specific environment
+            if [[ -n "$TERMUX_VERSION" ]]; then        OS_DETECTED="termux"
         OS_NAME="Termux"
     # Fallback to general Linux distribution detection
     elif [ -f /etc/os-release ]; then
@@ -97,24 +93,15 @@ if [[ -n "$OS_DETECTED" ]]; then
                 OS_DETECTED="" # Force menu
             fi
             ;;
-        "termux")
-            read -p "Detected Termux. Use Termux setup? (Y/n/menu): " choice
-            if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
-                SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_termux.sh"
-            elif [[ "$choice" =~ ^[Mm] ]]; then
-                OS_DETECTED="" # Force menu
-            fi
-            ;;
-        "wsl")
-            read -p "Detected WSL. Use WSL setup? (Y/n/menu): " choice
-            if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
-                SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_wsl.sh"
-            elif [[ "$choice" =~ ^[Mm] ]]; then
-                OS_DETECTED="" # Force menu
-            fi
-            ;;
-        "openbsd")
-            read -p "Detected OpenBSD. Use OpenBSD setup? (Y/n/menu): " choice
+                    "termux")
+                        read -p "Detected Termux. Use Termux setup? (Y/n/menu): " choice
+                        if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
+                            SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_termux.sh"
+                        elif [[ "$choice" =~ ^[Mm] ]]; then
+                            OS_DETECTED="" # Force menu
+                        fi
+                        ;;
+                    "openbsd")            read -p "Detected OpenBSD. Use OpenBSD setup? (Y/n/menu): " choice
             if [[ "$choice" =~ ^[Yy]$ ]] || [[ -z "$choice" ]]; then
                 SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_openbsd.sh"
             elif [[ "$choice" =~ ^[Mm] ]]; then
@@ -174,28 +161,26 @@ if [[ -z "$SELECTED_SCRIPT" ]] && [[ -z "$OS_DETECTED" ]]; then # If auto-detect
     echo "1. Linux Mint / Debian / Ubuntu"
     echo "2. macOS"
     echo "3. Termux (Android)"
-    echo "4. WSL (Windows Subsystem for Linux)"
-    echo "5. OpenBSD"
-    echo "6. Fedora"
-    echo "7. Arch Linux"
-    echo "8. FreeBSD"
-    echo "9. NetBSD"
-    echo "10. RHEL / CentOS"
-    echo "11. Exit"
-    read -p "Enter your choice (1-11): " menu_choice
+    echo "4. OpenBSD"
+    echo "5. Fedora"
+    echo "6. Arch Linux"
+    echo "7. FreeBSD"
+    echo "8. NetBSD"
+    echo "9. RHEL / CentOS"
+    echo "10. Exit"
+    read -p "Enter your choice (1-10): " menu_choice
 
     case "$menu_choice" in
         1) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_mint.sh" ;;
         2) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_mac.sh" ;;
         3) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_termux.sh" ;;
-        4) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_wsl.sh" ;;
-        5) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_openbsd.sh" ;;
-        6) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_fedora.sh" ;;
-        7) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_arch.sh" ;;
-        8) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_freebsd.sh" ;;
-        9) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_netbsd.sh" ;;
-        10) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_rhel.sh" ;;
-        11) echo "Exiting setup."; exit 0 ;;
+        4) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_openbsd.sh" ;;
+        5) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_fedora.sh" ;;
+        6) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_arch.sh" ;;
+        7) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_freebsd.sh" ;;
+        8) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_netbsd.sh" ;;
+        9) SELECTED_SCRIPT="$SETUP_SCRIPTS_DIR/setup_micro_X_rhel.sh" ;;
+        10) echo "Exiting setup."; exit 0 ;;
         *) echo "Invalid choice. Exiting."; exit 1 ;;
     esac
 fi

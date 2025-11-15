@@ -14,6 +14,7 @@ import json
 import shutil
 import hashlib
 import sys
+import socket
 import datetime # Added for log timestamps
 from typing import Tuple, Optional
 
@@ -342,9 +343,79 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
     return is_developer_mode, integrity_ok
 
 
+
+# --- API Server Implementation ---
+API_SOCKET_PATH = "/tmp/microx_api.sock"
+
+async def api_server_handler(reader, writer):
+    """Handles incoming API requests."""
+    global shell_engine_instance, ui_manager_instance, input_lock
+    data = await reader.read(4096)
+    message = data.decode()
+    addr = writer.get_extra_info('peername')
+    logger.info(f"API server received: {message!r} from {addr!r}")
+
+    try:
+        await input_lock.acquire()
+        request = json.loads(message)
+        response = {}
+
+        if request.get("type") == "get_input":
+            prompt = request.get("prompt", "")
+            logger.info(f"API: Handling get_input with prompt: '{prompt}'")
+            
+            if shell_engine_instance:
+                user_input = await shell_engine_instance.get_user_input_from_api(prompt)
+                response = {"status": "ok", "value": user_input}
+            else:
+                logger.error("API server cannot handle get_input: shell_engine_instance is not available.")
+                response = {"status": "error", "error": "Shell engine not initialized"}
+
+        else:
+            response = {"status": "error", "error": "Invalid request type"}
+
+    except json.JSONDecodeError:
+        logger.error("API server received invalid JSON.")
+        response = {"status": "error", "error": "Invalid JSON format"}
+    except Exception as e:
+        logger.error(f"API server error: {e}", exc_info=True)
+        response = {"status": "error", "error": str(e)}
+    finally:
+        if input_lock.locked():
+            input_lock.release()
+
+    writer.write(json.dumps(response).encode('utf-8'))
+    await writer.drain()
+
+    logger.info("API server closing client socket")
+    writer.close()
+    await writer.wait_closed()
+
+async def start_api_server():
+    """Starts the micro_X API server."""
+    # Set the environment variable for scripts to find the socket
+    os.environ["MICROX_API_SOCKET"] = API_SOCKET_PATH
+    
+    # Clean up old socket file if it exists
+    if os.path.exists(API_SOCKET_PATH):
+        os.remove(API_SOCKET_PATH)
+        logger.info(f"Removed stale API socket file: {API_SOCKET_PATH}")
+
+    server = await asyncio.start_unix_server(api_server_handler, path=API_SOCKET_PATH)
+
+    addr = server.sockets[0].getsockname()
+    logger.info(f'API server listening on {addr}')
+
+    async with server:
+        await server.serve_forever()
+
 async def main_async_runner():
     """ Main asynchronous runner for the application. """
     global app_instance, ui_manager_instance, shell_engine_instance, git_context_manager_instance
+
+    # Start the API server as a background task
+    api_server_task = asyncio.create_task(start_api_server())
+    logger.info("API server task created.")
 
     # --- FIX START: UI Backend Selection and Initialization ---
     # This block correctly selects the UI backend based on the configuration,
@@ -547,6 +618,11 @@ def run_shell():
     except Exception as e:
         print(f"\nUnexpected critical error: {e}"); logger.critical("Critical error in run_shell or main_async_runner", exc_info=True)
     finally:
+        # Clean up the API socket file
+        if os.path.exists(API_SOCKET_PATH):
+            os.remove(API_SOCKET_PATH)
+            logger.info(f"Cleaned up API socket file: {API_SOCKET_PATH}")
+
         global git_context_manager_instance
         if git_context_manager_instance :
             loop = None
