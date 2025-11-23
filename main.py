@@ -110,6 +110,7 @@ def load_configuration():
 
 
 load_configuration() # Load config at startup
+modules.ollama_manager.set_ollama_host_from_config(config)
 
 def normal_input_accept_handler(buff):
     """Universal handler for input submission from both prompt_toolkit and Curses UI."""
