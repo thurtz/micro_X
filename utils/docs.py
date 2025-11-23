@@ -68,6 +68,34 @@ def main():
         logging.getLogger().setLevel(log_level)
 
     if args.query:
+        # --- Check if Knowledge Base is Built ---
+        # We need to import the necessary modules here, inside the 'if' block,
+        # to avoid loading them when just opening the browser.
+        from modules import config_handler
+        from modules.rag_manager import RAGManager
+
+        # A minimal config load is needed for the RAGManager
+        project_root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        config_dir = os.path.join(project_root_dir, 'config')
+        default_config_path = os.path.join(config_dir, 'default_config.json')
+        user_config_path = os.path.join(config_dir, 'user_config.json')
+        
+        config = config_handler.load_jsonc_file(default_config_path) or {}
+        user_settings = config_handler.load_jsonc_file(user_config_path)
+        if user_settings:
+            # A simple merge for this check
+            config.update(user_settings)
+
+        rag_manager = RAGManager(config, name='micro_X_docs')
+        rag_manager.initialize()
+
+        if rag_manager.vector_store and rag_manager.vector_store._collection.count() == 0:
+            print("The 'micro_X_docs' knowledge base is empty or has not been built yet.")
+            print("To enable documentation queries, please build it by running the following command:")
+            print("\n    /knowledge --name micro_X_docs add-dir docs/source\n")
+            sys.exit(0)
+
+        # --- Proceed with Query ---
         query_text = " ".join(args.query)
         if args.rag:
             response = asyncio.run(query_knowledge_base_rag(kb_name="micro_X_docs", query=query_text))
