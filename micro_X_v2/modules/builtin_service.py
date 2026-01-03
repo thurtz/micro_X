@@ -16,18 +16,17 @@ class BuiltinService:
         self.bus.subscribe_async(EventType.USER_INPUT_RECEIVED, self._on_input)
 
     async def _on_input(self, event: Event):
-        text = event.payload.get('input', "").strip().lower()
+        text = event.payload.get('input', "").strip()
+        text_lower = text.lower()
         
-        if text.startswith("/alias"):
-             # For now, just a placeholder message
+        if text_lower.startswith("/alias"):
             await self.bus.publish(Event(
-                type=EventType.EXECUTION_OUTPUT,
-                payload={'output': "ℹ️ Alias management not yet implemented in V2 UI (but loading works)."},
+                type=EventType.ALIAS_COMMAND_RECEIVED,
+                payload={'input': text},
                 sender="BuiltinService"
             ))
-            await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
             
-        elif text == "/exit" or text == "exit":
+        elif text_lower == "/exit" or text_lower == "exit":
             logger.info("BuiltinService: Exit requested.")
             await self.bus.publish(Event(EventType.APP_SHUTDOWN))
             # prompt_toolkit app.exit() will be handled by the UI listening for SHUTDOWN or just exiting

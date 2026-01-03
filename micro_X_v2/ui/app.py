@@ -68,13 +68,16 @@ class V2UIManager:
 
         @self.kb.add("enter")
         def _(event):
+            # VERY IMPORTANT: Only handle input relevant to the current state!
             current_state = self.state.current_state
             
+            # Read input and clear it immediately
+            user_text = self.input_area.text.strip()
+            self.input_area.text = ""
+
             if current_state == AppState.IDLE:
-                user_text = self.input_area.text.strip()
                 if user_text:
                     self.append_text(f"\n(v2) > {user_text}\n")
-                    self.input_area.text = ""
                     asyncio.create_task(self.bus.publish(Event(
                         type=EventType.USER_INPUT_RECEIVED,
                         payload={'input': user_text},
@@ -82,8 +85,7 @@ class V2UIManager:
                     )))
             
             elif current_state == AppState.CONFIRMATION:
-                choice = self.input_area.text.strip().lower()
-                self.input_area.text = ""
+                choice = user_text.lower()
                 
                 if choice in ['1', 'y', 'yes', '']:
                     # Default confirmation (uses currently proposed category)

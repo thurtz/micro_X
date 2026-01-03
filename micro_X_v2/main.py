@@ -39,12 +39,67 @@ class LogicEngine:
         if not user_input:
             return
             
-        # 1. Expand Alias
-        user_input = self.alias_manager.resolve_alias(user_input)
-
-        # Ignore builtins (check after expansion, though usually aliases map to shell cmds)
-        if user_input.lower().split()[0] in ["/exit", "exit", "/help", "help", "/alias"]:
+        logger.debug(f"LogicEngine received input: '{user_input}'")
+        
+        # 1. Check for builtins (BEFORE alias expansion)
+        first_token = user_input.lower().split()[0]
+        if first_token in ["/exit", "exit", "/help", "help", "/alias"]:
+            logger.debug("LogicEngine ignoring builtin/alias (pre-expansion).")
             return
+
+        # 2. Expand Alias
+        user_input = self.alias_manager.resolve_alias(user_input)
+        
+        # 3. Check for builtins (after expansion)
+        first_token = user_input.lower().split()[0]
+        if first_token in ["/exit", "exit", "/help", "help", "/alias"]:
+            # Note: AliasManager expansion might have turned /alias into /utils alias,
+            # so we check the expanded version too? No, raw /alias check was moved before expansion.
+            # But wait, if I have /l -> ls -la. first_token is ls. Not builtin. Correct.
+            return
+
+        # 4. Check if command is already known/categorized (Auto-Run)
+        known_category = self.category_manager.classify_command(user_input)
+        if known_category:
+            logger.info(f"Auto-running known command: {user_input} ({known_category})")
+            # We need to set the context proposed command so execution has something to run
+            # But wait, EXECUTION_REQUESTED payload carries the command.
+            # However, StateManager context update usually happens on SUGGESTION_READY.
+            # We should probably update context manually or just pass it in payload.
+            
+            # Update context directly? No, clean way:
+            # We skip CONFIRMATION state and go straight to EXECUTING (via EXECUTION_REQUESTED).
+            
+            # BUT: StateManager needs to know we are EXECUTING.
+            # StateManager listens to USER_CONFIRMED -> EXECUTING.
+            # It doesn't listen to EXECUTION_REQUESTED?
+            # Let's check StateManager. It listens to nothing relevant for transition to EXECUTING except USER_CONFIRMED.
+            
+            # We need a new event or just fire EXECUTION_REQUESTED and let ShellService handle it?
+            # If we fire EXECUTION_REQUESTED, ShellService runs.
+            # But StateManager remains in IDLE.
+            # Then EXECUTION_FINISHED fires -> StateManager sets IDLE (no change).
+            # This is technically fine, but UI might not show [Running Command...] status.
+            
+            # Better: Publish a "DIRECT_EXECUTION_STARTED" event?
+            # Or just rely on ShellService/TmuxService execution.
+            
+            # Let's fire EXECUTION_REQUESTED.
+            await self.bus.publish(Event(
+                type=EventType.EXECUTION_REQUESTED,
+                payload={'command': user_input, 'mode': known_category},
+                sender="Logic"
+            ))
+            return
+
+        if user_input.startswith("/") or user_input.startswith("ls ") or user_input == "ls":
+             # Treat as direct command -> Suggestion (Confirmation)
+             # V1 would run this if categorized.
+             
+             # Let's stick to the current "Safe Mode" (Confirmation) for everything unless we are sure.
+             pass
+
+        # Check for RAG query
 
         # Check for RAG query
         if user_input.lower().startswith("/docs"):
@@ -108,8 +163,7 @@ async def main():
     tmux_service = TmuxService(bus)
     builtin_service = BuiltinService(bus)
     category_manager = CategoryManager(config)
-    alias_manager = AliasManager(config)
-    rag_service = RagService(bus, config)
+    alias_manager = AliasManager(bus, config)
     
     ui = V2UIManager(bus, state_manager)
     logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager)

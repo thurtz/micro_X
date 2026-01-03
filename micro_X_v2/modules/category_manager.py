@@ -69,10 +69,8 @@ class CategoryManager:
             if cmd in cmds:
                 cmds.remove(cmd)
 
-    def classify_command(self, cmd: str) -> str:
-        """Returns the category for a command string."""
-        # Simple exact match for the first word/token usually
-        # But V1 checked the full command string in the list.
+    def classify_command(self, cmd: str) -> Optional[str]:
+        """Returns the category for a command string, or None if not explicitly defined."""
         
         # Check exact matches first
         for cat, cmds in self.categories.items():
@@ -85,5 +83,4 @@ class CategoryManager:
             if binary in cmds:
                 return cat
 
-        # Default fallback from config
-        return self.config_manager.get("behavior.default_category_for_unclassified", "semi_interactive")
+        return None

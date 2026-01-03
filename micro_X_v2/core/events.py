@@ -30,7 +30,9 @@ class EventType(Enum):
     RAG_QUERY_REQUESTED = auto()
     RAG_RESPONSE_READY = auto()
     
-    # RAG Events
+    # Alias Events
+    ALIAS_COMMAND_RECEIVED = auto() # /alias --add etc.
+    ALIAS_LIST_REQUESTED = auto()
     
     # UI/State Events
     STATE_CHANGED = auto()        # The global app state has transitioned
