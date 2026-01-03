@@ -16,6 +16,8 @@ from .modules.category_manager import CategoryManager
 from .modules.alias_manager import AliasManager
 from .modules.tmux_service import TmuxService
 from .modules.rag_service import RagService
+from .modules.help_service import HelpService
+from .modules.intent_service import IntentService
 
 # Configure Logging
 logging.basicConfig(filename='v2.log', level=logging.DEBUG)
@@ -23,13 +25,16 @@ logger = logging.getLogger(__name__)
 
 class LogicEngine:
     """Handles the translation logic and execution requests."""
-    def __init__(self, bus: EventBus, state_manager: StateManager, ollama_service: OllamaService, config: ConfigManager, category_manager: CategoryManager, alias_manager: AliasManager):
+    def __init__(self, bus: EventBus, state_manager: StateManager, ollama_service: OllamaService, 
+                 config: ConfigManager, category_manager: CategoryManager, 
+                 alias_manager: AliasManager, intent_service: IntentService):
         self.bus = bus
         self.state = state_manager
         self.ollama = ollama_service
         self.config = config
         self.category_manager = category_manager
         self.alias_manager = alias_manager
+        self.intent_service = intent_service
         
         self.bus.subscribe_async(EventType.USER_INPUT_RECEIVED, self._handle_input)
         self.bus.subscribe_async(EventType.USER_CONFIRMED, self._execute_command)
@@ -41,6 +46,23 @@ class LogicEngine:
             
         logger.debug(f"LogicEngine received input: '{user_input}'")
         
+        # 0. Check for forced execution (!)
+        if user_input.startswith("!"):
+            forced_cmd = user_input[1:].strip()
+            if forced_cmd:
+                cat = self.category_manager.classify_command(forced_cmd)
+                if not cat:
+                    # Fallback for forced command if not in json categories
+                    cat = self.config.get("behavior.default_category_for_unclassified", "semi_interactive")
+                
+                logger.info(f"LogicEngine: Force executing '{forced_cmd}' with category '{cat}'")
+                await self.bus.publish(Event(
+                    type=EventType.EXECUTION_REQUESTED,
+                    payload={'command': forced_cmd, 'mode': cat},
+                    sender="Logic"
+                ))
+                return
+
         # 1. Check for builtins (BEFORE alias expansion)
         first_token = user_input.lower().split()[0]
         if first_token in ["/exit", "exit", "/help", "help", "/alias"]:
@@ -50,7 +72,24 @@ class LogicEngine:
         # 2. Expand Alias
         user_input = self.alias_manager.resolve_alias(user_input)
         
-        # 3. Check for builtins (after expansion)
+        # 3. Intent Classification (Semantic Routing)
+        intent, score = await self.intent_service.classify(user_input)
+        threshold = self.config.get("intent_classification.classification_threshold", 0.75)
+        logger.debug(f"Intent check: '{user_input}' -> {intent} (score: {score:.2f}, threshold: {threshold})")
+        
+        if intent and score > threshold:
+            mapped_cmd = self.intent_service.get_command_for_intent(intent)
+            if mapped_cmd:
+                logger.info(f"LogicEngine: Redirecting intent '{intent}' to '{mapped_cmd}'")
+                # Publish new event with the mapped command so services (Help, Builtin) can pick it up
+                await self.bus.publish(Event(
+                    type=EventType.USER_INPUT_RECEIVED,
+                    payload={'input': mapped_cmd},
+                    sender="LogicRedirect"
+                ))
+                return
+
+        # 4. Check for builtins (after expansion/intent)
         first_token = user_input.lower().split()[0]
         if first_token in ["/exit", "exit", "/help", "help", "/alias"]:
             # Note: AliasManager expansion might have turned /alias into /utils alias,
@@ -164,9 +203,12 @@ async def main():
     builtin_service = BuiltinService(bus)
     category_manager = CategoryManager(config)
     alias_manager = AliasManager(bus, config)
+    rag_service = RagService(bus, config)
+    help_service = HelpService(bus)
+    intent_service = IntentService(bus, config)
     
     ui = V2UIManager(bus, state_manager)
-    logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager)
+    logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager, intent_service)
 
     # Signal app start
     await bus.publish(Event(EventType.APP_STARTED))

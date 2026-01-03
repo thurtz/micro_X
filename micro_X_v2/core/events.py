@@ -34,6 +34,9 @@ class EventType(Enum):
     ALIAS_COMMAND_RECEIVED = auto() # /alias --add etc.
     ALIAS_LIST_REQUESTED = auto()
     
+    # Intent Events
+    INTENT_STATUS_CHANGED = auto()
+    
     # UI/State Events
     STATE_CHANGED = auto()        # The global app state has transitioned
     REQUEST_CONFIRMATION = auto() # Logic requests UI to show confirmation
