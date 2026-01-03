@@ -120,6 +120,11 @@ class AliasManager:
             await self._output("❌ Error: Alias names must start with '/'")
             return
         
+        reserved = ["/exit", "/help", "/alias", "/docs", "/config", "/history"]
+        if name.lower() in reserved:
+            await self._output(f"❌ Error: '{name}' is a reserved command and cannot be used as an alias.")
+            return
+        
         self.user_aliases[name] = cmd
         if self._save_user_aliases():
             self._update_merged()

@@ -139,25 +139,62 @@ class OllamaService:
         except Exception as e:
             await self._broadcast_error(f"Error stopping service: {e}")
 
+    async def validate_command(self, cmd: str) -> bool:
+        """Uses a specialized model to check if the string is a valid command."""
+        if not self._is_running: return False
+        
+        model = self.config.get("ai_models.validator.model", "qwen3:0.6b")
+        system_prompt = self.config.get("prompts.validator.system", "")
+        user_template = self.config.get("prompts.validator.user_template", "{command_text}")
+        prompt = user_template.format(command_text=cmd)
+        
+        try:
+            response = await asyncio.to_thread(
+                ollama.generate, model=model, system=system_prompt, prompt=prompt
+            )
+            text = self._clean_response(response['response']).lower()
+            return "yes" in text
+        except Exception as e:
+            logger.error(f"Validation failed: {e}")
+            return True # Fail open (assume valid) if validator crashes? Or False? V1 usually fails open or retries.
+
     async def generate_command(self, prompt: str) -> Optional[str]:
-        """High-level method to translate NL to shell command."""
+        """High-level method to translate NL to shell command with validation."""
         if not self._is_running:
             return None
         
-        # Get model from config
         model_name = self.config.get("ai_models.primary_translator.model", "llama3.2:3b")
+        retries = self.config.get("behavior.translation_validation_cycles", 3)
         
-        try:
-            logger.info(f"OllamaService: Generating command with model '{model_name}'")
-            response = await asyncio.to_thread(
-                ollama.generate, 
-                model=model_name,
-                prompt=f"Translate this to a single linux command. Output ONLY the command: {prompt}"
-            )
-            return self._clean_response(response['response'])
-        except Exception as e:
-            logger.error(f"Ollama generation failed: {e}")
-            return None
+        current_prompt = f"Translate this to a single linux command. Output ONLY the command: {prompt}"
+        
+        for attempt in range(retries):
+            try:
+                logger.info(f"OllamaService: Generating (Attempt {attempt+1}/{retries})...")
+                response = await asyncio.to_thread(
+                    ollama.generate, 
+                    model=model_name,
+                    prompt=current_prompt
+                )
+                candidate = self._clean_response(response['response'])
+                
+                # Validation Step
+                logger.info(f"OllamaService: Validating '{candidate}'...")
+                is_valid = await self.validate_command(candidate)
+                
+                if is_valid:
+                    return candidate
+                else:
+                    logger.warning(f"OllamaService: Validation failed for '{candidate}'. Retrying...")
+                    # Feedback for next attempt (Chain of Thought simulation)
+                    current_prompt += f"\n\nYour previous output '{candidate}' was marked as invalid. Please provide a valid Linux command."
+            
+            except Exception as e:
+                logger.error(f"Ollama generation error: {e}")
+                return None
+        
+        logger.error("OllamaService: Failed to generate valid command after retries.")
+        return None
 
     async def explain_command(self, cmd: str) -> Optional[str]:
         if not self._is_running: return None

@@ -28,6 +28,22 @@ if ! command -v tmux >/dev/null 2>&1; then
 fi
 
 # Launch
-TMUX_CONFIG="config/.tmux_v2.conf"
+TMUX_CONFIG="$SCRIPT_DIR/config/.tmux_v2.conf"
+# Explicitly construct the launch command
+LAUNCH_CMD="bash -c 'source .venv/bin/activate && python3 -m micro_X_v2'"
+
 echo "🚀 Launching micro_X V2 in tmux session: $SESSION_NAME"
-tmux -f "$TMUX_CONFIG" new-session -A -s "$SESSION_NAME"
+
+if [ -n "$TMUX" ]; then
+    # We are inside tmux, create the session and switch to it
+    tmux -f "$TMUX_CONFIG" new-session -d -s "$SESSION_NAME" "$LAUNCH_CMD" 2>/dev/null
+    # Ensure new windows also use this command
+    tmux set-option -t "$SESSION_NAME" default-command "$LAUNCH_CMD"
+    tmux switch-client -t "$SESSION_NAME"
+else
+    # We are not in tmux, create and attach
+    tmux -f "$TMUX_CONFIG" new-session -d -s "$SESSION_NAME" "$LAUNCH_CMD"
+    # Ensure new windows also use this command
+    tmux set-option -t "$SESSION_NAME" default-command "$LAUNCH_CMD"
+    tmux attach-session -t "$SESSION_NAME"
+fi

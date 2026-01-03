@@ -30,20 +30,4 @@ class BuiltinService:
             logger.info("BuiltinService: Exit requested.")
             await self.bus.publish(Event(EventType.APP_SHUTDOWN))
             # prompt_toolkit app.exit() will be handled by the UI listening for SHUTDOWN or just exiting
-            
-        elif text == "/help" or text == "help":
-            help_text = (
-                "\n📚 micro_X V2 Help:\n"
-                "  /ls, /pwd...    - Run shell commands directly.\n"
-                "  <any text>      - AI will translate to a command.\n"
-                "  /help           - Show this message.\n"
-                "  /exit           - Quit micro_X.\n"
-            )
-            await self.bus.publish(Event(
-                type=EventType.EXECUTION_OUTPUT,
-                payload={'output': help_text},
-                sender="BuiltinService"
-            ))
-            # Signal that we are done with this input
-            await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
 
