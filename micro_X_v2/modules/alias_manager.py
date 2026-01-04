@@ -69,6 +69,9 @@ class AliasManager:
             
         return command
 
+    def get_all_aliases(self) -> Dict[str, str]:
+        return self.merged_aliases
+
     async def _on_alias_command(self, event: Event):
         """Handles /alias --add, --remove, --list etc."""
         raw_input = event.payload.get('input', "")

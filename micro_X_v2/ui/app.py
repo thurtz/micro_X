@@ -8,6 +8,7 @@ from prompt_toolkit.layout import Layout, HSplit, Window
 from prompt_toolkit.widgets import TextArea, Label, Frame
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
+from prompt_toolkit.completion import PathCompleter, WordCompleter, FuzzyCompleter, merge_completers
 
 from ..core.events import EventBus, Event, EventType
 from ..core.state import StateManager, AppState
@@ -15,12 +16,18 @@ from ..core.state import StateManager, AppState
 logger = logging.getLogger(__name__)
 
 class V2UIManager:
-    def __init__(self, bus: EventBus, state_manager: StateManager, history):
+    def __init__(self, bus: EventBus, state_manager: StateManager, history, completion_words: list = None):
         self.bus = bus
         self.state = state_manager
         self.history = history
         self.app: Optional[Application] = None
         
+        # Autocompletion setup
+        words = completion_words or []
+        word_completer = WordCompleter(words, ignore_case=True)
+        path_completer = PathCompleter(expanduser=True)
+        self.completer = FuzzyCompleter(merge_completers([word_completer, path_completer]))
+
         # Styles
         self.style = Style.from_dict({
             'output-field': '#abb2bf',
@@ -46,7 +53,8 @@ class V2UIManager:
             prompt=[('class:prompt', '(v2) > ')],
             multiline=False,
             style='class:input-field',
-            history=self.history
+            history=self.history,
+            completer=self.completer
         )
         
         self.status_bar = Label(text=" Status: BOOTING | Ollama: UNKNOWN", style='class:status-bar')
@@ -123,6 +131,24 @@ class V2UIManager:
                         payload={'command': cmd},
                         sender="UIManager"
                     )))
+                elif choice in ['6', 'm', 'modify']:
+                    # Modify: Cancel confirmation, pre-fill input with command
+                    cmd = self.state.context.proposed_command
+                    
+                    # We manually cancel the current flow
+                    asyncio.create_task(self.bus.publish(Event(
+                        type=EventType.USER_CANCELLED,
+                        sender="UIManager"
+                    )))
+                    
+                    # And set the input text. 
+                    # Note: We need to wait for state to become IDLE? 
+                    # State update is async via event bus.
+                    # Ideally we should publish an event "EDIT_REQUESTED", but direct UI manipulation is faster here.
+                    self.input_area.text = cmd
+                    # Move cursor to end
+                    self.input_area.buffer.cursor_position = len(cmd)
+                    
                 elif choice in ['7', 'c', 'cancel', 'n', 'no']:
                     asyncio.create_task(self.bus.publish(Event(
                         type=EventType.USER_CANCELLED,
@@ -163,6 +189,7 @@ class V2UIManager:
             self.append_text("  [3] Run as Semi-Interactive\n")
             self.append_text("  [4] Run as TUI\n")
             self.append_text("  [5] Explain\n")
+            self.append_text("  [6] Modify\n")
             self.append_text("  [7] Cancel\n")
             self.append_text("Choice (1-7): ")
             if self.app:

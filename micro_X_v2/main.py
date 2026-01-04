@@ -203,7 +203,12 @@ async def main():
     history_service = HistoryService(bus, config)
     git_service = GitContextService(bus, config)
     
-    ui = V2UIManager(bus, state_manager, history_service.get_pt_history())
+    # Collect completion words
+    builtins = ["/exit", "/help", "/alias", "/history", "/git_branch", "/config", "/docs"]
+    aliases = list(alias_manager.get_all_aliases().keys())
+    completion_words = sorted(list(set(builtins + aliases)))
+
+    ui = V2UIManager(bus, state_manager, history_service.get_pt_history(), completion_words)
     logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager, intent_service)
 
     # Signal app start
