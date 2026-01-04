@@ -18,6 +18,8 @@ from .modules.tmux_service import TmuxService
 from .modules.rag_service import RagService
 from .modules.help_service import HelpService
 from .modules.intent_service import IntentService
+from .modules.history_service import HistoryService
+from .modules.git_context_service import GitContextService
 
 # Configure Logging
 logging.basicConfig(filename='v2.log', level=logging.DEBUG)
@@ -65,7 +67,7 @@ class LogicEngine:
 
         # 1. Check for builtins (BEFORE alias expansion)
         first_token = user_input.lower().split()[0]
-        if first_token in ["/exit", "exit", "/help", "help", "/alias"]:
+        if first_token in ["/exit", "exit", "/help", "help", "/alias", "/history", "/git_branch", "/config"]:
             logger.debug("LogicEngine ignoring builtin/alias (pre-expansion).")
             return
 
@@ -79,7 +81,7 @@ class LogicEngine:
         
         if intent and score > threshold:
             mapped_cmd = self.intent_service.get_command_for_intent(intent)
-            if mapped_cmd:
+            if mapped_cmd and mapped_cmd != user_input:
                 logger.info(f"LogicEngine: Redirecting intent '{intent}' to '{mapped_cmd}'")
                 # Publish new event with the mapped command so services (Help, Builtin) can pick it up
                 await self.bus.publish(Event(
@@ -89,9 +91,9 @@ class LogicEngine:
                 ))
                 return
 
-        # 4. Check for builtins (after expansion/intent)
+        # 4. Check for builtins (after expansion)
         first_token = user_input.lower().split()[0]
-        if first_token in ["/exit", "exit", "/help", "help", "/alias"]:
+        if first_token in ["/exit", "exit", "/help", "help", "/alias", "/history", "/git_branch", "/config"]:
             # Note: AliasManager expansion might have turned /alias into /utils alias,
             # so we check the expanded version too? No, raw /alias check was moved before expansion.
             # But wait, if I have /l -> ls -la. first_token is ls. Not builtin. Correct.
@@ -206,8 +208,10 @@ async def main():
     rag_service = RagService(bus, config)
     help_service = HelpService(bus)
     intent_service = IntentService(bus, config)
+    history_service = HistoryService(bus, config)
+    git_service = GitContextService(bus, config)
     
-    ui = V2UIManager(bus, state_manager)
+    ui = V2UIManager(bus, state_manager, history_service.get_pt_history())
     logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager, intent_service)
 
     # Signal app start

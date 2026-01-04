@@ -15,9 +15,10 @@ from ..core.state import StateManager, AppState
 logger = logging.getLogger(__name__)
 
 class V2UIManager:
-    def __init__(self, bus: EventBus, state_manager: StateManager):
+    def __init__(self, bus: EventBus, state_manager: StateManager, history):
         self.bus = bus
         self.state = state_manager
+        self.history = history
         self.app: Optional[Application] = None
         
         # Styles
@@ -44,7 +45,8 @@ class V2UIManager:
         self.input_area = TextArea(
             prompt=[('class:prompt', '(v2) > ')],
             multiline=False,
-            style='class:input-field'
+            style='class:input-field',
+            history=self.history
         )
         
         self.status_bar = Label(text=" Status: BOOTING | Ollama: UNKNOWN", style='class:status-bar')
