@@ -26,6 +26,8 @@ class IntentService:
         "ollama_stop": "/ollama stop",
         "ollama_restart": "/ollama restart",
         "ollama_status": "/ollama status",
+        "config_start": "/config --start",
+        "config_stop": "/config --stop",
         "command_list": "/command --list",
         "alias_list": "/alias --list",
         "generate_project_tree": "/tree",
