@@ -178,6 +178,20 @@ class V2UIManager:
                     sender="UIManager"
                 )))
 
+        @self.kb.add("pageup")
+        def _(event):
+            # Move cursor back significantly to force scroll up
+            b = self.output_area.buffer
+            # Estimate 50 chars per line * 20 lines = 1000
+            new_pos = max(0, b.cursor_position - 1000)
+            b.cursor_position = new_pos
+
+        @self.kb.add("pagedown")
+        def _(event):
+            b = self.output_area.buffer
+            new_pos = min(len(b.text), b.cursor_position + 1000)
+            b.cursor_position = new_pos
+
     def append_text(self, text: str):
         """Helper to append text to the output area and scroll."""
         self.output_area.text += text
