@@ -20,6 +20,7 @@ from .modules.help_service import HelpService
 from .modules.intent_service import IntentService
 from .modules.history_service import HistoryService
 from .modules.git_context_service import GitContextService
+from .modules.utility_service import UtilityService
 
 # Configure Logging
 logging.basicConfig(filename='v2.log', level=logging.DEBUG)
@@ -67,7 +68,15 @@ class LogicEngine:
 
         # 1. Check for builtins (BEFORE alias expansion)
         first_token = user_input.lower().split()[0]
-        if first_token in ["/exit", "exit", "/help", "help", "/alias", "/history", "/git_branch", "/config"]:
+        # We need a comprehensive list of builtins + utilities to ignore
+        # Since UtilityService handles them, LogicEngine must ignore.
+        
+        # Hardcoding the list for now, ideally pass it in or query services
+        ignore_list = ["/exit", "exit", "/help", "help", "/alias", "/history", "/git_branch", "/config"]
+        # Add utilities from UtilityService map (manually for now to avoid circular import issues in this snippet context)
+        ignore_list.extend(["/snapshot", "/tree", "/update", "/dev", "/list", "/logs", "/setup_brew", "/test", "/ollama_cli"])
+        
+        if first_token in ignore_list:
             logger.debug("LogicEngine ignoring builtin/alias (pre-expansion).")
             return
 
@@ -202,11 +211,13 @@ async def main():
     intent_service = IntentService(bus, config)
     history_service = HistoryService(bus, config)
     git_service = GitContextService(bus, config)
+    utility_service = UtilityService(bus, config)
     
     # Collect completion words
     builtins = ["/exit", "/help", "/alias", "/history", "/git_branch", "/config", "/docs"]
+    utils = list(utility_service.UTILITY_MAP.keys())
     aliases = list(alias_manager.get_all_aliases().keys())
-    completion_words = sorted(list(set(builtins + aliases)))
+    completion_words = sorted(list(set(builtins + utils + aliases)))
 
     ui = V2UIManager(bus, state_manager, history_service.get_pt_history(), completion_words)
     logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager, intent_service)
