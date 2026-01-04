@@ -9,6 +9,8 @@ from prompt_toolkit.widgets import TextArea, Label, Frame
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
 from prompt_toolkit.completion import PathCompleter, WordCompleter, FuzzyCompleter, merge_completers
+from prompt_toolkit.lexers import PygmentsLexer
+from pygments.lexers.shell import BashLexer
 
 from ..core.events import EventBus, Event, EventType
 from ..core.state import StateManager, AppState
@@ -28,6 +30,9 @@ class V2UIManager:
         path_completer = PathCompleter(expanduser=True)
         self.completer = FuzzyCompleter(merge_completers([word_completer, path_completer]))
 
+        # Syntax Highlighting
+        self.lexer = PygmentsLexer(BashLexer)
+
         # Styles
         self.style = Style.from_dict({
             'output-field': '#abb2bf',
@@ -39,6 +44,13 @@ class V2UIManager:
             'error': '#e06c75',
             'success': '#98c379',
             'warning': '#d19a66',
+            # Pygments tokens (basic mappings for Bash)
+            'pygments.keyword': 'bold #c678dd',
+            'pygments.string': '#98c379',
+            'pygments.operator': '#56b6c2',
+            'pygments.name.builtin': '#e5c07b',
+            'pygments.name.function': '#61afef',
+            'pygments.comment': 'italic #5c6370',
         })
 
         # UI Components
@@ -54,7 +66,8 @@ class V2UIManager:
             multiline=False,
             style='class:input-field',
             history=self.history,
-            completer=self.completer
+            completer=self.completer,
+            lexer=self.lexer
         )
         
         self.status_bar = Label(text=" Status: BOOTING | Ollama: UNKNOWN", style='class:status-bar')
