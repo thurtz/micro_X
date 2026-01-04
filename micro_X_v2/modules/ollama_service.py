@@ -36,6 +36,26 @@ class OllamaService:
         self.bus.subscribe_async(EventType.OLLAMA_START_REQUESTED, self.start_service)
         self.bus.subscribe_async(EventType.OLLAMA_STOP_REQUESTED, self.stop_service)
         self.bus.subscribe_async(EventType.AI_EXPLAIN_REQUESTED, self._on_explain_requested)
+        self.bus.subscribe_async(EventType.AI_ANALYZE_ERROR, self._on_analyze_error)
+
+    async def _on_analyze_error(self, event: Event):
+        cmd = event.payload.get('command')
+        output = event.payload.get('output')
+        
+        await self.bus.publish(Event(EventType.AI_PROCESSING_STARTED, sender="OllamaService"))
+        
+        analysis = await self.analyze_error(cmd, output)
+        
+        # We reuse EXPLANATION_READY or create a new one?
+        # Reusing explanation ready is fine, it displays text.
+        await self.bus.publish(Event(
+            type=EventType.AI_EXPLANATION_READY,
+            payload={'explanation': f"🔧 **Error Analysis**:\n{analysis}"},
+            sender="OllamaService"
+        ))
+        
+        # Reset state to IDLE so user can type new command
+        await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
 
     async def _on_explain_requested(self, event: Event):
         cmd = event.payload.get('command')
@@ -215,3 +235,20 @@ class OllamaService:
         except Exception as e:
             logger.error(f"Ollama explanation failed: {e}")
             return "Failed to get explanation."
+
+    async def analyze_error(self, cmd: str, output: str) -> str:
+        if not self._is_running: return "Ollama not running."
+        
+        # Use explainer model or primary? Explainer is good for text.
+        model_name = self.config.get("ai_models.explainer.model", "qwen3:0.6b")
+        prompt = f"The command `{cmd}` failed with the following output:\n\n{output}\n\nExplain why it failed and suggest a fix. Be concise."
+        
+        try:
+            response = await asyncio.to_thread(
+                ollama.generate,
+                model=model_name,
+                prompt=prompt
+            )
+            return self._clean_response(response['response'])
+        except Exception as e:
+            return f"Analysis failed: {e}"

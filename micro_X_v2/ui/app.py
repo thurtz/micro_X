@@ -157,9 +157,6 @@ class V2UIManager:
                     )))
                     
                     # And set the input text. 
-                    # Note: We need to wait for state to become IDLE? 
-                    # State update is async via event bus.
-                    # Ideally we should publish an event "EDIT_REQUESTED", but direct UI manipulation is faster here.
                     self.input_area.text = cmd
                     # Move cursor to end
                     self.input_area.buffer.cursor_position = len(cmd)
@@ -187,9 +184,28 @@ class V2UIManager:
                 else:
                     self.append_text("\n⚠️ Invalid choice. Use 1 (Confirm) or 7 (Cancel).\n")
 
+            elif current_state == AppState.ERROR_RECOVERY:
+                choice = user_text.lower()
+                if choice in ['1', 'y', 'yes', '']:
+                    # Trigger analysis
+                    failed_cmd = self.state.context.failed_command
+                    failed_out = self.state.context.failed_output
+                    
+                    asyncio.create_task(self.bus.publish(Event(
+                        type=EventType.AI_ANALYZE_ERROR, 
+                        payload={'command': failed_cmd, 'output': failed_out},
+                        sender="UIManager"
+                    )))
+                else:
+                    # Ignore/Cancel
+                    asyncio.create_task(self.bus.publish(Event(
+                        type=EventType.USER_CANCELLED,
+                        sender="UIManager"
+                    )))
+
         @self.kb.add("escape")
         def _(event):
-            if self.state.current_state == AppState.CONFIRMATION:
+            if self.state.current_state in [AppState.CONFIRMATION, AppState.CAUTION, AppState.ERROR_RECOVERY]:
                 asyncio.create_task(self.bus.publish(Event(
                     type=EventType.USER_CANCELLED,
                     sender="UIManager"
@@ -199,7 +215,6 @@ class V2UIManager:
         def _(event):
             # Move cursor back significantly to force scroll up
             b = self.output_area.buffer
-            # Estimate 50 chars per line * 20 lines = 1000
             new_pos = max(0, b.cursor_position - 1000)
             b.cursor_position = new_pos
 
@@ -248,6 +263,15 @@ class V2UIManager:
             self.append_text("Choice (1/7): ")
             if self.app:
                 self.app.layout.focus(self.input_area)
+
+        elif new_state == AppState.ERROR_RECOVERY:
+            self.append_text(f"\n⚠️  Command failed (Exit Code: Non-Zero)\n")
+            self.append_text("Action:\n")
+            self.append_text("  [1] Analyze Error with AI\n")
+            self.append_text("  [7] Ignore (Return to prompt)\n")
+            self.append_text("Choice (1/7): ")
+            if self.app:
+                self.app.layout.focus(self.input_area)
             
         elif new_state == AppState.EXECUTING:
             self.append_text(f"\n[Running Command...]\n")
@@ -285,8 +309,12 @@ class V2UIManager:
 
     async def _on_explanation_ready(self, event: Event):
         explanation = event.payload.get('explanation', "No explanation available.")
-        self.append_text(f"\n🧠 Explanation:\n{explanation}\n")
-        self.append_text("\nChoice (1-7): ")
+        self.append_text(f"\n{explanation}\n")
+        
+        # Only re-prompt if we are still in a confirmation flow
+        if self.state.current_state == AppState.CONFIRMATION:
+            self.append_text("\nChoice (1-7): ")
+            
         if self.app:
             self.app.invalidate()
 
