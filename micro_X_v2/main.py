@@ -31,7 +31,7 @@ class LogicEngine:
     """Handles the translation logic and execution requests."""
     def __init__(self, bus: EventBus, state_manager: StateManager, ollama_service: OllamaService, 
                  config: ConfigManager, category_manager: CategoryManager, 
-                 alias_manager: AliasManager, intent_service: IntentService):
+                 alias_manager: AliasManager, intent_service: IntentService, utility_service: UtilityService):
         self.bus = bus
         self.state = state_manager
         self.ollama = ollama_service
@@ -39,6 +39,7 @@ class LogicEngine:
         self.category_manager = category_manager
         self.alias_manager = alias_manager
         self.intent_service = intent_service
+        self.utility_service = utility_service
         
         self.bus.subscribe_async(EventType.USER_INPUT_RECEIVED, self._handle_input)
         self.bus.subscribe_async(EventType.USER_CONFIRMED, self._execute_command)
@@ -103,15 +104,7 @@ class LogicEngine:
 
         # 1. Check for builtins (BEFORE alias expansion)
         first_token = user_input.lower().split()[0]
-        # We need a comprehensive list of builtins + utilities to ignore
-        # Since UtilityService handles them, LogicEngine must ignore.
-        
-        # Hardcoding the list for now, ideally pass it in or query services
-        ignore_list = ["/exit", "exit", "/help", "help", "/alias", "/history", "/git_branch", "/config"]
-        # Add utilities from UtilityService map (manually for now to avoid circular import issues in this snippet context)
-        ignore_list.extend(["/snapshot", "/tree", "/update", "/dev", "/list", "/logs", "/setup_brew", "/test", "/ollama_cli"])
-        
-        if first_token in ignore_list:
+        if first_token in ["/exit", "exit", "/help", "help", "/alias", "/history", "/git_branch", "/config"]:
             logger.debug("LogicEngine ignoring builtin/alias (pre-expansion).")
             return
 
@@ -119,23 +112,38 @@ class LogicEngine:
         user_input = self.alias_manager.resolve_alias(user_input)
         
         # 3. Intent Classification (Semantic Routing)
-        intent, score = await self.intent_service.classify(user_input)
-        threshold = self.config.get("intent_classification.classification_threshold", 0.75)
-        logger.debug(f"Intent check: '{user_input}' -> {intent} (score: {score:.2f}, threshold: {threshold})")
-        
-        if intent and score > threshold:
-            mapped_cmd = self.intent_service.get_command_for_intent(intent)
-            if mapped_cmd and mapped_cmd != user_input:
-                logger.info(f"LogicEngine: Redirecting intent '{intent}' to '{mapped_cmd}'")
-                # Publish new event with the mapped command so services (Help, Builtin) can pick it up
-                await self.bus.publish(Event(
-                    type=EventType.USER_INPUT_RECEIVED,
-                    payload={'input': mapped_cmd},
-                    sender="LogicRedirect"
-                ))
-                return
+        # Only run for natural language (doesn't start with / or !)
+        intent, score = None, 0.0
+        if not user_input.startswith("/") and not user_input.startswith("!"):
+            intent, score = await self.intent_service.classify(user_input)
+            threshold = self.config.get("intent_classification.classification_threshold", 0.75)
+            logger.debug(f"Intent check: '{user_input}' -> {intent} (score: {score:.2f}, threshold: {threshold})")
+            
+            if intent and score > threshold:
+                mapped_cmd = self.intent_service.get_command_for_intent(intent)
+                if mapped_cmd and mapped_cmd != user_input:
+                    logger.info(f"LogicEngine: Redirecting intent '{intent}' to '{mapped_cmd}'")
+                    # Publish new event with the mapped command so services (Help, Builtin) can pick it up
+                    await self.bus.publish(Event(
+                        type=EventType.USER_INPUT_RECEIVED,
+                        payload={'input': mapped_cmd},
+                        sender="LogicRedirect"
+                    ))
+                    return
 
         # 4. Check if command is already known/categorized (Auto-Run)
+        
+        # Check for Utilities first
+        first_token = user_input.split()[0]
+        if first_token in self.utility_service.UTILITY_MAP or first_token == "/utils":
+             logger.info(f"Auto-running utility: {user_input}")
+             await self.bus.publish(Event(
+                type=EventType.EXECUTION_REQUESTED,
+                payload={'command': user_input, 'mode': 'utility'}, # mode='utility' handled by UtilityService?
+                sender="Logic"
+            ))
+             return
+
         known_category = self.category_manager.classify_command(user_input)
         if known_category:
             # Security Check
@@ -183,7 +191,9 @@ class LogicEngine:
         # Check for RAG query
 
         # Check for RAG query
-        if user_input.lower().startswith("/docs"):
+        # Only if arguments are provided (e.g. /docs how to use)
+        # If just "/docs", let it fall through to UtilityService (opens web docs)
+        if user_input.lower().startswith("/docs ") and len(user_input.strip()) > 6:
             query = user_input[5:].strip() # Remove /docs
             await self.bus.publish(Event(
                 EventType.RAG_QUERY_REQUESTED,
@@ -259,7 +269,7 @@ async def main():
     completion_words = sorted(list(set(builtins + utils + aliases)))
 
     ui = V2UIManager(bus, state_manager, history_service.get_pt_history(), completion_words)
-    logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager, intent_service)
+    logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager, intent_service, utility_service)
 
     # Signal app start
     await bus.publish(Event(EventType.APP_STARTED))

@@ -26,33 +26,50 @@ class UtilityService:
         "/logs": ("utils/logs.py", True),
         "/setup_brew": ("utils/setup_brew.py", True),
         "/test": ("utils/run_tests.py", True),
-        "/ollama_cli": ("utils/ollama_cli.py", True) # Renamed to avoid conflict with /ollama intent
+        "/ollama_cli": ("utils/ollama_cli.py", True),
+        "/command": ("utils/command.py", True),
+        "/docs": ("utils/docs.py", True),
+        "/knowledge": ("utils/knowledge.py", True),
+        "/history_cli": ("utils/history.py", True) # Renamed to avoid conflict with internal /history
     }
 
     def __init__(self, bus: EventBus, config: ConfigManager):
         self.bus = bus
         self.config = config
-        self.bus.subscribe_async(EventType.USER_INPUT_RECEIVED, self._on_input)
+        self.bus.subscribe_async(EventType.EXECUTION_REQUESTED, self._on_execution)
 
-    async def _on_input(self, event: Event):
-        text = event.payload.get('input', "").strip()
-        parts = text.split()
+    async def _on_execution(self, event: Event):
+        # We check if the requested command is a utility
+        full_cmd = event.payload.get('command', "").strip()
+        parts = full_cmd.split()
         if not parts: return
         
         cmd = parts[0].lower()
+        if not cmd.startswith("/"):
+            cmd = "/" + cmd # Normalize ls -> /ls for lookup if needed? No, utilities start with /
         
-        # Special handling for /ollama intent vs cli
-        # If user types /ollama, IntentService might map it to /ollama status/start/stop.
-        # But if they type /ollama arguments, we might want the CLI.
-        # V1 alias: /ollama -> /utils ollama_cli
-        # So we should look for /utils ollama_cli or /ollama_cli if we want to be strict.
-        # For now, let's stick to the mapped aliases.
-        
+        # Handle generic /utils wrapper
+        if cmd == "/utils" and len(parts) > 1:
+            script_name = parts[1]
+            lookup_cmd = f"/{script_name}"
+            if lookup_cmd in self.UTILITY_MAP:
+                script, allow_args = self.UTILITY_MAP[lookup_cmd]
+                args = parts[2:] if allow_args else []
+                await self._run_script(script, args)
+                # Signal finished is implicit? No, we should probably output.
+            else:
+                pass # Not a known utility
+            return
+
         if cmd in self.UTILITY_MAP:
             script, allow_args = self.UTILITY_MAP[cmd]
             args = parts[1:] if allow_args else []
             await self._run_script(script, args)
-            await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
+            # EXECUTION_FINISHED is published by _run_script logic or should be?
+            # _run_script does not publish FINISHED. It waits.
+            # But the ShellService also listens to EXECUTION_REQUESTED.
+            # We need to make sure ShellService DOESN'T run it if we do.
+            # Or we ensure LogicEngine sets a mode?
 
     async def _run_script(self, script_rel_path: str, args: list):
         base_dir = self.config.get_base_dir()
@@ -96,6 +113,7 @@ class UtilityService:
             )
             
             await proc.wait()
+            await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
             
         except Exception as e:
             logger.error(f"Utility execution failed: {e}")

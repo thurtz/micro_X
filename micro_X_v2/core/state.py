@@ -18,6 +18,7 @@ class AppState(Enum):
     CONFIRMATION = auto()       # Showing the "Yes/No/Explain" dialog
     CAUTION = auto()            # Security warning for sensitive manual commands
     EXECUTING = auto()          # Running a shell command
+    ERROR_RECOVERY = auto()     # Command failed, offering fix
     ERROR = auto()              # Error state
 
 @dataclass
@@ -27,6 +28,10 @@ class StateContext:
     proposed_command: Optional[str] = None
     proposed_category: str = "simple"
     last_error: Optional[str] = None
+    
+    # For Error Recovery
+    failed_command: Optional[str] = None
+    failed_output: Optional[str] = None
 
 class StateManager:
     """
@@ -91,13 +96,35 @@ class StateManager:
     def _on_error(self, event: Event):
         self._context.last_error = event.payload.get('message')
 
-    def _on_execution_finished(self, event: Event):
-        self._set_state(AppState.IDLE)
-
     def _on_security_warn(self, event: Event):
         self._context.proposed_command = event.payload.get('command')
         self._context.proposed_category = event.payload.get('category', 'semi_interactive')
         self._set_state(AppState.CAUTION)
+
+    def _on_execution_finished(self, event: Event):
+        returncode = event.payload.get('returncode', 0)
+        
+        # Note: ShellService passes full output? No, it streamed it.
+        # But we need the output for analysis. 
+        # StateManager doesn't buffer output. ShellService doesn't store it.
+        # We need to capture the buffer?
+        # V2 UIManager has the output buffer. 
+        # Or ShellService should include the captured stderr in the finished payload?
+        
+        # For now, let's assume we trigger recovery only if we have context.
+        # But wait, ShellService logic sends EXECUTION_OUTPUT events.
+        # If we want to analyze, we need the last N lines of output?
+        
+        # Let's assume ShellService adds 'last_stderr' to payload if possible?
+        # I'll update ShellService first.
+        
+        # Placeholder logic:
+        if returncode != 0:
+            self._context.failed_command = self._context.proposed_command or "Unknown"
+            self._context.failed_output = event.payload.get('last_stderr', "No output captured.")
+            self._set_state(AppState.ERROR_RECOVERY)
+        else:
+            self._set_state(AppState.IDLE)
 
     async def command_execution_finished(self):
         self._set_state(AppState.IDLE)

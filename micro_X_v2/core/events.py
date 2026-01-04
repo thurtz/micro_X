@@ -25,6 +25,7 @@ class EventType(Enum):
     AI_SUGGESTION_READY = auto()  # AI has a proposed command
     AI_EXPLAIN_REQUESTED = auto() # Request for explanation
     AI_EXPLANATION_READY = auto() # Explanation received
+    AI_ANALYZE_ERROR = auto()     # Request error analysis
     
     # RAG Events
     RAG_QUERY_REQUESTED = auto()

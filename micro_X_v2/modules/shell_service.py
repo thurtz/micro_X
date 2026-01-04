@@ -29,6 +29,9 @@ class ShellService:
         logger.info(f"ShellService: Executing '{cmd}'")
         
         try:
+            # Buffer for error analysis
+            stderr_buffer = []
+
             # We use the system shell to handle things like pipes and expansions
             process = await asyncio.create_subprocess_shell(
                 cmd,
@@ -44,6 +47,9 @@ class ShellService:
                     line = await stream.readline()
                     if line:
                         decoded_line = line.decode().strip()
+                        if is_stderr:
+                            stderr_buffer.append(decoded_line)
+                        
                         await self.bus.publish(Event(
                             type=EventType.EXECUTION_OUTPUT,
                             payload={'output': decoded_line, 'is_stderr': is_stderr},
@@ -62,7 +68,7 @@ class ShellService:
             
             await self.bus.publish(Event(
                 type=EventType.EXECUTION_FINISHED,
-                payload={'returncode': returncode},
+                payload={'returncode': returncode, 'last_stderr': "\n".join(stderr_buffer[-10:])}, # Pass last 10 lines
                 sender="ShellService"
             ))
 
