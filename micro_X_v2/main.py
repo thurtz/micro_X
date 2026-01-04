@@ -91,14 +91,6 @@ class LogicEngine:
                 ))
                 return
 
-        # 4. Check for builtins (after expansion)
-        first_token = user_input.lower().split()[0]
-        if first_token in ["/exit", "exit", "/help", "help", "/alias", "/history", "/git_branch", "/config"]:
-            # Note: AliasManager expansion might have turned /alias into /utils alias,
-            # so we check the expanded version too? No, raw /alias check was moved before expansion.
-            # But wait, if I have /l -> ls -la. first_token is ls. Not builtin. Correct.
-            return
-
         # 4. Check if command is already known/categorized (Auto-Run)
         known_category = self.category_manager.classify_command(user_input)
         if known_category:
