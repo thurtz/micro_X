@@ -4,6 +4,7 @@ import asyncio
 import logging
 import sys
 import os
+import re
 
 from .core.events import EventBus, Event, EventType
 from .core.state import StateManager, AppState
@@ -42,6 +43,36 @@ class LogicEngine:
         self.bus.subscribe_async(EventType.USER_INPUT_RECEIVED, self._handle_input)
         self.bus.subscribe_async(EventType.USER_CONFIRMED, self._execute_command)
 
+    async def _check_security(self, command: str) -> bool:
+        """Checks command against Deny and Warn lists. Returns False if blocked."""
+        # 1. Deny List (Regex)
+        dangerous_patterns = self.config.get("security.dangerous_patterns", [])
+        for pattern in dangerous_patterns:
+            if re.search(pattern, command):
+                logger.warning(f"SECURITY: Command '{command}' blocked by pattern '{pattern}'")
+                await self.bus.publish(Event(
+                    type=EventType.EXECUTION_ERROR,
+                    payload={'message': f"❌ SECURITY BLOCKED: Dangerous command pattern detected."},
+                    sender="LogicSecurity"
+                ))
+                return False
+
+        # 2. Warn List (Sensitive Commands)
+        warn_commands = self.config.get("security.warn_on_commands", [])
+        first_token = command.strip().split()[0]
+        if first_token in warn_commands:
+            logger.info(f"SECURITY: Command '{command}' triggered warning.")
+            # Trigger CAUTION state
+            cat = self.category_manager.classify_command(command) or "semi_interactive"
+            await self.bus.publish(Event(
+                type=EventType.SECURITY_WARN_TRIGGERED,
+                payload={'command': command, 'category': cat},
+                sender="LogicSecurity"
+            ))
+            return False # Block direct execution, flow continues in CAUTION state
+
+        return True
+
     async def _handle_input(self, event: Event):
         user_input = event.payload.get('input', "").strip()
         if not user_input:
@@ -53,6 +84,10 @@ class LogicEngine:
         if user_input.startswith("!"):
             forced_cmd = user_input[1:].strip()
             if forced_cmd:
+                # Security Check
+                if not await self._check_security(forced_cmd):
+                    return
+
                 cat = self.category_manager.classify_command(forced_cmd)
                 if not cat:
                     # Fallback for forced command if not in json categories
@@ -103,6 +138,10 @@ class LogicEngine:
         # 4. Check if command is already known/categorized (Auto-Run)
         known_category = self.category_manager.classify_command(user_input)
         if known_category:
+            # Security Check
+            if not await self._check_security(user_input):
+                return
+
             logger.info(f"Auto-running known command: {user_input} ({known_category})")
             # We need to set the context proposed command so execution has something to run
             # But wait, EXECUTION_REQUESTED payload carries the command.

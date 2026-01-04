@@ -9,6 +9,7 @@ from prompt_toolkit.widgets import TextArea, Label, Frame
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
 from prompt_toolkit.completion import PathCompleter, WordCompleter, FuzzyCompleter, merge_completers
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.lexers import PygmentsLexer
 from pygments.lexers.shell import BashLexer
 
@@ -67,7 +68,8 @@ class V2UIManager:
             style='class:input-field',
             history=self.history,
             completer=self.completer,
-            lexer=self.lexer
+            lexer=self.lexer,
+            auto_suggest=AutoSuggestFromHistory()
         )
         
         self.status_bar = Label(text=" Status: BOOTING | Ollama: UNKNOWN", style='class:status-bar')
@@ -170,6 +172,21 @@ class V2UIManager:
                 else:
                     self.append_text("\n⚠️ Invalid choice. Use 1-4 to run, 5 to explain, 7 to cancel.\n")
 
+            elif current_state == AppState.CAUTION:
+                choice = user_text.lower()
+                if choice in ['1', 'y', 'yes']:
+                    asyncio.create_task(self.bus.publish(Event(
+                        type=EventType.USER_CONFIRMED,
+                        sender="UIManager"
+                    )))
+                elif choice in ['7', 'n', 'no', 'c', 'cancel', '']: # Default to cancel for caution
+                    asyncio.create_task(self.bus.publish(Event(
+                        type=EventType.USER_CANCELLED,
+                        sender="UIManager"
+                    )))
+                else:
+                    self.append_text("\n⚠️ Invalid choice. Use 1 (Confirm) or 7 (Cancel).\n")
+
         @self.kb.add("escape")
         def _(event):
             if self.state.current_state == AppState.CONFIRMATION:
@@ -219,6 +236,16 @@ class V2UIManager:
             self.append_text("  [6] Modify\n")
             self.append_text("  [7] Cancel\n")
             self.append_text("Choice (1-7): ")
+            if self.app:
+                self.app.layout.focus(self.input_area)
+
+        elif new_state == AppState.CAUTION:
+            cmd = self.state.context.proposed_command
+            self.append_text(f"\n⚠️  SECURITY CAUTION: '{cmd}' is a sensitive command.\n")
+            self.append_text("Are you sure you want to run it?\n")
+            self.append_text("  [1] Yes (Confirm)\n")
+            self.append_text("  [7] No (Cancel)\n")
+            self.append_text("Choice (1/7): ")
             if self.app:
                 self.app.layout.focus(self.input_area)
             

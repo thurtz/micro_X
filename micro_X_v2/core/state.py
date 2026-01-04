@@ -16,6 +16,7 @@ class AppState(Enum):
     IDLE = auto()               # Waiting for user input at the prompt
     PROCESSING = auto()         # AI or Logic is thinking
     CONFIRMATION = auto()       # Showing the "Yes/No/Explain" dialog
+    CAUTION = auto()            # Security warning for sensitive manual commands
     EXECUTING = auto()          # Running a shell command
     ERROR = auto()              # Error state
 
@@ -45,6 +46,7 @@ class StateManager:
         self.bus.subscribe(EventType.USER_CANCELLED, self._on_user_cancelled)
         self.bus.subscribe(EventType.ERROR_OCCURRED, self._on_error)
         self.bus.subscribe(EventType.EXECUTION_FINISHED, self._on_execution_finished)
+        self.bus.subscribe(EventType.SECURITY_WARN_TRIGGERED, self._on_security_warn)
 
     @property
     def current_state(self) -> AppState:
@@ -91,6 +93,11 @@ class StateManager:
 
     def _on_execution_finished(self, event: Event):
         self._set_state(AppState.IDLE)
+
+    def _on_security_warn(self, event: Event):
+        self._context.proposed_command = event.payload.get('command')
+        self._context.proposed_category = event.payload.get('category', 'semi_interactive')
+        self._set_state(AppState.CAUTION)
 
     async def command_execution_finished(self):
         self._set_state(AppState.IDLE)

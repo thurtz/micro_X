@@ -37,6 +37,10 @@ class EventType(Enum):
     # Intent Events
     INTENT_STATUS_CHANGED = auto()
     
+    # Security Events
+    SECURITY_BLOCKED = auto()
+    SECURITY_WARN_TRIGGERED = auto()
+    
     # UI/State Events
     STATE_CHANGED = auto()        # The global app state has transitioned
     REQUEST_CONFIRMATION = auto() # Logic requests UI to show confirmation
