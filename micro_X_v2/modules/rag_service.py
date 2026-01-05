@@ -17,9 +17,10 @@ class RagService:
     V2 RAG Service.
     Handles querying the vector store for documentation.
     """
-    def __init__(self, bus: EventBus, config: ConfigManager):
+    def __init__(self, bus: EventBus, config: ConfigManager, ollama_service):
         self.bus = bus
         self.config = config
+        self.ollama_service = ollama_service
         self.vector_store = None
         self._initialized = False
         
@@ -65,16 +66,70 @@ class RagService:
         await self.bus.publish(Event(EventType.AI_PROCESSING_STARTED, sender="RagService"))
         
         try:
+            # 1. Retrieve
             results = await asyncio.to_thread(self._query_sync, query)
-            response_text = self._format_results(results)
-            await self._broadcast_response(response_text)
+            
+            if not results:
+                await self._broadcast_response("No relevant documentation found.")
+                return
+
+            # 2. Generate
+            answer = await self._generate_answer(query, results)
+            
+            # 3. Format Output (Hide snippets to match V1 style)
+            full_response = f"📘 **Documentation Answer**:\n{answer}"
+            
+            await self._broadcast_response(full_response)
+            
         except Exception as e:
             logger.error(f"RAG query failed: {e}")
             await self._broadcast_response("❌ Failed to query documentation.")
 
+    async def _generate_answer(self, query: str, docs) -> str:
+        """Uses Ollama to synthesize an answer from the docs."""
+        context = "\n\n---\n\n".join([d.page_content for d in docs])
+        
+        # V1 uses the 'router' model for RAG (often a better chat model)
+        model_name = self.config.get("ai_models.router.model", "qwen3:0.6b")
+        
+        # Prompt from V1
+        prompt = (
+            "You are an assistant for question-answering tasks. "
+            "Use the following pieces of retrieved context to answer the question. "
+            "If you don't know the answer, just say that you don't know. "
+            "Keep the answer concise and relevant. "
+            "Do not include your thinking process or any XML-style tags like <think> in your final response.\n\n"
+            f"Context:\n{context}\n\n"
+            f"Question: {query}\n\n"
+            "Answer:"
+        )
+        
+        try:
+            if not self.ollama_service._is_running:
+                return "Ollama service is not available."
+
+            import ollama
+            response = await asyncio.to_thread(
+                ollama.generate,
+                model=model_name,
+                prompt=prompt
+            )
+            raw_text = response['response'].strip()
+            return self._clean_response(raw_text)
+        except Exception as e:
+            logger.error(f"RAG generation failed: {e}")
+            return "Could not generate answer from context."
+
+    def _clean_response(self, text: str) -> str:
+        """Strips reasoning tags like <think>...</think> from the AI output."""
+        import re
+        if not text: return ""
+        cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+        return cleaned.strip()
+
     def _query_sync(self, query: str):
         # Simple similarity search
-        return self.vector_store.similarity_search(query, k=3)
+        return self.vector_store.similarity_search(query, k=5)
 
     def _format_results(self, docs) -> str:
         if not docs:
