@@ -204,3 +204,6 @@ config/.history
 # micro_X Versions (Ignore experimental versions)
 micro_X_v*/
 micro_X_v*.sh
+
+# Experimental tmux configs
+config/.tmux_v*.conf
