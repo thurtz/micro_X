@@ -37,7 +37,7 @@ class HistoryService:
     async def _on_input(self, event: Event):
         """Handle /history command."""
         text = event.payload.get('input', "").strip().lower()
-        if text == "/history":
+        if text == "/history": # Only explicit command
             await self._show_history()
             await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
 

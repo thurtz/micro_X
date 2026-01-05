@@ -83,12 +83,9 @@ Topics:
         if not parts: return
         
         cmd = parts[0].lower()
-        if cmd == "/help" or cmd == "help":
+        if cmd == "/help": # Only explicit command
             topic = parts[1].lower() if len(parts) > 1 else "general"
             await self._show_help(topic)
-            # We consumed the input, so we signal finished.
-            # But wait, LogicEngine also sees this. LogicEngine checks for /help and returns.
-            # So we are responsible for the output.
             await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
 
     async def _show_help(self, topic: str):

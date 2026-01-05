@@ -21,6 +21,10 @@ class BuiltinService:
         text = event.payload.get('input', "").strip()
         text_lower = text.lower()
         
+        # Only handle commands starting with /
+        if not text_lower.startswith("/"):
+            return
+
         if text_lower.startswith("/alias"):
             await self.bus.publish(Event(
                 type=EventType.ALIAS_COMMAND_RECEIVED,
@@ -32,7 +36,7 @@ class BuiltinService:
             await self._handle_config(text)
             await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
 
-        elif text_lower == "/exit" or text_lower == "exit":
+        elif text_lower == "/exit" or text_lower == "/quit":
             logger.info("BuiltinService: Exit requested.")
             await self.bus.publish(Event(EventType.APP_SHUTDOWN))
             # prompt_toolkit app.exit() will be handled by the UI listening for SHUTDOWN or just exiting

@@ -95,12 +95,15 @@ class LogicEngine:
 
         # 2. Alias Expansion
         expanded_input = self.alias_manager.resolve_alias(raw_input)
-        if expanded_input != raw_input:
+        is_alias = expanded_input != raw_input
+        if is_alias:
             logger.debug(f"Alias expanded: '{raw_input}' -> '{expanded_input}'")
 
         # 3. Intent Classification (Semantic Routing)
-        # Skip if it looks like a command (starts with /) to avoid redirection loops
-        if not expanded_input.startswith("/") and event.sender != "LogicRedirect":
+        # Rule: Only run for natural language. 
+        # If it started with / or ! or was an alias, we treat it as an explicit command and SKIP intents.
+        intent, score = None, 0.0
+        if not raw_input.startswith("/") and not raw_input.startswith("!") and not is_alias and event.sender != "LogicRedirect":
             intent, score = await self.intent_service.classify(expanded_input)
             threshold = self.config.get("intent_classification.classification_threshold", 0.60)
             

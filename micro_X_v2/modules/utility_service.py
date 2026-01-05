@@ -4,6 +4,7 @@ import logging
 import asyncio
 import shlex
 import os
+import sys
 from ..core.events import EventBus, Event, EventType
 from ..core.config import ConfigManager
 
@@ -75,13 +76,17 @@ class UtilityService:
         base_dir = self.config.get_base_dir()
         script_path = os.path.join(base_dir, script_rel_path)
         
+        logger.debug(f"UtilityService: Looking for script at {script_path}")
         if not os.path.exists(script_path):
-            await self._error(f"Script not found: {script_path}")
+            logger.error(f"UtilityService: Script NOT FOUND at {script_path}")
+            await self._error(f"Script not found: {script_rel_path}")
+            await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
             return
 
-        cmd = ["python3", script_path] + args
+        cmd = [sys.executable, script_path] + args
         
         try:
+            logger.info(f"UtilityService: Launching subprocess: {' '.join(cmd)}")
             await self._output(f"⚙️ Executing: {' '.join(cmd)}")
             
             proc = await asyncio.create_subprocess_exec(

@@ -33,7 +33,8 @@ class IntentService:
         "generate_project_tree": "/tree",
         "open_docs": "/docs",
         "update_system": "/update",
-        "exit_shell": "/exit"
+        "exit_shell": "/exit",
+        "take_snapshot": "/snapshot"
     }
 
     def __init__(self, bus: EventBus, config: ConfigManager):
