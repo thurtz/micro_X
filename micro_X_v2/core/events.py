@@ -42,6 +42,9 @@ class EventType(Enum):
     SECURITY_BLOCKED = auto()
     SECURITY_WARN_TRIGGERED = auto()
     
+    # Categorization Events
+    CATEGORIZATION_REQUESTED = auto()
+    
     # UI/State Events
     STATE_CHANGED = auto()        # The global app state has transitioned
     REQUEST_CONFIRMATION = auto() # Logic requests UI to show confirmation

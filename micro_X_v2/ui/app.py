@@ -169,6 +169,49 @@ class V2UIManager:
                 else:
                     self.append_text("\n⚠️ Invalid choice. Use 1-4 to run, 5 to explain, 7 to cancel.\n")
 
+            elif current_state == AppState.CATEGORIZATION:
+                choice = user_text.lower()
+                cmd = self.state.context.proposed_command
+                
+                cat_map = {
+                    '1': 'simple',
+                    '2': 'semi_interactive',
+                    '3': 'interactive_tui'
+                }
+                
+                if choice in cat_map:
+                    # Save and Run
+                    # We need to trigger a SAVE logic? Or just pass category to execution?
+                    # The requirement is to save it.
+                    # We can use a new event CATEGORIZATION_SAVED or reuse USER_CONFIRMED with extra payload.
+                    # Let's use a new event or rely on Logic to handle saving?
+                    # LogicEngine listens to USER_CONFIRMED.
+                    # We'll publish USER_CONFIRMED but update the context first?
+                    # StateManager context update is not directly accessible from here cleanly (async).
+                    
+                    # Better: Publish CATEGORY_SELECTED event.
+                    asyncio.create_task(self.bus.publish(Event(
+                        type=EventType.USER_CONFIRMED, # Reusing logic flow
+                        payload={'category': cat_map[choice], 'save': True},
+                        sender="UIManager"
+                    )))
+                elif choice == '4':
+                    # Modify
+                    self.input_area.text = cmd
+                    self.input_area.buffer.cursor_position = len(cmd)
+                    asyncio.create_task(self.bus.publish(Event(EventType.USER_CANCELLED))) # Go to IDLE
+                elif choice == '5':
+                    # Run once (default semi)
+                    asyncio.create_task(self.bus.publish(Event(
+                        type=EventType.USER_CONFIRMED,
+                        payload={'category': 'semi_interactive', 'save': False},
+                        sender="UIManager"
+                    )))
+                elif choice == '6':
+                    asyncio.create_task(self.bus.publish(Event(EventType.USER_CANCELLED)))
+                else:
+                    self.append_text("\n⚠️ Invalid choice.\n")
+
             elif current_state == AppState.CAUTION:
                 choice = user_text.lower()
                 if choice in ['1', 'y', 'yes']:
@@ -241,16 +284,30 @@ class V2UIManager:
             cmd = self.state.context.proposed_command
             cat = self.state.context.proposed_category
             self.append_text(f"\n🤖 AI Suggestion: {cmd}")
-            self.append_text(f"\n📂 Category: {cat}\n")
+            self.append_text(f"\n📂 Category: {cat or 'Unknown'}\n")
             self.append_text("Action:\n")
-            self.append_text("  [1] Yes (Run as shown)\n")
-            self.append_text("  [2] Run as Simple\n")
-            self.append_text("  [3] Run as Semi-Interactive\n")
-            self.append_text("  [4] Run as TUI\n")
+            self.append_text("  [1] Yes (Confirm & Categorize)\n")
+            self.append_text("  [2] Run Once as Simple\n")
+            self.append_text("  [3] Run Once as Semi-Interactive\n")
+            self.append_text("  [4] Run Once as TUI\n")
             self.append_text("  [5] Explain\n")
             self.append_text("  [6] Modify\n")
             self.append_text("  [7] Cancel\n")
             self.append_text("Choice (1-7): ")
+            if self.app:
+                self.app.layout.focus(self.input_area)
+
+        elif new_state == AppState.CATEGORIZATION:
+            cmd = self.state.context.proposed_command
+            self.append_text(f"\n📂 Unknown Command: '{cmd}'\n")
+            self.append_text("How should this command run?\n")
+            self.append_text("  [1] simple             (Direct output)\n")
+            self.append_text("  [2] semi_interactive   (Tmux, wait)\n")
+            self.append_text("  [3] interactive_tui    (Tmux, interactive)\n")
+            self.append_text("  [4] Modify command\n")
+            self.append_text("  [5] Run once (Don't save)\n")
+            self.append_text("  [6] Cancel\n")
+            self.append_text("Choice (1-6): ")
             if self.app:
                 self.app.layout.focus(self.input_area)
 

@@ -84,3 +84,47 @@ class CategoryManager:
                 return cat
 
         return None
+
+    def is_known(self, cmd: str) -> bool:
+        """Returns True if the command is already categorized."""
+        return self.classify_command(cmd) is not None
+
+    def add_command(self, cmd: str, category: str):
+        """Adds a command to a category and saves it to user config."""
+        if category not in self.CATEGORY_MAP:
+            logger.error(f"Invalid category: {category}")
+            return
+
+        # Update in-memory merged cache
+        if category not in self.categories:
+            self.categories[category] = []
+        if cmd not in self.categories[category]:
+            self.categories[category].append(cmd)
+            
+        # Save to user file
+        self._add_to_user_file(cmd, category)
+
+    def _add_to_user_file(self, cmd: str, category: str):
+        user_path = os.path.join(self.config_manager.base_dir, "config", "user_command_categories.json")
+        try:
+            data = self._load_file(user_path)
+            
+            # Ensure category list exists
+            if category not in data:
+                data[category] = []
+            
+            # Remove from other categories if present (move)
+            for cat in data:
+                if cmd in data[cat]:
+                    data[cat].remove(cmd)
+            
+            # Add to target
+            if cmd not in data[category]:
+                data[category].append(cmd)
+                
+            with open(user_path, 'w') as f:
+                json.dump(data, f, indent=2)
+                
+            logger.info(f"Saved '{cmd}' to category '{category}' in {user_path}")
+        except Exception as e:
+            logger.error(f"Failed to save user categories: {e}")

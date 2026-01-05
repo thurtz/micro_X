@@ -16,6 +16,7 @@ class AppState(Enum):
     IDLE = auto()               # Waiting for user input at the prompt
     PROCESSING = auto()         # AI or Logic is thinking
     CONFIRMATION = auto()       # Showing the "Yes/No/Explain" dialog
+    CATEGORIZATION = auto()     # Asking user to categorize unknown command
     CAUTION = auto()            # Security warning for sensitive manual commands
     EXECUTING = auto()          # Running a shell command
     ERROR_RECOVERY = auto()     # Command failed, offering fix
@@ -26,7 +27,7 @@ class StateContext:
     """Holds data relevant to the current state (payloads, history, etc)."""
     current_input: str = ""
     proposed_command: Optional[str] = None
-    proposed_category: str = "simple"
+    proposed_category: Optional[str] = None
     last_error: Optional[str] = None
     
     # For Error Recovery
@@ -52,6 +53,7 @@ class StateManager:
         self.bus.subscribe(EventType.ERROR_OCCURRED, self._on_error)
         self.bus.subscribe(EventType.EXECUTION_FINISHED, self._on_execution_finished)
         self.bus.subscribe(EventType.SECURITY_WARN_TRIGGERED, self._on_security_warn)
+        self.bus.subscribe(EventType.CATEGORIZATION_REQUESTED, self._on_categorization_req)
 
     @property
     def current_state(self) -> AppState:
@@ -83,7 +85,7 @@ class StateManager:
 
     def _on_suggestion_ready(self, event: Event):
         self._context.proposed_command = event.payload.get('command')
-        self._context.proposed_category = event.payload.get('category', 'simple')
+        self._context.proposed_category = event.payload.get('category') # Can be None
         self._set_state(AppState.CONFIRMATION)
 
     def _on_user_confirmed(self, event: Event):
@@ -100,6 +102,11 @@ class StateManager:
         self._context.proposed_command = event.payload.get('command')
         self._context.proposed_category = event.payload.get('category', 'semi_interactive')
         self._set_state(AppState.CAUTION)
+
+    def _on_categorization_req(self, event: Event):
+        self._context.proposed_command = event.payload.get('command')
+        # We don't have a category yet
+        self._set_state(AppState.CATEGORIZATION)
 
     def _on_execution_finished(self, event: Event):
         returncode = event.payload.get('returncode', 0)

@@ -231,13 +231,32 @@ class LogicEngine:
 
     async def _execute_command(self, event: Event):
         cmd = self.state.context.proposed_command
-        # This category might have been updated by the UI (overrides)
-        category = self.state.context.proposed_category 
+        # Check payload first (from Categorization)
+        category = event.payload.get('category') or self.state.context.proposed_category
+        should_save = event.payload.get('save', False)
         
+        if cmd and should_save and category:
+            logger.info(f"Saving '{cmd}' as '{category}'")
+            self.category_manager.add_command(cmd, category)
+
+        # Check if the command is known/categorized
+        # If category is None, it means it wasn't forced by UI and wasn't known by CategoryManager (on suggestion)
+        if category is None and not self.category_manager.is_known(cmd) and not should_save: 
+            logger.info(f"Command '{cmd}' is unknown. Requesting categorization.")
+            await self.bus.publish(Event(
+                type=EventType.CATEGORIZATION_REQUESTED,
+                payload={'command': cmd},
+                sender="Logic"
+            ))
+            return
+        
+        # Fallback if None (e.g. forced but no cat?) shouldn't happen with UI options
+        final_mode = category or 'simple'
+
         if cmd:
             await self.bus.publish(Event(
                 type=EventType.EXECUTION_REQUESTED,
-                payload={'command': cmd, 'mode': category},
+                payload={'command': cmd, 'mode': final_mode},
                 sender="Logic"
             ))
 
