@@ -197,6 +197,5 @@ micro_X-dev/
 *.code-workspace
 gemini_startup_prompt.txt
 
-# Knowledge base files
-knowledge_bases/*
-!knowledge_bases/micro_X_docs/
+# Knowledge base files are generated artifacts and should not be tracked.
+#knowledge_bases/*

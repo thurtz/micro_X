@@ -3,7 +3,9 @@
 import logging
 import re
 from typing import TypedDict, Annotated, Sequence, Literal
+import asyncio # New import
 import operator
+import ollama # New import
 
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
@@ -13,6 +15,27 @@ from langgraph.graph import StateGraph, END
 
 # --- Logging Setup ---
 logger = logging.getLogger(__name__)
+
+async def _invoke_llm_with_retries(chain, input_data: dict, config: dict, max_retries_key: str, delay_key: str) -> str:
+    """
+    Invokes an LLM chain with retry logic for network-related errors.
+    """
+    max_retries = config.get('behavior', {}).get(max_retries_key, 0) # Default to 0 retries
+    retry_delay = config.get('behavior', {}).get(delay_key, 1) # Default to 1 second delay
+
+    for attempt in range(max_retries + 1): # +1 because initial attempt is not a retry
+        try:
+            return await chain.ainvoke(input_data)
+        except ollama.RequestError as e:
+            logger.warning(f"Ollama API call failed (attempt {attempt+1}/{max_retries+1}): {e}")
+            if attempt < max_retries:
+                await asyncio.sleep(retry_delay)
+            else:
+                logger.error(f"Ollama API call exhausted all retries. Final error: {e}")
+                raise # Re-raise if all retries fail
+        except Exception as e: # Catch other unexpected errors
+            logger.error(f"Unexpected error during LLM invocation (attempt {attempt+1}/{max_retries+1}): {e}", exc_info=True)
+            raise # Re-raise for unhandled exceptions
 
 # --- Helper Functions (migrated from ai_handler.py) ---
 
@@ -80,20 +103,18 @@ async def primary_translator_node(state: AgentState) -> AgentState:
     system_prompt = config.get('prompts', {}).get('primary_translator', {}).get('system', "")
     user_template = config.get('prompts', {}).get('primary_translator', {}).get('user_template', "{human_input}")
 
-    if not model_name:
-        logger.error("Primary Translator model not configured.")
-        return {"primary_command": None, "raw_response": "Primary model not configured."}
-
-    # 2. Set up LangChain chain
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("user", user_template)
-    ])
-    model = ChatOllama(model=model_name)
-    chain = prompt | model | StrOutputParser()
-
-    # 3. Invoke the chain
-    raw_output = await chain.ainvoke({"human_input": state["human_query"]})
+    # 3. Invoke the chain with retry logic
+    try:
+        raw_output = await _invoke_llm_with_retries(
+            chain,
+            {"human_input": state["human_query"]},
+            config,
+            max_retries_key='ollama_api_call_retries',
+            delay_key='ai_retry_delay_seconds'
+        )
+    except Exception as e:
+        logger.error(f"Failed to get primary translation after retries: {e}")
+        return {"primary_command": None, "raw_response": f"Error: {e}"}
     
     # 4. Clean the output
     cleaned_command = _clean_extracted_command(raw_output)
@@ -139,8 +160,18 @@ async def validator_node(state: AgentState) -> AgentState:
     model = ChatOllama(model=model_name)
     chain = prompt | model | StrOutputParser()
 
-    # 3. Invoke the chain
-    response = await chain.ainvoke({"command_text": command_to_validate})
+    # 3. Invoke the chain with retry logic
+    try:
+        response = await _invoke_llm_with_retries(
+            chain,
+            {"command_text": command_to_validate},
+            config,
+            max_retries_key='ollama_api_call_retries', # Validator can also benefit from retries
+            delay_key='ai_retry_delay_seconds'
+        )
+    except Exception as e:
+        logger.error(f"Failed to validate command after retries: {e}")
+        return {"decision": "fail", "messages": [HumanMessage(content=f"Validator error: {e}")]}
     logger.info(f"Validator response for '{command_to_validate}': '{response}'")
     
     # 4. Process response
@@ -196,8 +227,18 @@ async def secondary_translator_node(state: AgentState) -> AgentState:
     model = ChatOllama(model=model_name)
     chain = prompt | model | StrOutputParser()
 
-    # 3. Invoke the chain
-    raw_output = await chain.ainvoke({"human_input": state["human_query"]})
+    # 3. Invoke the chain with retry logic
+    try:
+        raw_output = await _invoke_llm_with_retries(
+            chain,
+            {"human_input": state["human_query"]},
+            config,
+            max_retries_key='ollama_api_call_retries',
+            delay_key='ai_retry_delay_seconds'
+        )
+    except Exception as e:
+        logger.error(f"Failed to get secondary translation after retries: {e}")
+        return {"secondary_command": None, "raw_response": f"Error: {e}"}
     
     # 4. Clean the output
     cleaned_command = _clean_extracted_command(raw_output)
