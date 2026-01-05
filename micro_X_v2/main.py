@@ -22,6 +22,7 @@ from .modules.intent_service import IntentService
 from .modules.history_service import HistoryService
 from .modules.git_context_service import GitContextService
 from .modules.utility_service import UtilityService
+from .modules.router_service import RouterService
 
 # Configure Logging
 logging.basicConfig(filename='v2.log', level=logging.DEBUG)
@@ -31,7 +32,8 @@ class LogicEngine:
     """Handles the translation logic and execution requests."""
     def __init__(self, bus: EventBus, state_manager: StateManager, ollama_service: OllamaService, 
                  config: ConfigManager, category_manager: CategoryManager, 
-                 alias_manager: AliasManager, intent_service: IntentService, utility_service: UtilityService):
+                 alias_manager: AliasManager, intent_service: IntentService, utility_service: UtilityService,
+                 router_service: RouterService):
         self.bus = bus
         self.state = state_manager
         self.ollama = ollama_service
@@ -40,6 +42,7 @@ class LogicEngine:
         self.alias_manager = alias_manager
         self.intent_service = intent_service
         self.utility_service = utility_service
+        self.router_service = router_service
         
         self.bus.subscribe_async(EventType.USER_INPUT_RECEIVED, self._handle_input)
         self.bus.subscribe_async(EventType.USER_CONFIRMED, self._execute_command)
@@ -202,32 +205,41 @@ class LogicEngine:
             ))
             return
 
-        # Use logic from Router/Config if possible, but for demo keep it simple
-        if user_input.startswith("/") or user_input.startswith("ls") or user_input.startswith("cd"):
-             await self.bus.publish(Event(
+        # 5. LLM Router (Decide if Shell vs Docs)
+        # Only if it doesn't look like a direct command (no / or !)
+        route = await self.router_service.route_input(user_input)
+        
+        if route == "DOCS":
+            logger.info("Router: Redirecting to RAG.")
+            await self.bus.publish(Event(
+                EventType.RAG_QUERY_REQUESTED,
+                payload={'query': user_input},
+                sender="LogicRouter"
+            ))
+            return
+        
+        # If CHAT or SHELL, we proceed to Translation (OllamaService handles chatty input reasonably well by translating to 'echo ...' or similar)
+        # But for now, we assume SHELL.
+
+        # 6. AI Translation (Ollama)
+        # Natural Language - use Ollama
+        await self.bus.publish(Event(EventType.AI_PROCESSING_STARTED, sender="Logic"))
+        proposed_cmd = await self.ollama.generate_command(user_input)
+        
+        if proposed_cmd:
+            cat = self.category_manager.classify_command(proposed_cmd)
+            await self.bus.publish(Event(
                 EventType.AI_SUGGESTION_READY, 
-                payload={'command': user_input.lstrip("/")},
+                payload={'command': proposed_cmd, 'category': cat},
                 sender="Logic"
             ))
         else:
-            # Natural Language - use Ollama
-            await self.bus.publish(Event(EventType.AI_PROCESSING_STARTED, sender="Logic"))
-            proposed_cmd = await self.ollama.generate_command(user_input)
-            
-            if proposed_cmd:
-                cat = self.category_manager.classify_command(proposed_cmd)
-                await self.bus.publish(Event(
-                    EventType.AI_SUGGESTION_READY, 
-                    payload={'command': proposed_cmd, 'category': cat},
-                    sender="Logic"
-                ))
-            else:
-                await self.bus.publish(Event(
-                    EventType.ERROR_OCCURRED,
-                    payload={'message': "Ollama failed to generate command."},
-                    sender="Logic"
-                ))
-                await self.bus.publish(Event(EventType.EXECUTION_FINISHED)) # Return to IDLE
+            await self.bus.publish(Event(
+                EventType.ERROR_OCCURRED,
+                payload={'message': "Ollama failed to generate command."},
+                sender="Logic"
+            ))
+            await self.bus.publish(Event(EventType.EXECUTION_FINISHED)) # Return to IDLE
 
     async def _execute_command(self, event: Event):
         cmd = self.state.context.proposed_command
@@ -280,6 +292,7 @@ async def main():
     history_service = HistoryService(bus, config)
     git_service = GitContextService(bus, config)
     utility_service = UtilityService(bus, config)
+    router_service = RouterService(config)
     
     # Collect completion words
     builtins = ["/exit", "/help", "/alias", "/history", "/git_branch", "/config", "/docs"]
@@ -288,7 +301,7 @@ async def main():
     completion_words = sorted(list(set(builtins + utils + aliases)))
 
     ui = V2UIManager(bus, state_manager, history_service.get_pt_history(), completion_words)
-    logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager, intent_service, utility_service)
+    logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager, intent_service, utility_service, router_service)
 
     # Signal app start
     await bus.publish(Event(EventType.APP_STARTED))
