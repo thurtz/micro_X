@@ -201,3 +201,6 @@ gemini_startup_prompt.txt
 knowledge_bases/*
 !knowledge_bases/micro_X_docs/
 config/.history
+# micro_X Versions (Ignore experimental versions)
+micro_X_v*/
+micro_X_v*.sh
