@@ -148,8 +148,24 @@ class LogicEngine:
         # Handles complex routing and translation
         await self.bus.publish(Event(EventType.AI_PROCESSING_STARTED, sender="Logic"))
         
-        initial_state = {"messages": [HumanMessage(content=expanded_input)]}
-        result = await self.agent_graph.ainvoke(initial_state)
+        initial_state = {
+            "messages": [HumanMessage(content=expanded_input)],
+            "user_input": expanded_input,
+            "final_action": None
+        }
+        
+        try:
+            result = await self.agent_graph.ainvoke(initial_state)
+            logger.debug(f"Agent Graph result: {result}")
+        except Exception as e:
+            logger.error(f"Agent Graph execution failed: {e}")
+            await self.bus.publish(Event(
+                type=EventType.EXECUTION_ERROR,
+                payload={'message': f"❌ AI Brain Error: {str(e)}"},
+                sender="Logic"
+            ))
+            await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
+            return
         
         last_message = result['messages'][-1]
         

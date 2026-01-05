@@ -19,14 +19,16 @@ SYSTEM_PROMPT = """You are micro_X, a specialized AI shell assistant.
 Your goal is to help users manage their system efficiently.
 
 RULES:
-1. For questions about micro_X's features, documentation, or "how-to" guides, ALWAYS use the 'search_documentation' tool.
-2. For ANY request that can be answered by a Linux command (including "what is...", "show me...", "check..."), ALWAYS use the 'propose_shell_command' tool.
-   - Example: "what is the current directory" -> propose_shell_command("pwd")
-   - Example: "list files" -> propose_shell_command("ls")
-3. For running specific internal micro_X utility scripts (like 'snapshot', 'tree', 'logs'), use 'run_internal_utility'.
-4. If the user is just greeting you or chatting, respond directly without tools.
+1. For questions about micro_X's features or "how-to" guides, use 'search_documentation'.
+   Format: <search_documentation query="your query" />
+2. For ANY system request that a Linux command can answer, use 'propose_shell_command'.
+   Format: <propose_shell_command query="the linux command" />
+3. For internal micro_X utility scripts (snapshot, tree, logs), use 'run_internal_utility'.
+   Format: <run_internal_utility utility_name="name" />
 
-Be concise and professional."""
+ALWAYS respond with a tool call in <tool_name ... /> format. 
+DO NOT use JSON. DO NOT use generic <tool_name> tags.
+Be concise."""
 
 # --- State ---
 class AgentState(TypedDict):
@@ -60,41 +62,48 @@ class MicroXAgent:
             
         response = await self.llm_with_tools.ainvoke(messages)
         
-        # --- FIX: Manual parsing for small models (Qwen 0.5B) that output XML ---
+        # --- FIX: Robust manual parsing for small models ---
         import re
+        import json
+        import uuid
+        
         content = response.content
         if not response.tool_calls and isinstance(content, str):
-            # Regex for <tool_name query="..."> format
-            # Example: <search_documentation query="what is micro_X?" />
+            # 1. Try JSON parsing (some models fall back to JSON)
+            json_pattern = re.compile(r'\{.*"name":\s*"(\w+)".*\}', re.DOTALL)
+            json_match = json_pattern.search(content)
+            if json_match:
+                try:
+                    # Find the actual json block
+                    start = content.find('{')
+                    end = content.rfind('}') + 1
+                    data = json.loads(content[start:end])
+                    tool_name = data.get('name') or data.get('tool')
+                    args = data.get('arguments') or data.get('args') or {}
+                    
+                    if tool_name and tool_name != "tool_name":
+                        response.tool_calls = [{'name': tool_name, 'args': args, 'id': str(uuid.uuid4())}]
+                        logger.info(f"Parsed tool call from JSON: {tool_name}")
+                        return {"messages": [response]}
+                except: pass
+
+            # 2. Try XML parsing
+            # We ignore generic <tool_name ... /> and look for specific tool names
+            valid_tool_names = [t.name for t in self.tools]
             tool_pattern = re.compile(r'<(\w+)\s+([^>]+?)\s*/?>')
-            match = tool_pattern.search(content)
             
-            if match:
-                tool_name = match.group(1)
-                args_str = match.group(2)
-                
-                # Parse args (simple "key=value" parsing)
-                args = {}
-                # Regex for key="value"
-                arg_pattern = re.compile(r'(\w+)="([^"]+)"')
-                for arg_match in arg_pattern.finditer(args_str):
-                    args[arg_match.group(1)] = arg_match.group(2)
-                
-                # Construct manual tool call
-                import uuid
-                tool_call = {
-                    'name': tool_name,
-                    'args': args,
-                    'id': str(uuid.uuid4())
-                }
-                
-                logger.info(f"Manually parsed tool call from XML: {tool_name} with args {args}")
-                
-                # Verify it's a valid tool
-                valid_tools = [t.name for t in self.tools]
-                if tool_name in valid_tools:
-                    response.tool_calls = [tool_call]
-                    # response.content = "" # Optional: Clear content so we don't print the raw XML
+            for match in tool_pattern.finditer(content):
+                name = match.group(1)
+                if name in valid_tool_names:
+                    args_str = match.group(2)
+                    args = {}
+                    arg_pattern = re.compile(r'(\w+)="([^"]+)"')
+                    for arg_match in arg_pattern.finditer(args_str):
+                        args[arg_match.group(1)] = arg_match.group(2)
+                    
+                    response.tool_calls = [{'name': name, 'args': args, 'id': str(uuid.uuid4())}]
+                    logger.info(f"Parsed tool call from XML: {name}")
+                    break
 
         return {"messages": [response]}
 
