@@ -1,8 +1,5 @@
 # main.py
 
-from prompt_toolkit import Application
-from prompt_toolkit.history import FileHistory
-
 import asyncio
 import subprocess
 import uuid
@@ -15,11 +12,88 @@ import shutil
 import hashlib
 import sys
 import socket
-import datetime # Added for log timestamps
+import datetime 
 from typing import Tuple, Optional
 
-# --- New Import ---
+# --- Pre-Import Configuration Step ---
+# We must load config and set OLLAMA_HOST *before* importing modules that might 
+# initialize Ollama clients at module level (like langchain_ollama).
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_DIR = "logs"
+CONFIG_DIR = "config"
+LOG_FILE = os.path.join(SCRIPT_DIR, LOG_DIR, "micro_x.log")
+os.makedirs(os.path.join(SCRIPT_DIR, LOG_DIR), exist_ok=True)
+os.makedirs(os.path.join(SCRIPT_DIR, CONFIG_DIR), exist_ok=True)
+HISTORY_FILENAME = ".micro_x_history"
+HISTORY_FILE_PATH = os.path.join(SCRIPT_DIR, HISTORY_FILENAME)
+
+# Logging configuration
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
+    handlers=[logging.FileHandler(LOG_FILE)]
+)
+logger = logging.getLogger(__name__)
+
+# Load Config Early
 import modules.config_handler
+DEFAULT_CONFIG_FILENAME = "default_config.json"
+USER_CONFIG_FILENAME = "user_config.json"
+
+def merge_configs(base, override):
+    """ Helper function to recursively merge dictionaries. """
+    merged = base.copy()
+    for key, value in override.items():
+        if isinstance(value, dict) and key in merged and isinstance(merged[key], dict):
+            merged[key] = merge_configs(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+def load_configuration_early():
+    """
+    Loads configurations from default and user JSONC files early in the startup process.
+    """
+    default_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, DEFAULT_CONFIG_FILENAME)
+    user_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, USER_CONFIG_FILENAME)
+
+    base_config = modules.config_handler.load_jsonc_file(default_config_path)
+    if base_config is None:
+        error_msg = f"CRITICAL ERROR: Default configuration file not found or failed to parse at '{default_config_path}'. Application cannot start."
+        logger.critical(error_msg)
+        print(error_msg)
+        sys.exit(1)
+
+    logger.info(f"Successfully loaded base configuration from {default_config_path}")
+    config = base_config
+
+    user_settings = modules.config_handler.load_jsonc_file(user_config_path)
+    if user_settings:
+        config = merge_configs(config, user_settings)
+        logger.info(f"Loaded and merged user configurations from {user_config_path}")
+    else:
+        logger.info(f"{user_config_path} not found or is invalid. No user configuration overrides applied.")
+    
+    return config
+
+# Perform early config load
+config = load_configuration_early()
+
+# Set OLLAMA_HOST immediately
+ollama_host = config.get('ollama_service', {}).get('ollama_host', 'http://localhost')
+ollama_port = config.get('ollama_service', {}).get('ollama_port', 11434)
+
+# Ensure protocol is present
+if not str(ollama_host).startswith(('http://', 'https://')):
+    ollama_host = f'http://{ollama_host}'
+
+os.environ['OLLAMA_HOST'] = f"{ollama_host}:{ollama_port}"
+logger.info(f"Initialized OLLAMA_HOST={os.environ['OLLAMA_HOST']}")
+
+# --- Now Import the rest of the application ---
+from prompt_toolkit import Application
+from prompt_toolkit.history import FileHistory
 
 from modules.git_context_manager import GitContextManager
 from modules.shell_engine import ShellEngine
@@ -33,30 +107,6 @@ from modules.category_manager import (
 from modules.ui_manager import UIManager
 from modules.curses_ui_manager import CursesUIManager
 from modules.embedding_manager import EmbeddingManager
-
-LOG_DIR = "logs"
-CONFIG_DIR = "config"
-HISTORY_FILENAME = ".micro_x_history"
-REQUIREMENTS_FILENAME = "requirements.txt"
-UTILS_DIR_NAME = "utils"
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-os.makedirs(os.path.join(SCRIPT_DIR, LOG_DIR), exist_ok=True)
-os.makedirs(os.path.join(SCRIPT_DIR, CONFIG_DIR), exist_ok=True)
-LOG_FILE = os.path.join(SCRIPT_DIR, LOG_DIR, "micro_x.log")
-HISTORY_FILE_PATH = os.path.join(SCRIPT_DIR, HISTORY_FILENAME)
-
-# Logging configuration
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
-    handlers=[logging.FileHandler(LOG_FILE)]
-)
-logger = logging.getLogger(__name__)
-
-config = {}
-DEFAULT_CONFIG_FILENAME = "default_config.json"
-USER_CONFIG_FILENAME = "user_config.json"
 
 app_instance = None
 ui_manager_instance = None
@@ -72,44 +122,7 @@ class StartupIntegrityError(Exception):
         super().__init__(message)
         self.details = details
 
-def merge_configs(base, override):
-    """ Helper function to recursively merge dictionaries. """
-    merged = base.copy()
-    for key, value in override.items():
-        if isinstance(value, dict) and key in merged and isinstance(merged[key], dict):
-            merged[key] = merge_configs(merged[key], value)
-        else:
-            merged[key] = value
-    return merged
-
-def load_configuration():
-    """
-    Loads configurations from default and user JSONC files.
-    The default_config.json file is mandatory for the application to start.
-    It now uses the config_handler module to support comments.
-    """
-    global config
-    default_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, DEFAULT_CONFIG_FILENAME)
-    user_config_path = os.path.join(SCRIPT_DIR, CONFIG_DIR, USER_CONFIG_FILENAME)
-
-    base_config = modules.config_handler.load_jsonc_file(default_config_path)
-    if base_config is None:
-        error_msg = f"CRITICAL ERROR: Default configuration file not found or failed to parse at '{default_config_path}'. Application cannot start."
-        logger.critical(error_msg)
-        raise FileNotFoundError(error_msg)
-
-    logger.info(f"Successfully loaded base configuration from {default_config_path}")
-    config = base_config
-
-    user_settings = modules.config_handler.load_jsonc_file(user_config_path)
-    if user_settings:
-        config = merge_configs(config, user_settings)
-        logger.info(f"Loaded and merged user configurations from {user_config_path}")
-    else:
-        logger.info(f"{user_config_path} not found or is invalid. No user configuration overrides applied.")
-
-
-load_configuration() # Load config at startup
+# Ensure Ollama Manager knows about the config (redundant but safe)
 modules.ollama_manager.set_ollama_host_from_config(config)
 
 def normal_input_accept_handler(buff):
@@ -511,7 +524,7 @@ async def main_async_runner():
     if current_dir_for_prompt == home_dir: initial_prompt_dir = "~"
     elif current_dir_for_prompt.startswith(home_dir + os.sep):
         rel_path = current_dir_for_prompt[len(home_dir)+1:]; full_rel_prompt = "~/"; full_rel_prompt += rel_path
-        initial_prompt_dir = full_rel_prompt if len(full_rel_prompt) <= max_prompt_len else "~/"; initial_prompt_dir += "..." + rel_path[-(max_prompt_len - 5):] if (max_prompt_len - 5) > 0 else "~/... "
+        initial_prompt_dir = full_rel_prompt if len(full_rel_prompt) <= max_prompt_len else "~"; initial_prompt_dir += "..." + rel_path[-(max_prompt_len - 5):] if (max_prompt_len - 5) > 0 else "~/... "
     else:
         base_name = os.path.basename(current_dir_for_prompt)
         initial_prompt_dir = base_name if len(base_name) <= max_prompt_len else "..." + base_name[-(max_prompt_len - 3):] if (max_prompt_len - 3) > 0 else "..."
