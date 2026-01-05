@@ -1,10 +1,10 @@
-# micro_X_v3/core/agent_graph.py
+# micro_X_v4/core/agent_graph.py
 
 import logging
 from typing import TypedDict, Annotated, List, Literal, Union
 import operator
 
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
@@ -13,6 +13,20 @@ from .tools import search_documentation, propose_shell_command, run_internal_uti
 from .events import EventBus, Event, EventType
 
 logger = logging.getLogger(__name__)
+
+# --- Prompts ---
+SYSTEM_PROMPT = """You are micro_X, a specialized AI shell assistant. 
+Your goal is to help users manage their system efficiently.
+
+RULES:
+1. For questions about micro_X's features, documentation, or "how-to" guides, ALWAYS use the 'search_documentation' tool.
+2. For ANY request that can be answered by a Linux command (including "what is...", "show me...", "check..."), ALWAYS use the 'propose_shell_command' tool.
+   - Example: "what is the current directory" -> propose_shell_command("pwd")
+   - Example: "list files" -> propose_shell_command("ls")
+3. For running specific internal micro_X utility scripts (like 'snapshot', 'tree', 'logs'), use 'run_internal_utility'.
+4. If the user is just greeting you or chatting, respond directly without tools.
+
+Be concise and professional."""
 
 # --- State ---
 class AgentState(TypedDict):
@@ -40,7 +54,48 @@ class MicroXAgent:
 
     async def call_model(self, state: AgentState):
         messages = state['messages']
+        # Prepend system prompt if not present
+        if not any(isinstance(m, SystemMessage) for m in messages):
+            messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
+            
         response = await self.llm_with_tools.ainvoke(messages)
+        
+        # --- FIX: Manual parsing for small models (Qwen 0.5B) that output XML ---
+        import re
+        content = response.content
+        if not response.tool_calls and isinstance(content, str):
+            # Regex for <tool_name query="..."> format
+            # Example: <search_documentation query="what is micro_X?" />
+            tool_pattern = re.compile(r'<(\w+)\s+([^>]+?)\s*/?>')
+            match = tool_pattern.search(content)
+            
+            if match:
+                tool_name = match.group(1)
+                args_str = match.group(2)
+                
+                # Parse args (simple "key=value" parsing)
+                args = {}
+                # Regex for key="value"
+                arg_pattern = re.compile(r'(\w+)="([^"]+)"')
+                for arg_match in arg_pattern.finditer(args_str):
+                    args[arg_match.group(1)] = arg_match.group(2)
+                
+                # Construct manual tool call
+                import uuid
+                tool_call = {
+                    'name': tool_name,
+                    'args': args,
+                    'id': str(uuid.uuid4())
+                }
+                
+                logger.info(f"Manually parsed tool call from XML: {tool_name} with args {args}")
+                
+                # Verify it's a valid tool
+                valid_tools = [t.name for t in self.tools]
+                if tool_name in valid_tools:
+                    response.tool_calls = [tool_call]
+                    # response.content = "" # Optional: Clear content so we don't print the raw XML
+
         return {"messages": [response]}
 
     async def execute_tools(self, state: AgentState):

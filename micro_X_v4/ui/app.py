@@ -1,4 +1,4 @@
-# micro_X_v2/ui/app.py
+# micro_X_v4/ui/app.py
 
 import asyncio
 import logging
@@ -18,7 +18,7 @@ from ..core.state import StateManager, AppState
 
 logger = logging.getLogger(__name__)
 
-class V2UIManager:
+class V4UIManager:
     def __init__(self, bus: EventBus, state_manager: StateManager, history, completion_words: list = None):
         self.bus = bus
         self.state = state_manager
@@ -56,14 +56,14 @@ class V2UIManager:
 
         # UI Components
         self.output_area = TextArea(
-            text="micro_X V3 - LangGraph Edition\n" + ("="*40) + "\n",
+            text="micro_X V4 - Agentic Edition\n" + ("="*40) + "\n",
             read_only=True,
             scrollbar=True,
             style='class:output-field'
         )
         
         self.input_area = TextArea(
-            prompt=[('class:prompt', '(v3) > ')],
+            prompt=[('class:prompt', '(v4) > ')],
             multiline=False,
             style='class:input-field',
             history=self.history,
@@ -102,7 +102,7 @@ class V2UIManager:
 
             if current_state == AppState.IDLE:
                 if user_text:
-                    self.append_text(f"\n(v2) > {user_text}\n")
+                    self.append_text(f"\n(v4) > {user_text}\n")
                     asyncio.create_task(self.bus.publish(Event(
                         type=EventType.USER_INPUT_RECEIVED,
                         payload={'input': user_text},

@@ -1,4 +1,4 @@
-# micro_X_v2/modules/help_service.py
+# micro_X_v4/modules/help_service.py
 
 import logging
 from ..core.events import EventBus, Event, EventType

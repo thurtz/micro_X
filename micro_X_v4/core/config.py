@@ -1,4 +1,4 @@
-# micro_X_v2/core/config.py
+# micro_X_v4/core/config.py
 
 import os
 import json

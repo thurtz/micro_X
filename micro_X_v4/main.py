@@ -1,4 +1,4 @@
-# micro_X_v3/main.py
+# micro_X_v4/main.py
 
 import asyncio
 import logging
@@ -9,7 +9,7 @@ import re
 from .core.events import EventBus, Event, EventType
 from .core.state import StateManager, AppState
 from .core.config import ConfigManager
-from .ui.app import V2UIManager
+from .ui.app import V4UIManager
 from .modules.ollama_service import OllamaService
 from .modules.shell_service import ShellService
 from .modules.builtin_service import BuiltinService
@@ -26,12 +26,12 @@ from .core.agent_graph import MicroXAgent
 from langchain_core.messages import HumanMessage
 
 # Configure Logging
-logging.basicConfig(filename='v3.log', level=logging.DEBUG)
+logging.basicConfig(filename='v4.log', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class LogicEngine:
     """
-    The Master Router for micro_X V3 (LangGraph Edition).
+    The Master Router for micro_X V4.
     Orchestrates Alias expansion, Intent classification, Security, and Agent Dispatching.
     """
     def __init__(self, bus: EventBus, state_manager: StateManager, ollama_service: OllamaService, 
@@ -164,7 +164,13 @@ class LogicEngine:
                     sender="Logic"
                 ))
             else:
-                # Other tools (RAG, etc.) already printed their output
+                # Direct output from tool (e.g. RAG answer)
+                # We prefix this to distinguish it from the agent's chat
+                await self.bus.publish(Event(
+                    type=EventType.EXECUTION_OUTPUT,
+                    payload={'output': f"📘 {output}"},
+                    sender="Logic"
+                ))
                 await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
         
         elif last_message.type == "ai":
@@ -233,7 +239,7 @@ async def main():
     aliases = list(alias_manager.get_all_aliases().keys())
     completion_words = sorted(list(set(builtins + utils + aliases)))
 
-    ui = V2UIManager(bus, state_manager, history_service.get_pt_history(), completion_words)
+    ui = V4UIManager(bus, state_manager, history_service.get_pt_history(), completion_words)
     logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager, intent_service, utility_service, rag_service)
 
     # Signal app start

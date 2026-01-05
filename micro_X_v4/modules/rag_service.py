@@ -1,4 +1,4 @@
-# micro_X_v2/modules/rag_service.py
+# micro_X_v4/modules/rag_service.py
 
 import os
 import logging
