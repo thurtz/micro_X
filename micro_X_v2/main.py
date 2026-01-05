@@ -16,6 +16,7 @@ from .modules.builtin_service import BuiltinService
 from .modules.category_manager import CategoryManager
 from .modules.alias_manager import AliasManager
 from .modules.tmux_service import TmuxService
+# from .modules.rag_service import RagService # Imported but we'll use specific trigger
 from .modules.rag_service import RagService
 from .modules.help_service import HelpService
 from .modules.intent_service import IntentService
@@ -29,11 +30,14 @@ logging.basicConfig(filename='v2.log', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class LogicEngine:
-    """Handles the translation logic and execution requests."""
+    """
+    The Master Router for micro_X V2.
+    Orchestrates Alias expansion, Intent classification, Security, and Dispatching.
+    """
     def __init__(self, bus: EventBus, state_manager: StateManager, ollama_service: OllamaService, 
                  config: ConfigManager, category_manager: CategoryManager, 
-                 alias_manager: AliasManager, intent_service: IntentService, utility_service: UtilityService,
-                 router_service: RouterService):
+                 alias_manager: AliasManager, intent_service: IntentService, 
+                 utility_service: UtilityService, router_service: RouterService):
         self.bus = bus
         self.state = state_manager
         self.ollama = ollama_service
@@ -49,7 +53,6 @@ class LogicEngine:
 
     async def _check_security(self, command: str) -> bool:
         """Checks command against Deny and Warn lists. Returns False if blocked."""
-        # 1. Deny List (Regex)
         dangerous_patterns = self.config.get("security.dangerous_patterns", [])
         for pattern in dangerous_patterns:
             if re.search(pattern, command):
@@ -61,72 +64,50 @@ class LogicEngine:
                 ))
                 return False
 
-        # 2. Warn List (Sensitive Commands)
         warn_commands = self.config.get("security.warn_on_commands", [])
         first_token = command.strip().split()[0]
         if first_token in warn_commands:
             logger.info(f"SECURITY: Command '{command}' triggered warning.")
-            # Trigger CAUTION state
             cat = self.category_manager.classify_command(command) or "semi_interactive"
             await self.bus.publish(Event(
                 type=EventType.SECURITY_WARN_TRIGGERED,
                 payload={'command': command, 'category': cat},
                 sender="LogicSecurity"
             ))
-            return False # Block direct execution, flow continues in CAUTION state
+            return False 
 
         return True
 
     async def _handle_input(self, event: Event):
-        user_input = event.payload.get('input', "").strip()
-        if not user_input:
-            return
-            
-        logger.debug(f"LogicEngine received input: '{user_input}'")
+        raw_input = event.payload.get('input', "").strip()
+        if not raw_input: return
         
-        # 0. Check for forced execution (!)
-        if user_input.startswith("!"):
-            forced_cmd = user_input[1:].strip()
-            if forced_cmd:
-                # Security Check
-                if not await self._check_security(forced_cmd):
-                    return
+        logger.debug(f"LogicEngine processing: '{raw_input}' (sender: {event.sender})")
 
-                cat = self.category_manager.classify_command(forced_cmd)
-                if not cat:
-                    # Fallback for forced command if not in json categories
-                    cat = self.config.get("behavior.default_category_for_unclassified", "semi_interactive")
-                
-                logger.info(f"LogicEngine: Force executing '{forced_cmd}' with category '{cat}'")
-                await self.bus.publish(Event(
-                    type=EventType.EXECUTION_REQUESTED,
-                    payload={'command': forced_cmd, 'mode': cat},
-                    sender="Logic"
-                ))
-                return
-
-        # 1. Check for builtins (BEFORE alias expansion)
-        first_token = user_input.lower().split()[0]
-        if first_token in ["/exit", "exit", "/help", "help", "/alias", "/history", "/git_branch", "/config"]:
-            logger.debug("LogicEngine ignoring builtin/alias (pre-expansion).")
+        # 1. Immediate Dispatch for Forced Execution (!)
+        if raw_input.startswith("!"):
+            cmd = raw_input[1:].strip()
+            if cmd:
+                if not await self._check_security(cmd): return
+                cat = self.category_manager.classify_command(cmd) or self.config.get("behavior.default_category_for_unclassified", "semi_interactive")
+                await self._dispatch(cmd, cat)
             return
 
-        # 2. Expand Alias
-        user_input = self.alias_manager.resolve_alias(user_input)
-        
+        # 2. Alias Expansion
+        expanded_input = self.alias_manager.resolve_alias(raw_input)
+        if expanded_input != raw_input:
+            logger.debug(f"Alias expanded: '{raw_input}' -> '{expanded_input}'")
+
         # 3. Intent Classification (Semantic Routing)
-        # Only run for natural language (doesn't start with / or !)
-        intent, score = None, 0.0
-        if not user_input.startswith("/") and not user_input.startswith("!"):
-            intent, score = await self.intent_service.classify(user_input)
-            threshold = self.config.get("intent_classification.classification_threshold", 0.75)
-            logger.debug(f"Intent check: '{user_input}' -> {intent} (score: {score:.2f}, threshold: {threshold})")
+        # Skip if it looks like a command (starts with /) to avoid redirection loops
+        if not expanded_input.startswith("/") and event.sender != "LogicRedirect":
+            intent, score = await self.intent_service.classify(expanded_input)
+            threshold = self.config.get("intent_classification.classification_threshold", 0.60)
             
             if intent and score > threshold:
                 mapped_cmd = self.intent_service.get_command_for_intent(intent)
-                if mapped_cmd and mapped_cmd != user_input:
-                    logger.info(f"LogicEngine: Redirecting intent '{intent}' to '{mapped_cmd}'")
-                    # Publish new event with the mapped command so services (Help, Builtin) can pick it up
+                if mapped_cmd and mapped_cmd != expanded_input:
+                    logger.info(f"Intent Match: '{expanded_input}' -> '{intent}' -> '{mapped_cmd}'")
                     await self.bus.publish(Event(
                         type=EventType.USER_INPUT_RECEIVED,
                         payload={'input': mapped_cmd},
@@ -134,97 +115,56 @@ class LogicEngine:
                     ))
                     return
 
-        # 4. Check if command is already known/categorized (Auto-Run)
+        # 4. Builtin & Utility Routing
+        # Use expanded input from here on
+        first_token = expanded_input.split()[0].lower()
         
-        # Check for Utilities first
-        first_token = user_input.split()[0]
-        if first_token in self.utility_service.UTILITY_MAP or first_token == "/utils":
-             logger.info(f"Auto-running utility: {user_input}")
-             await self.bus.publish(Event(
-                type=EventType.EXECUTION_REQUESTED,
-                payload={'command': user_input, 'mode': 'utility'}, # mode='utility' handled by UtilityService?
-                sender="Logic"
-            ))
-             return
+        # Builtins handled natively by services listening to USER_INPUT_RECEIVED
+        # We just need to stop processing here.
+        if first_token in ["/exit", "exit", "/help", "help", "/alias", "/history", "/git_branch", "/config"]:
+            logger.debug(f"LogicEngine skipping builtin: {first_token}")
+            return
 
-        known_category = self.category_manager.classify_command(user_input)
-        if known_category:
-            # Security Check
-            if not await self._check_security(user_input):
+        # Utilities handled by UtilityService
+        if first_token in self.utility_service.UTILITY_MAP or first_token == "/utils":
+            logger.info(f"LogicEngine routing to UtilityService: {expanded_input}")
+            await self._dispatch(expanded_input, mode='utility')
+            return
+
+        # RAG / Documentation
+        if expanded_input.lower().startswith("/docs"):
+            query = expanded_input[5:].strip()
+            if query:
+                await self.bus.publish(Event(
+                    EventType.RAG_QUERY_REQUESTED,
+                    payload={'query': query},
+                    sender="Logic"
+                ))
+            else:
+                # Just /docs -> trigger the utility
+                await self._dispatch("/docs", mode='utility')
+            return
+
+        # 5. Auto-Run for Categorized Shell Commands
+        known_cat = self.category_manager.classify_command(expanded_input)
+        if known_cat:
+            if not await self._check_security(expanded_input): return
+            logger.info(f"Auto-running known command: {expanded_input} ({known_cat})")
+            await self._dispatch(expanded_input, known_cat)
+            return
+
+        # 6. Ambiguity Routing (Router Agent)
+        # Only if not a direct command path
+        if not expanded_input.startswith("/"):
+            route = await self.router_service.route_input(expanded_input)
+            if route == "DOCS":
+                logger.info("Router directed to RAG.")
+                await self.bus.publish(Event(EventType.RAG_QUERY_REQUESTED, payload={'query': expanded_input}, sender="Logic"))
                 return
 
-            logger.info(f"Auto-running known command: {user_input} ({known_category})")
-            # We need to set the context proposed command so execution has something to run
-            # But wait, EXECUTION_REQUESTED payload carries the command.
-            # However, StateManager context update usually happens on SUGGESTION_READY.
-            # We should probably update context manually or just pass it in payload.
-            
-            # Update context directly? No, clean way:
-            # We skip CONFIRMATION state and go straight to EXECUTING (via EXECUTION_REQUESTED).
-            
-            # BUT: StateManager needs to know we are EXECUTING.
-            # StateManager listens to USER_CONFIRMED -> EXECUTING.
-            # It doesn't listen to EXECUTION_REQUESTED?
-            # Let's check StateManager. It listens to nothing relevant for transition to EXECUTING except USER_CONFIRMED.
-            
-            # We need a new event or just fire EXECUTION_REQUESTED and let ShellService handle it?
-            # If we fire EXECUTION_REQUESTED, ShellService runs.
-            # But StateManager remains in IDLE.
-            # Then EXECUTION_FINISHED fires -> StateManager sets IDLE (no change).
-            # This is technically fine, but UI might not show [Running Command...] status.
-            
-            # Better: Publish a "DIRECT_EXECUTION_STARTED" event?
-            # Or just rely on ShellService/TmuxService execution.
-            
-            # Let's fire EXECUTION_REQUESTED.
-            await self.bus.publish(Event(
-                type=EventType.EXECUTION_REQUESTED,
-                payload={'command': user_input, 'mode': known_category},
-                sender="Logic"
-            ))
-            return
-
-        if user_input.startswith("/") or user_input.startswith("ls ") or user_input == "ls":
-             # Treat as direct command -> Suggestion (Confirmation)
-             # V1 would run this if categorized.
-             
-             # Let's stick to the current "Safe Mode" (Confirmation) for everything unless we are sure.
-             pass
-
-        # Check for RAG query
-
-        # Check for RAG query
-        # Only if arguments are provided (e.g. /docs how to use)
-        # If just "/docs", let it fall through to UtilityService (opens web docs)
-        if user_input.lower().startswith("/docs ") and len(user_input.strip()) > 6:
-            query = user_input[5:].strip() # Remove /docs
-            await self.bus.publish(Event(
-                EventType.RAG_QUERY_REQUESTED,
-                payload={'query': query},
-                sender="Logic"
-            ))
-            return
-
-        # 5. LLM Router (Decide if Shell vs Docs)
-        # Only if it doesn't look like a direct command (no / or !)
-        route = await self.router_service.route_input(user_input)
-        
-        if route == "DOCS":
-            logger.info("Router: Redirecting to RAG.")
-            await self.bus.publish(Event(
-                EventType.RAG_QUERY_REQUESTED,
-                payload={'query': user_input},
-                sender="LogicRouter"
-            ))
-            return
-        
-        # If CHAT or SHELL, we proceed to Translation (OllamaService handles chatty input reasonably well by translating to 'echo ...' or similar)
-        # But for now, we assume SHELL.
-
-        # 6. AI Translation (Ollama)
-        # Natural Language - use Ollama
+        # 7. AI Translation (Ollama)
         await self.bus.publish(Event(EventType.AI_PROCESSING_STARTED, sender="Logic"))
-        proposed_cmd = await self.ollama.generate_command(user_input)
+        proposed_cmd = await self.ollama.generate_command(expanded_input)
         
         if proposed_cmd:
             cat = self.category_manager.classify_command(proposed_cmd)
@@ -239,43 +179,40 @@ class LogicEngine:
                 payload={'message': "Ollama failed to generate command."},
                 sender="Logic"
             ))
-            await self.bus.publish(Event(EventType.EXECUTION_FINISHED)) # Return to IDLE
+            await self.bus.publish(Event(EventType.EXECUTION_FINISHED))
+
+    async def _dispatch(self, command: str, mode: str):
+        """Helper to fire execution event."""
+        await self.bus.publish(Event(
+            type=EventType.EXECUTION_REQUESTED,
+            payload={'command': command, 'mode': mode},
+            sender="Logic"
+        ))
 
     async def _execute_command(self, event: Event):
+        """Called when user confirms an AI suggestion."""
         cmd = self.state.context.proposed_command
-        # Check payload first (from Categorization)
         category = event.payload.get('category') or self.state.context.proposed_category
         should_save = event.payload.get('save', False)
         
-        if cmd and should_save and category:
-            logger.info(f"Saving '{cmd}' as '{category}'")
+        if not cmd: return
+
+        if should_save and category:
             self.category_manager.add_command(cmd, category)
 
-        # Check if the command is known/categorized
-        # If category is None, it means it wasn't forced by UI and wasn't known by CategoryManager (on suggestion)
-        if category is None and not self.category_manager.is_known(cmd) and not should_save: 
-            logger.info(f"Command '{cmd}' is unknown. Requesting categorization.")
-            await self.bus.publish(Event(
+        # Final check if we need categorization (if user hit [1] Yes on unknown)
+        if not event.payload.get('category') and not self.category_manager.is_known(cmd):
+             await self.bus.publish(Event(
                 type=EventType.CATEGORIZATION_REQUESTED,
                 payload={'command': cmd},
                 sender="Logic"
             ))
-            return
-        
-        # Fallback if None (e.g. forced but no cat?) shouldn't happen with UI options
-        final_mode = category or 'simple'
+             return
 
-        if cmd:
-            await self.bus.publish(Event(
-                type=EventType.EXECUTION_REQUESTED,
-                payload={'command': cmd, 'mode': final_mode},
-                sender="Logic"
-            ))
+        await self._dispatch(cmd, category or 'simple')
 
 async def main():
-    # Detect base directory (one level up from micro_X_v2/)
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
     bus = EventBus()
     config = ConfigManager(base_dir)
     
@@ -286,7 +223,7 @@ async def main():
     builtin_service = BuiltinService(bus)
     category_manager = CategoryManager(config)
     alias_manager = AliasManager(bus, config)
-    rag_service = RagService(bus, config)
+    rag_service = RagService(bus, config, ollama_service)
     help_service = HelpService(bus)
     intent_service = IntentService(bus, config)
     history_service = HistoryService(bus, config)
@@ -294,7 +231,6 @@ async def main():
     utility_service = UtilityService(bus, config)
     router_service = RouterService(config)
     
-    # Collect completion words
     builtins = ["/exit", "/help", "/alias", "/history", "/git_branch", "/config", "/docs"]
     utils = list(utility_service.UTILITY_MAP.keys())
     aliases = list(alias_manager.get_all_aliases().keys())
@@ -303,12 +239,8 @@ async def main():
     ui = V2UIManager(bus, state_manager, history_service.get_pt_history(), completion_words)
     logic = LogicEngine(bus, state_manager, ollama_service, config, category_manager, alias_manager, intent_service, utility_service, router_service)
 
-    # Signal app start
     await bus.publish(Event(EventType.APP_STARTED))
-
     app = ui.build_app()
-    
-    # Run the prompt_toolkit app
     await app.run_async()
 
 if __name__ == "__main__":
