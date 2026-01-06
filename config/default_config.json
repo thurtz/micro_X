@@ -45,7 +45,7 @@
   },
   "intent_classification": {
     "embedding_model": "nomic-embed-text",
-    "classification_threshold": 0.75,
+    "classification_threshold": 0.60,
     "intents_file_path": "config/intents.json"
   },
   "paths": {

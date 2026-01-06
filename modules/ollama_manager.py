@@ -27,6 +27,33 @@ _append_output_func_cached = None
 _config_cached = None
 _is_initialized = False # Flag to ensure config and callback are set
 
+def set_ollama_host_from_config(config_obj: dict):
+    """
+    Sets the OLLAMA_HOST environment variable from a given configuration object.
+    This should be called as early as possible during startup.
+    """
+    global _config_cached
+    if not _config_cached:
+        _config_cached = config_obj # Cache the config for other functions in this module
+    
+    # Get the ollama_service sub-dictionary
+    ollama_service_config = config_obj.get('ollama_service', {})
+    
+    # Logic to determine and set OLLAMA_HOST
+    ollama_host = ollama_service_config.get('ollama_host', 'http://localhost')
+    ollama_port = ollama_service_config.get('ollama_port', 11434)
+
+    # Ensure the scheme is present for consistency
+    if not isinstance(ollama_host, str) or not ollama_host.startswith(('http://', 'https://')):
+        ollama_host = f'http://{ollama_host}'
+
+    # The ollama library uses the OLLAMA_HOST environment variable
+    # to determine the server address.
+    # It expects format like "http://host:port"
+    os.environ['OLLAMA_HOST'] = f"{ollama_host}:{ollama_port}"
+    logger.info(f"OLLAMA_HOST environment variable set to: {os.environ['OLLAMA_HOST']}")
+
+
 def _initialize_manager_if_needed(main_config=None, append_output_callback=None):
     """Ensures the manager has its necessary shared resources."""
     global _is_initialized, _config_cached, _append_output_func_cached
@@ -40,17 +67,6 @@ def _initialize_manager_if_needed(main_config=None, append_output_callback=None)
     if _config_cached and _append_output_func_cached:
         _is_initialized = True
         logger.debug("Ollama Manager initialized with config and append_output.")
-
-        # Configure Ollama client to use the specified host and port
-        ollama_service_config = _config_cached.get(OLLAMA_SERVICE_CONFIG_SECTION, {})
-        ollama_host = ollama_service_config.get("ollama_host", "http://localhost")
-        ollama_port = ollama_service_config.get("ollama_port", 11434)
-
-        # The ollama library uses the OLLAMA_HOST environment variable
-        # to determine the server address.
-        # It expects format like "host:port" or "http://host:port"
-        os.environ['OLLAMA_HOST'] = f"{ollama_host}:{ollama_port}"
-        logger.info(f"Set OLLAMA_HOST environment variable to: {os.environ['OLLAMA_HOST']}")
     else:
         logger.error("Ollama Manager cannot be fully initialized: main_config or append_output_callback missing.")
 

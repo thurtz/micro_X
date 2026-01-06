@@ -278,8 +278,8 @@
             async function loadInitialDefaults() {
                 try {
                     const [configResponse, categoriesResponse] = await Promise.all([
-                        fetch('../../config/default_config.json'),
-                        fetch('../../config/default_command_categories.json')
+                        fetch('../../config/default_config.json', { cache: 'no-store' }),
+                        fetch('../../config/default_command_categories.json', { cache: 'no-store' })
                     ]);
 
                     if (!configResponse.ok) {
@@ -833,7 +833,7 @@
                 let errorMessages = [];
 
                 const loadPromises = filesToLoad.map(fileInfo =>
-                    fetch(fileInfo.path)
+                    fetch(fileInfo.path, { cache: 'no-store' })
                         .then(response => {
                             if (!response.ok) {
                                 throw new Error(`HTTP error ${response.status} for ${fileInfo.name}`);
