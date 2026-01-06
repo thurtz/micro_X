@@ -209,4 +209,5 @@ config/.tmux_v*.conf
 **/clones/
 
 # Knowledge base directories
-knowledge_bases/
+knowledge_bases/*
+!knowledge_bases/.gitkeep
