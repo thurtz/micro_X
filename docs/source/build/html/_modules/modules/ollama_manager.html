@@ -100,6 +100,36 @@
 <span class="n">_config_cached</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="n">_is_initialized</span> <span class="o">=</span> <span class="kc">False</span> <span class="c1"># Flag to ensure config and callback are set</span>
 
+<div class="viewcode-block" id="set_ollama_host_from_config">
+<a class="viewcode-back" href="../../api_reference.html#modules.ollama_manager.set_ollama_host_from_config">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">set_ollama_host_from_config</span><span class="p">(</span><span class="n">config_obj</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sets the OLLAMA_HOST environment variable from a given configuration object.</span>
+<span class="sd">    This should be called as early as possible during startup.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_config_cached</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_config_cached</span><span class="p">:</span>
+        <span class="n">_config_cached</span> <span class="o">=</span> <span class="n">config_obj</span> <span class="c1"># Cache the config for other functions in this module</span>
+    
+    <span class="c1"># Get the ollama_service sub-dictionary</span>
+    <span class="n">ollama_service_config</span> <span class="o">=</span> <span class="n">config_obj</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ollama_service&#39;</span><span class="p">,</span> <span class="p">{})</span>
+    
+    <span class="c1"># Logic to determine and set OLLAMA_HOST</span>
+    <span class="n">ollama_host</span> <span class="o">=</span> <span class="n">ollama_service_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ollama_host&#39;</span><span class="p">,</span> <span class="s1">&#39;http://localhost&#39;</span><span class="p">)</span>
+    <span class="n">ollama_port</span> <span class="o">=</span> <span class="n">ollama_service_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ollama_port&#39;</span><span class="p">,</span> <span class="mi">11434</span><span class="p">)</span>
+
+    <span class="c1"># Ensure the scheme is present for consistency</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ollama_host</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">ollama_host</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s1">&#39;http://&#39;</span><span class="p">,</span> <span class="s1">&#39;https://&#39;</span><span class="p">)):</span>
+        <span class="n">ollama_host</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;http://</span><span class="si">{</span><span class="n">ollama_host</span><span class="si">}</span><span class="s1">&#39;</span>
+
+    <span class="c1"># The ollama library uses the OLLAMA_HOST environment variable</span>
+    <span class="c1"># to determine the server address.</span>
+    <span class="c1"># It expects format like &quot;http://host:port&quot;</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;OLLAMA_HOST&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ollama_host</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">ollama_port</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;OLLAMA_HOST environment variable set to: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;OLLAMA_HOST&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_initialize_manager_if_needed</span><span class="p">(</span><span class="n">main_config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">append_output_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensures the manager has its necessary shared resources.&quot;&quot;&quot;</span>
     <span class="k">global</span> <span class="n">_is_initialized</span><span class="p">,</span> <span class="n">_config_cached</span><span class="p">,</span> <span class="n">_append_output_func_cached</span>
@@ -113,17 +143,6 @@
     <span class="k">if</span> <span class="n">_config_cached</span> <span class="ow">and</span> <span class="n">_append_output_func_cached</span><span class="p">:</span>
         <span class="n">_is_initialized</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Ollama Manager initialized with config and append_output.&quot;</span><span class="p">)</span>
-
-        <span class="c1"># Configure Ollama client to use the specified host and port</span>
-        <span class="n">ollama_service_config</span> <span class="o">=</span> <span class="n">_config_cached</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">OLLAMA_SERVICE_CONFIG_SECTION</span><span class="p">,</span> <span class="p">{})</span>
-        <span class="n">ollama_host</span> <span class="o">=</span> <span class="n">ollama_service_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ollama_host&quot;</span><span class="p">,</span> <span class="s2">&quot;http://localhost&quot;</span><span class="p">)</span>
-        <span class="n">ollama_port</span> <span class="o">=</span> <span class="n">ollama_service_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ollama_port&quot;</span><span class="p">,</span> <span class="mi">11434</span><span class="p">)</span>
-
-        <span class="c1"># The ollama library uses the OLLAMA_HOST environment variable</span>
-        <span class="c1"># to determine the server address.</span>
-        <span class="c1"># It expects format like &quot;host:port&quot; or &quot;http://host:port&quot;</span>
-        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;OLLAMA_HOST&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ollama_host</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">ollama_port</span><span class="si">}</span><span class="s2">&quot;</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Set OLLAMA_HOST environment variable to: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;OLLAMA_HOST&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Ollama Manager cannot be fully initialized: main_config or append_output_callback missing.&quot;</span><span class="p">)</span>
 
