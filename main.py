@@ -530,6 +530,12 @@ async def main_async_runner():
         initial_prompt_dir = base_name if len(base_name) <= max_prompt_len else "..." + base_name[-(max_prompt_len - 3):] if (max_prompt_len - 3) > 0 else "..."
 
     if config.get("behavior", {}).get("verbosity_level") != "quiet":
+        # Check for Documentation Knowledge Base
+        kb_path = os.path.join(SCRIPT_DIR, "knowledge_bases", "micro_X_docs")
+        kb_hint = ""
+        if not os.path.exists(kb_path):
+            kb_hint = "\nℹ️  Documentation Knowledge Base is missing. Run '/docs' to build it."
+
         initial_welcome_message = (
             "Welcome to micro_X Shell 🚀\n"
             "Type a Linux command, or try '/translate your query' (e.g., /translate list text files).\n"
@@ -537,6 +543,8 @@ async def main_async_runner():
             "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
             "Use '/ollama help' to manage the Ollama service.\n"
         )
+        initial_welcome_message += kb_hint
+
         initial_buffer_for_ui = list(ui_manager_instance.output_buffer)
 
         is_buffer_empty_or_just_welcome = not initial_buffer_for_ui or \
