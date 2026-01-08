@@ -103,6 +103,14 @@ async def primary_translator_node(state: AgentState) -> AgentState:
     system_prompt = config.get('prompts', {}).get('primary_translator', {}).get('system', "")
     user_template = config.get('prompts', {}).get('primary_translator', {}).get('user_template', "{human_input}")
 
+    # 2. Set up LangChain chain
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("user", user_template)
+    ])
+    model = ChatOllama(model=model_name)
+    chain = prompt | model | StrOutputParser()
+
     # 3. Invoke the chain with retry logic
     try:
         raw_output = await _invoke_llm_with_retries(
@@ -196,10 +204,7 @@ def route_after_primary(state: AgentState) -> Literal["validator", "secondary_tr
         return "secondary_translator"
 
 
-# --- Graph Definition (In Progress) ---
-
-# TODO: Add other nodes (validator, secondary_translator, etc.)
-# TODO: Define conditional edges
+# --- Graph Definition ---
 
 async def secondary_translator_node(state: AgentState) -> AgentState:
     """
