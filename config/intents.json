@@ -250,9 +250,17 @@
         "logs dev",
         "show dev logs"
     ],
-    "show_help_logs": [
-        "/help logs",
-        "help logs",
-        "how to use logs"
-    ]
-}
+        "show_help_logs": [
+            "/help logs",
+            "help logs",
+            "how to use logs"
+        ],
+        "take_snapshot": [
+            "/snapshot",
+            "take a snapshot",
+            "create a snapshot",
+            "generate snapshot",
+            "snapshot project"
+        ]
+    }
+    

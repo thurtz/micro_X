@@ -21,6 +21,7 @@
   "/list": "/utils list_scripts",
   "/ollama": "/utils ollama_cli",
   "/snapshot": "/utils generate_snapshot",
+  "/clone": "/utils clone",
   "/tree": "/utils generate_tree",
   "/update": "python utils/update.py",
   "/test": "/utils run_tests",

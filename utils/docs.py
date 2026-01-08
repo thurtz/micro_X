@@ -10,6 +10,7 @@ import logging
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from modules.query_engine import query_knowledge_base, query_knowledge_base_rag
+from utils.shared.api_client import get_input
 
 # --- Help Text ---
 HELP_TEXT = """
@@ -68,6 +69,54 @@ def main():
         logging.getLogger().setLevel(log_level)
 
     if args.query:
+        # --- Check if Knowledge Base is Built ---
+        # We need to import the necessary modules here, inside the 'if' block,
+        # to avoid loading them when just opening the browser.
+        from modules import config_handler
+        from modules.rag_manager import RAGManager
+
+        # A minimal config load is needed for the RAGManager
+        project_root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        config_dir = os.path.join(project_root_dir, 'config')
+        default_config_path = os.path.join(config_dir, 'default_config.json')
+        user_config_path = os.path.join(config_dir, 'user_config.json')
+        
+        config = config_handler.load_jsonc_file(default_config_path) or {}
+        user_settings = config_handler.load_jsonc_file(user_config_path)
+        if user_settings:
+            # A simple merge for this check
+            config.update(user_settings)
+
+        rag_manager = RAGManager(config, name='micro_X_docs')
+        rag_manager.initialize()
+
+        if rag_manager.vector_store and rag_manager.vector_store._collection.count() == 0:
+            print("⚠️  The 'micro_X_docs' knowledge base is empty or has not been built yet.")
+            choice = get_input("Would you like to build it now? This process may take around 20 minutes. [y/N]: ").strip().lower()
+            
+            if choice == 'y':
+                print("\n🚀 Starting build process...")
+                knowledge_script = os.path.join(os.path.dirname(__file__), 'knowledge.py')
+                docs_source = os.path.join(project_root_dir, 'docs', 'source')
+                
+                try:
+                    subprocess.run(
+                        [sys.executable, knowledge_script, '--name', 'micro_X_docs', 'add-dir', docs_source],
+                        check=True
+                    )
+                    print("\n✅ Knowledge base built successfully! Retrying query...")
+                    # Re-initialize to ensure fresh state
+                    rag_manager = RAGManager(config, name='micro_X_docs')
+                    rag_manager.initialize()
+                except subprocess.CalledProcessError as e:
+                    print(f"\n❌ Error building knowledge base: {e}")
+                    sys.exit(1)
+            else:
+                print("\nTo enable documentation queries later, please run:")
+                print("    /knowledge --name micro_X_docs add-dir docs/source\n")
+                sys.exit(0)
+
+        # --- Proceed with Query ---
         query_text = " ".join(args.query)
         if args.rag:
             response = asyncio.run(query_knowledge_base_rag(kb_name="micro_X_docs", query=query_text))

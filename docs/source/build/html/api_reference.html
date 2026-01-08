@@ -96,6 +96,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#modules.ollama_manager.explicit_stop_ollama_service"><code class="docutils literal notranslate"><span class="pre">explicit_stop_ollama_service()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#modules.ollama_manager.get_ollama_status_info"><code class="docutils literal notranslate"><span class="pre">get_ollama_status_info()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#modules.ollama_manager.is_ollama_server_running"><code class="docutils literal notranslate"><span class="pre">is_ollama_server_running()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#modules.ollama_manager.set_ollama_host_from_config"><code class="docutils literal notranslate"><span class="pre">set_ollama_host_from_config()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#modules.output_analyzer.is_tui_like_output"><code class="docutils literal notranslate"><span class="pre">is_tui_like_output()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#modules.shell_engine.ShellEngine"><code class="docutils literal notranslate"><span class="pre">ShellEngine</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#modules.shell_engine.ShellEngine.execute_command_in_tmux"><code class="docutils literal notranslate"><span class="pre">ShellEngine.execute_command_in_tmux()</span></code></a></li>
@@ -169,8 +170,6 @@
 <li class="toctree-l3"><a class="reference internal" href="#utils.install_requirements.install_requirements"><code class="docutils literal notranslate"><span class="pre">install_requirements()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.list_scripts.get_scripts_from_directory"><code class="docutils literal notranslate"><span class="pre">get_scripts_from_directory()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.list_scripts.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#utils.ollama_cli.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#utils.ollama_cli.print_for_manager"><code class="docutils literal notranslate"><span class="pre">print_for_manager()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.run_tests.display_path"><code class="docutils literal notranslate"><span class="pre">display_path()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.run_tests.get_project_root"><code class="docutils literal notranslate"><span class="pre">get_project_root()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.run_tests.run_tests_main_logic"><code class="docutils literal notranslate"><span class="pre">run_tests_main_logic()</span></code></a></li>
@@ -661,6 +660,13 @@ to launch ‘ollama serve’ in a tmux session and waits for it to become respon
 <dd class="field-odd"><p>True if the server is responsive, False otherwise.</p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modules.ollama_manager.set_ollama_host_from_config">
+<span class="sig-prename descclassname"><span class="pre">modules.ollama_manager.</span></span><span class="sig-name descname"><span class="pre">set_ollama_host_from_config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config_obj</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/modules/ollama_manager.html#set_ollama_host_from_config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modules.ollama_manager.set_ollama_host_from_config" title="Link to this definition"></a></dt>
+<dd><p>Sets the OLLAMA_HOST environment variable from a given configuration object.
+This should be called as early as possible during startup.</p>
 </dd></dl>
 
 <dl class="py function" id="module-modules.output_analyzer">
@@ -1182,18 +1188,6 @@ If None (e.g., direct script run), prints to console.</p></li>
 <dt class="sig sig-object py" id="utils.list_scripts.main">
 <span class="sig-prename descclassname"><span class="pre">utils.list_scripts.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/list_scripts.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.list_scripts.main" title="Link to this definition"></a></dt>
 <dd><p>Main function to list all available scripts.</p>
-</dd></dl>
-
-<dl class="py function" id="module-utils.ollama_cli">
-<dt class="sig sig-object py" id="utils.ollama_cli.main">
-<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">utils.ollama_cli.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/ollama_cli.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.ollama_cli.main" title="Link to this definition"></a></dt>
-<dd><p>Main async function to parse arguments and execute ollama management commands.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="utils.ollama_cli.print_for_manager">
-<span class="sig-prename descclassname"><span class="pre">utils.ollama_cli.</span></span><span class="sig-name descname"><span class="pre">print_for_manager</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">style_class</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'INFO'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/ollama_cli.html#print_for_manager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.ollama_cli.print_for_manager" title="Link to this definition"></a></dt>
-<dd><p>A simple print function to mimic the UI manager’s append_output for this standalone script.</p>
 </dd></dl>
 
 <dl class="py function" id="module-utils.run_tests">
