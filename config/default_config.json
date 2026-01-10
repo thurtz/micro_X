@@ -1,6 +1,6 @@
 {
   "application": {
-    "version": "0.0.1000"
+    "version": "0.0.1001"
   },
   "ai_models": {
     "primary_translator": {
@@ -43,7 +43,7 @@
     "output_separator_length": 30,
     "enable_startup_separator": true,
     "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n",
-    "enable_mouse_support": false,
+    "enable_mouse_support": true,
     "ui_backend": "prompt_toolkit"
   },
   "intent_classification": {

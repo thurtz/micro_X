@@ -182,8 +182,10 @@ class MicroXTextualApp(App):
     """
 
     BINDINGS = [
-        Binding("ctrl+c", "quit", "Quit", show=True),
-        Binding("ctrl+l", "clear", "Clear Output", show=True),
+        Binding("f1", "help", "Help", show=True),
+        Binding("ctrl+q", "quit", "Quit", show=True),
+        Binding("ctrl+c", "cancel_or_clear", "Cancel/Clear", show=True),
+        Binding("ctrl+l", "clear_screen", "Clear Output", show=True),
     ]
 
     def __init__(self, shell_engine=None, history=None, initial_logs=None, **kwargs):
@@ -200,8 +202,34 @@ class MicroXTextualApp(App):
         yield Header(show_clock=True)
         yield RichLog(id="main_log", highlight=True, markup=True)
         yield Vertical(id="interaction_zone")
-        yield Input(placeholder="Type a command or natural language query...")
+        yield Input(placeholder="Command... [Ctrl+Shift+V] Paste | [Shift+Select & Ctrl+Shift+C] Copy")
         yield Footer()
+
+    def action_clear_screen(self) -> None:
+        if self.log_widget:
+            self.log_widget.clear()
+
+    def action_help(self) -> None:
+        """Trigger the /help command."""
+        if self.shell_engine:
+            asyncio.create_task(self.shell_engine.handle_built_in_command("/help"))
+
+    def action_cancel_or_clear(self) -> None:
+        """Handle Ctrl+C: Cancel current interaction or clear input."""
+        # 1. Cancel any active inline confirmation/categorization
+        if self.current_confirmation_future and not self.current_confirmation_future.done():
+            self.current_confirmation_future.set_result("cancel")
+            self.interaction_zone.remove_children()
+            self.input_widget.focus()
+            return
+
+        # 2. Clear input if not empty
+        if self.input_widget.value:
+            self.input_widget.value = ""
+            return
+        
+        # 3. If nothing else, maybe show a hint about Quitting?
+        self.notify("Press Ctrl+Q to Quit", timeout=2)
 
     async def on_mount(self) -> None:
         self.log_widget = self.query_one("#main_log")

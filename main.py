@@ -562,10 +562,11 @@ async def main_async_runner():
         version = config.get("application", {}).get("version", "unknown")
         initial_welcome_message = (
             f"Welcome to micro_X Shell 🚀 (Version: {version})\n"
-            "Type a Linux command, or try '/translate your query' (e.g., /translate list text files).\n"
-            "Key shortcuts are shown below. For more help, type '/help'.\n"
-            "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
-            "Use '/ollama help' to manage the Ollama service.\n"
+            "Type a Linux command, or try '/translate your query'.\n"
+            "• Copy: Hold Shift + Select text, then press Ctrl+Shift+C.\n"
+            "• Paste: Press Ctrl+Shift+V.\n"
+            "• Help: Type '/help' or press F1.\n"
+            "• Quit: Press Ctrl+Q.\n"
         )
         initial_welcome_message += kb_hint
 

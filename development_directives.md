@@ -44,3 +44,12 @@ When creating or modifying OS-specific setup scripts in the `setup_scripts/` dir
 - **Baseline Reference**: The `setup_micro_X_mint.sh` script is considered the baseline or "gold standard". New scripts for other operating systems should follow its structure, verbosity, and error-handling logic as closely as possible.
 
 - **Goal**: The objective is to provide a fully automated setup experience where possible. When full automation is not feasible (e.g., for Ollama on certain OSes), the script should provide clear, step-by-step manual instructions for the user.
+
+## 7. Versioning and Documentation
+
+Before committing significant changes or releases to the `dev` branch, follow these steps to ensure consistency:
+
+1.  **Update Version (If Applicable)**: If the changes warrant a version bump (patch, minor, or major), update the `application.version` key in `config/default_config.json`.
+2.  **Sync Version**: Run `/version_sync` (or `python3 utils/version_sync.py`) to propagate the version number to all metadata files (`micro_X.desktop`, `docs/source/conf.py`, whitepaper).
+3.  **Update Documentation**: Run `/dev --update-docs` (or `python3 utils/dev.py --update-docs`) to rebuild the Sphinx documentation. This ensures the HTML output reflects the latest code and version.
+4.  **Verify**: Check `git diff` to confirm that version numbers and documentation builds are updated and consistent before staging.

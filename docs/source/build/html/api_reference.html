@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API Reference &mdash; micro_X 0.0.1000 documentation</title>
+  <title>API Reference &mdash; micro_X 0.0.1001 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=4ff0bc1c"></script>
+      <script src="_static/documentation_options.js?v=eb883805"></script>
       <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
@@ -170,6 +170,8 @@
 <li class="toctree-l3"><a class="reference internal" href="#utils.install_requirements.install_requirements"><code class="docutils literal notranslate"><span class="pre">install_requirements()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.list_scripts.get_scripts_from_directory"><code class="docutils literal notranslate"><span class="pre">get_scripts_from_directory()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.list_scripts.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#utils.ollama_cli.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#utils.ollama_cli.print_for_manager"><code class="docutils literal notranslate"><span class="pre">print_for_manager()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.run_tests.display_path"><code class="docutils literal notranslate"><span class="pre">display_path()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.run_tests.get_project_root"><code class="docutils literal notranslate"><span class="pre">get_project_root()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utils.run_tests.run_tests_main_logic"><code class="docutils literal notranslate"><span class="pre">run_tests_main_logic()</span></code></a></li>
@@ -1188,6 +1190,18 @@ If None (e.g., direct script run), prints to console.</p></li>
 <dt class="sig sig-object py" id="utils.list_scripts.main">
 <span class="sig-prename descclassname"><span class="pre">utils.list_scripts.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/list_scripts.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.list_scripts.main" title="Link to this definition"></a></dt>
 <dd><p>Main function to list all available scripts.</p>
+</dd></dl>
+
+<dl class="py function" id="module-utils.ollama_cli">
+<dt class="sig sig-object py" id="utils.ollama_cli.main">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">utils.ollama_cli.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/ollama_cli.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.ollama_cli.main" title="Link to this definition"></a></dt>
+<dd><p>Main async function to parse arguments and execute ollama management commands.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="utils.ollama_cli.print_for_manager">
+<span class="sig-prename descclassname"><span class="pre">utils.ollama_cli.</span></span><span class="sig-name descname"><span class="pre">print_for_manager</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">style_class</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'INFO'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/ollama_cli.html#print_for_manager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#utils.ollama_cli.print_for_manager" title="Link to this definition"></a></dt>
+<dd><p>A simple print function to mimic the UI manager’s append_output for this standalone script.</p>
 </dd></dl>
 
 <dl class="py function" id="module-utils.run_tests">

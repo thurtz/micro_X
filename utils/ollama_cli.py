@@ -15,7 +15,7 @@ try:
         sys.path.insert(0, project_root)
     # Now we can safely import from modules
     from modules import ollama_manager
-    from main import load_configuration # Import config loader from main
+    from main import load_configuration_early # Import config loader from main
 except ImportError as e:
     print(f"❌ Error: Could not import necessary modules. Ensure this script is run from within the micro_X project structure.", file=sys.stderr)
     print(f"   Details: {e}", file=sys.stderr)
@@ -61,7 +61,7 @@ async def main():
     # Load the main application configuration
     try:
         # We need to call the global function from main, not an instance method
-        load_configuration()
+        load_configuration_early()
         # The configuration is loaded into a global 'config' variable in main.py,
         # which we need to access.
         from main import config
