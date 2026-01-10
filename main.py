@@ -234,6 +234,10 @@ async def perform_startup_integrity_checks() -> Tuple[bool, bool]:
 
     git_fetch_timeout_from_config = config.get('timeouts', {}).get('git_fetch_timeout')
 
+    version = config.get("application", {}).get("version", "unknown")
+    if config.get("behavior", {}).get("verbosity_level") != "quiet":
+        ui_manager_instance.append_output(f"🚀 micro_X Version: {version}", style_class='info')
+
     if git_fetch_timeout_from_config is not None:
         git_context_manager_instance = GitContextManager(project_root=SCRIPT_DIR, fetch_timeout=git_fetch_timeout_from_config)
     else:
@@ -555,8 +559,9 @@ async def main_async_runner():
         if not os.path.exists(kb_path):
             kb_hint = "\nℹ️  Documentation Knowledge Base is missing. Run '/docs' to build it."
 
+        version = config.get("application", {}).get("version", "unknown")
         initial_welcome_message = (
-            "Welcome to micro_X Shell 🚀\n"
+            f"Welcome to micro_X Shell 🚀 (Version: {version})\n"
             "Type a Linux command, or try '/translate your query' (e.g., /translate list text files).\n"
             "Key shortcuts are shown below. For more help, type '/help'.\n"
             "Use '/command help' for category options, '/utils help' for utilities, or '/update' to get new code.\n"
@@ -639,8 +644,9 @@ async def main_async_runner():
 
 def run_shell():
     """ Main entry point to run the shell application. """
+    version = config.get("application", {}).get("version", "unknown")
     logger.info("=" * 80)
-    logger.info("  micro_X Session Started")
+    logger.info(f"  micro_X Session Started (Version: {version})")
     logger.info(f"  Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("=" * 80)
     try:

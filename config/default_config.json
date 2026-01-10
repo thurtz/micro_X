@@ -1,4 +1,7 @@
 {
+  "application": {
+    "version": "0.0.1000"
+  },
   "ai_models": {
     "primary_translator": {
       "model": "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"

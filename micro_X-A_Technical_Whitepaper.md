@@ -2,7 +2,7 @@
 
 ### **A Technical Whitepaper**
 
-Version: 1.0 (Reflecting Deep Analysis of Snapshot 2025-08-20)  
+Version: 0.0.1000 (Reflecting Deep Analysis of Snapshot 2025-08-20)  
 Project Repository: https://github.com/thurtz/micro_X.git
 
 ### **Abstract**
