@@ -1,5 +1,5 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, RichLog, Label, Static
+from textual.widgets import Header, Footer, TextArea, RichLog, Label, Static
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
@@ -143,6 +143,39 @@ class InlineCategorization(Vertical):
             yield ClickableLabel("TUI", classes="primary", id="tui")
             yield ClickableLabel("Cancel", classes="error", id="cancel")
 
+class CommandInput(TextArea):
+    """Custom TextArea for command input that handles Enter key for submission."""
+    
+    BINDINGS = [
+        Binding("enter", "submit", "Submit Command", show=False),
+        Binding("up", "history_up", "History Up", show=False),
+        Binding("down", "history_down", "History Down", show=False),
+    ]
+
+    def on_key(self, event) -> None:
+        if event.key == "enter":
+            event.prevent_default()
+            event.stop()
+            self.action_submit()
+        elif event.key == "up":
+            event.prevent_default()
+            event.stop()
+            self.action_history_up()
+        elif event.key == "down":
+            event.prevent_default()
+            event.stop()
+            self.action_history_down()
+
+    def action_submit(self) -> None:
+        """Submit the command."""
+        self.app.action_submit_command()
+
+    def action_history_up(self) -> None:
+        self.app.action_history_up()
+
+    def action_history_down(self) -> None:
+        self.app.action_history_down()
+
 class MicroXTextualApp(App):
     """The main Textual application for micro_X."""
     
@@ -159,24 +192,28 @@ class MicroXTextualApp(App):
         height: 1fr;
     }
 
-    #interaction_zone {
+    #bottom_container {
         dock: bottom;
-        height: 5;
+        height: auto;
         background: #252526;
-        border-top: solid $primary;
-        margin-bottom: 5;
-        overflow-y: auto;
     }
 
-    Input {
-        dock: bottom;
+    #interaction_zone {
+        height: 5;
+        min-height: 5;
+        border-top: solid $primary;
+        overflow-y: auto;
+        background: #252526;
+    }
+
+    CommandInput {
+        height: 5;
+        border: tall #333333;
         background: #252526;
         color: #cccccc;
-        border: tall #333333;
-        height: 5;
     }
 
-    Input:focus {
+    CommandInput:focus {
         border: tall #007acc;
     }
     """
@@ -200,9 +237,10 @@ class MicroXTextualApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        yield RichLog(id="main_log", highlight=True, markup=True)
-        yield Vertical(id="interaction_zone")
-        yield Input(placeholder="Command... [Ctrl+Shift+V] Paste | [Shift+Select & Ctrl+Shift+C] Copy")
+        yield RichLog(id="main_log", highlight=True, markup=True, wrap=True)
+        with Vertical(id="bottom_container"):
+            yield Vertical(id="interaction_zone")
+            yield CommandInput(id="input_field", soft_wrap=True, placeholder="Command... [Ctrl+Shift+V] Paste | [Shift+Select & Ctrl+Shift+C] Copy")
         yield Footer()
 
     def action_clear_screen(self) -> None:
@@ -216,29 +254,25 @@ class MicroXTextualApp(App):
 
     def action_cancel_or_clear(self) -> None:
         """Handle Ctrl+C: Cancel current interaction or clear input."""
-        # 1. Cancel any active inline confirmation/categorization
         if self.current_confirmation_future and not self.current_confirmation_future.done():
             self.current_confirmation_future.set_result("cancel")
             self.interaction_zone.remove_children()
             self.input_widget.focus()
             return
 
-        # 2. Clear input if not empty
-        if self.input_widget.value:
-            self.input_widget.value = ""
+        if self.input_widget.text:
+            self.input_widget.text = ""
             return
         
-        # 3. If nothing else, maybe show a hint about Quitting?
         self.notify("Press Ctrl+Q to Quit", timeout=2)
 
     async def on_mount(self) -> None:
         self.log_widget = self.query_one("#main_log")
         self.log_widget.auto_scroll = True
-        self.input_widget = self.query_one(Input)
+        self.input_widget = self.query_one("#input_field")
         self.interaction_zone = self.query_one("#interaction_zone")
         self.input_widget.focus()
         
-        # Flush initial logs
         for entry in self._pending_logs:
             if isinstance(entry, tuple):
                 self.append_output(entry[1], entry[0])
@@ -258,42 +292,53 @@ class MicroXTextualApp(App):
         self.interaction_zone.remove_children()
         self.input_widget.focus()
 
-    def key_up(self) -> None:
-        if self.input_widget.has_focus:
-            if not self.history: return
-            if self.history_index == -1: self.history_index = len(self.history) - 1
-            elif self.history_index > 0: self.history_index -= 1
-            self.input_widget.value = self.history[self.history_index]
-            self.input_widget.cursor_position = len(self.input_widget.value)
+    def action_submit_command(self) -> None:
+        cmd = self.input_widget.text.strip()
+        if cmd:
+            self.handle_input_submission(cmd)
+            self.input_widget.text = ""
 
-    def key_down(self) -> None:
-        if self.input_widget.has_focus:
-            if self.history_index == -1: return
-            if self.history_index < len(self.history) - 1:
-                self.history_index += 1
-                self.input_widget.value = self.history[self.history_index]
-            else:
-                self.history_index = -1
-                self.input_widget.value = ""
-            self.input_widget.cursor_position = len(self.input_widget.value)
+    def action_history_up(self) -> None:
+        self.history_up()
 
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        user_input = event.value.strip()
-        if not user_input: return
+    def action_history_down(self) -> None:
+        self.history_down()
 
-        self.history.append(user_input)
-        self.history_index = -1
-        self.input_widget.value = ""
-        self.log_widget.write(Text(f"\n> {user_input}", style="bold yellow"))
-
+    def handle_input_submission(self, value: str) -> None:
         if self.pending_input_future and not self.pending_input_future.done():
-            self.pending_input_future.set_result(user_input)
+            self.pending_input_future.set_result(value)
             self.pending_input_future = None
-        elif self.shell_engine:
-            # Correct flow: Check built-ins/aliases first
-            was_builtin = await self.shell_engine.handle_built_in_command(user_input)
-            if not was_builtin:
-                asyncio.create_task(self.shell_engine.submit_user_input(user_input))
+        else:
+            # Normal command submission
+            if value:
+                self.history.append(value)
+                self.history_index = -1
+                if self.shell_engine and self.shell_engine.main_normal_input_accept_handler_ref:
+                    self.shell_engine.main_normal_input_accept_handler_ref(value)
+
+    def history_up(self) -> None:
+        if not self.history:
+            return
+        if self.history_index == -1:
+            self.history_index = len(self.history) - 1
+        elif self.history_index > 0:
+            self.history_index -= 1
+        
+        self.input_widget.text = self.history[self.history_index]
+        self.input_widget.move_cursor((len(self.input_widget.text.split('\n')), 0))
+
+    def history_down(self) -> None:
+        if self.history_index == -1:
+            return
+        
+        if self.history_index < len(self.history) - 1:
+            self.history_index += 1
+            self.input_widget.text = self.history[self.history_index]
+        else:
+            self.history_index = -1
+            self.input_widget.text = ""
+        
+        self.input_widget.move_cursor((len(self.input_widget.text.split('\n')), 0))
 
     def append_output(self, content: str, style_class: str = None) -> None:
         if not content: return
