@@ -34,6 +34,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
     handlers=[logging.FileHandler(LOG_FILE)]
 )
+logging.getLogger("markdown_it").setLevel(logging.WARNING) # Reduce noise
 logger = logging.getLogger(__name__)
 
 # Load Config Early
@@ -106,6 +107,8 @@ from modules.category_manager import (
 )
 from modules.ui_manager import UIManager
 from modules.curses_ui_manager import CursesUIManager
+from modules.textual_ui_manager import TextualUIManager
+from modules.textual_app import MicroXTextualApp
 from modules.embedding_manager import EmbeddingManager
 
 app_instance = None
@@ -431,6 +434,9 @@ async def main_async_runner():
     api_server_task = asyncio.create_task(start_api_server())
     logger.info("API server task created.")
 
+    # Initialize history early for UI backends that need it
+    history = FileHistory(HISTORY_FILE_PATH)
+
     # --- FIX START: UI Backend Selection and Initialization ---
     # This block correctly selects the UI backend based on the configuration,
     # initializes the appropriate UI manager, and then passes the instance
@@ -453,6 +459,9 @@ async def main_async_runner():
     if ui_backend_choice == "curses":
         logger.info("Selected UI Backend: curses")
         ui_manager_instance = CursesUIManager(config, shell_engine_instance)
+    elif ui_backend_choice == "textual":
+        logger.info("Selected UI Backend: textual")
+        ui_manager_instance = TextualUIManager(config, shell_engine_instance)
     else:
         if ui_backend_choice != "prompt_toolkit":
             logger.warning(f"Unrecognized UI backend '{ui_backend_choice}' configured. Defaulting to 'prompt_toolkit'.")
@@ -466,6 +475,18 @@ async def main_async_runner():
     if isinstance(ui_manager_instance, CursesUIManager):
       ui_manager_instance.shell_engine_instance = shell_engine_instance
       ui_manager_instance.main_exit_app_ref = _exit_app_main
+    
+    if isinstance(ui_manager_instance, TextualUIManager):
+        # Initialize Textual App
+        history_strings = list(history.load_history_strings())
+        # Pass the current output buffer as initial logs
+        app_instance = MicroXTextualApp(
+            shell_engine=shell_engine_instance, 
+            history=history_strings,
+            initial_logs=list(ui_manager_instance.output_buffer)
+        )
+        ui_manager_instance.app = app_instance
+        app_instance.shell_engine = shell_engine_instance # Circular link
     # --- FIX END ---
 
     # Initialize Git context after the shell engine has its ui_manager
@@ -516,14 +537,12 @@ async def main_async_runner():
 
     init_category_manager(SCRIPT_DIR, CONFIG_DIR, ui_manager_instance.append_output)
 
-    history = FileHistory(HISTORY_FILE_PATH)
-
     home_dir = os.path.expanduser("~")
     max_prompt_len = config.get('ui', {}).get('max_prompt_length', 20)
     current_dir_for_prompt = shell_engine_instance.current_directory
     if current_dir_for_prompt == home_dir: initial_prompt_dir = "~"
     elif current_dir_for_prompt.startswith(home_dir + os.sep):
-        rel_path = current_dir_for_prompt[len(home_dir)+1:]; full_rel_prompt = "~/"; full_rel_prompt += rel_path
+        rel_path = current_dir_for_prompt[len(home_dir)+1:]; full_rel_prompt = "~"; full_rel_prompt += rel_path
         initial_prompt_dir = full_rel_prompt if len(full_rel_prompt) <= max_prompt_len else "~"; initial_prompt_dir += "..." + rel_path[-(max_prompt_len - 5):] if (max_prompt_len - 5) > 0 else "~/... "
     else:
         base_name = os.path.basename(current_dir_for_prompt)
@@ -579,6 +598,12 @@ async def main_async_runner():
     if ui_backend_choice == "curses":
         # CursesUIManager has its own async run loop.
         await ui_manager_instance.run_async()
+    elif ui_backend_choice == "textual":
+        logger.info("Starting Textual App...")
+        # Add welcome message
+        if initial_buffer_for_ui:
+             pass
+        await app_instance.run_async()
     else:
         # This is the original path for the prompt_toolkit backend.
         if ui_manager_instance and ui_manager_instance.input_field:

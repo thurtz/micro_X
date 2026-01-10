@@ -421,7 +421,8 @@ class ShellEngine:
         if not os.path.isfile(script_path):
             self.ui_manager.append_output(f"❌ Script not found: {subcommand}.py in '{script_dir_name}'.", style_class='error'); return
 
-        command_to_execute_list = [sys.executable, script_path] + parts[2:]
+        # Use -u for unbuffered output to ensure we see prints immediately
+        command_to_execute_list = [sys.executable, "-u", script_path] + parts[2:]
         if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
             self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute_list)}", style_class='info')
 
