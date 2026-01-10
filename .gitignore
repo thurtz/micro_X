@@ -206,7 +206,8 @@ micro_X_v*.sh
 
 # Experimental tmux configs
 config/.tmux_v*.conf
-**/clones/
+**/clones/*
+!**/clones/.gitkeep
 
 # Knowledge base directories
 knowledge_bases/*
