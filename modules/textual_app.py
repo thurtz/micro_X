@@ -10,14 +10,36 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class ClickableLabel(Label):
-    """A label that acts like a button/link."""
+class KeyboardSelectableLabel(Label):
+    """A label that can be focused and activated via keyboard or mouse."""
+    
+    can_focus = True
+
+    BINDINGS = [
+        Binding("enter", "activate", "Select", show=False),
+        Binding("space", "activate", "Select", show=False),
+        Binding("left", "app.focus_previous", "Previous", show=False),
+        Binding("right", "app.focus_next", "Next", show=False),
+    ]
+
     def on_click(self) -> None:
+        self.action_activate()
+
+    def action_activate(self) -> None:
         self.app.post_message(InlineConfirmation.Selected(self.id))
 
 class InlineConfirmation(Vertical):
     """Integrated confirmation widget."""
     
+    BINDINGS = [
+        Binding("left", "focus_previous", "Previous", show=False),
+        Binding("right", "focus_next", "Next", show=False),
+        Binding("escape", "cancel", "Cancel", show=False),
+    ]
+
+    def action_cancel(self) -> None:
+        self.app.post_message(self.Selected("cancel"))
+
     DEFAULT_CSS = """
     InlineConfirmation {
         height: auto;
@@ -41,17 +63,24 @@ class InlineConfirmation(Vertical):
         margin-top: 1;
     }
 
-    ClickableLabel {
+    KeyboardSelectableLabel {
         padding: 0 1;
         margin: 0 1;
         color: $text;
         text-style: underline;
+        border: none;
     }
 
-    ClickableLabel:hover {
+    KeyboardSelectableLabel:hover {
         background: $surface-lighten-1;
         color: $accent;
         text-style: bold underline;
+    }
+
+    KeyboardSelectableLabel:focus {
+        background: $primary;
+        color: $text;
+        text-style: bold;
     }
 
     .success { color: $success; }
@@ -73,17 +102,26 @@ class InlineConfirmation(Vertical):
         yield Label(f"AI suggests: {self.command}", id="command_display")
         
         with Horizontal():
-            yield ClickableLabel("Run", classes="success", id="execute")
-            yield ClickableLabel("Simple", classes="primary", id="execute_simple")
-            yield ClickableLabel("Semi", classes="primary", id="execute_semi")
-            yield ClickableLabel("TUI", classes="primary", id="execute_tui")
-            yield ClickableLabel("Explain", classes="default", id="explain")
-            yield ClickableLabel("Modify", classes="default", id="modify")
-            yield ClickableLabel("Cancel", classes="error", id="cancel")
+            yield KeyboardSelectableLabel("Run", classes="success", id="execute")
+            yield KeyboardSelectableLabel("Simple", classes="primary", id="execute_simple")
+            yield KeyboardSelectableLabel("Semi", classes="primary", id="execute_semi")
+            yield KeyboardSelectableLabel("TUI", classes="primary", id="execute_tui")
+            yield KeyboardSelectableLabel("Explain", classes="default", id="explain")
+            yield KeyboardSelectableLabel("Modify", classes="default", id="modify")
+            yield KeyboardSelectableLabel("Cancel", classes="error", id="cancel")
 
 class InlineCategorization(Vertical):
     """Inline categorization menu."""
     
+    BINDINGS = [
+        Binding("left", "focus_previous", "Previous", show=False),
+        Binding("right", "focus_next", "Next", show=False),
+        Binding("escape", "cancel", "Cancel", show=False),
+    ]
+
+    def action_cancel(self) -> None:
+        self.app.post_message(self.Selected("cancel"))
+
     DEFAULT_CSS = """
     InlineCategorization {
         height: auto;
@@ -107,17 +145,23 @@ class InlineCategorization(Vertical):
         margin-top: 1;
     }
 
-    ClickableLabel {
+    KeyboardSelectableLabel {
         padding: 0 1;
         margin: 0 1;
         color: $text;
         text-style: underline;
     }
 
-    ClickableLabel:hover {
+    KeyboardSelectableLabel:hover {
         background: $surface-lighten-1;
         color: $accent;
         text-style: bold underline;
+    }
+
+    KeyboardSelectableLabel:focus {
+        background: $primary;
+        color: $text;
+        text-style: bold;
     }
 
     .success { color: $success; }
@@ -138,10 +182,10 @@ class InlineCategorization(Vertical):
         yield Label(f"Categorize: {self.command}", id="command_display")
         
         with Horizontal():
-            yield ClickableLabel("Simple", classes="primary", id="simple")
-            yield ClickableLabel("Semi-Interactive", classes="primary", id="semi")
-            yield ClickableLabel("TUI", classes="primary", id="tui")
-            yield ClickableLabel("Cancel", classes="error", id="cancel")
+            yield KeyboardSelectableLabel("Simple", classes="primary", id="simple")
+            yield KeyboardSelectableLabel("Semi-Interactive", classes="primary", id="semi")
+            yield KeyboardSelectableLabel("TUI", classes="primary", id="tui")
+            yield KeyboardSelectableLabel("Cancel", classes="error", id="cancel")
 
 class CommandInput(TextArea):
     """Custom TextArea for command input that handles Enter key for submission."""
@@ -366,6 +410,8 @@ class MicroXTextualApp(App):
         self.current_confirmation_future = loop.create_future()
         widget = InlineConfirmation(command, query, explanation_text)
         await self.interaction_zone.mount(widget)
+        # Focus the first option ("Run" usually)
+        widget.query_one("#execute").focus()
         return await self.current_confirmation_future
 
     async def show_categorization_modal(self, command: str) -> str:
@@ -374,6 +420,8 @@ class MicroXTextualApp(App):
         self.current_confirmation_future = loop.create_future()
         widget = InlineCategorization(command)
         await self.interaction_zone.mount(widget)
+        # Focus the first option
+        widget.query_one("#simple").focus()
         return await self.current_confirmation_future
 
 if __name__ == "__main__":
