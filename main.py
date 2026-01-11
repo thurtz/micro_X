@@ -487,7 +487,8 @@ async def main_async_runner():
         app_instance = MicroXTextualApp(
             shell_engine=shell_engine_instance, 
             history=history_strings,
-            initial_logs=list(ui_manager_instance.output_buffer)
+            initial_logs=list(ui_manager_instance.output_buffer),
+            history_path=HISTORY_FILE_PATH
         )
         ui_manager_instance.app = app_instance
         app_instance.shell_engine = shell_engine_instance # Circular link

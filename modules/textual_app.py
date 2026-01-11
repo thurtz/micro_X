@@ -311,10 +311,12 @@ class MicroXTextualApp(App):
         Binding("ctrl+l", "clear_screen", "Clear Output", show=True),
     ]
 
-    def __init__(self, shell_engine=None, history=None, initial_logs=None, **kwargs):
+    def __init__(self, shell_engine=None, history=None, initial_logs=None, history_path=None, **kwargs):
         super().__init__(**kwargs)
         self.shell_engine = shell_engine
-        self.history = history or []
+        # Ensure history is chronologically ordered (Old -> New)
+        self.history = list(reversed(history or []))
+        self.history_path = history_path
         self.history_index = -1
         self.pending_input_future = None
         self.current_confirmation_future = None
@@ -407,6 +409,19 @@ class MicroXTextualApp(App):
     def action_history_down(self) -> None:
         self.history_down()
 
+    def _save_to_history_file(self, value: str) -> None:
+        """Append a command to the persistent history file."""
+        if not self.history_path:
+            return
+        try:
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+            with open(self.history_path, "a", encoding="utf-8") as f:
+                f.write(f"# {timestamp}\n")
+                f.write(f"+{value}\n")
+        except Exception as e:
+            logger.error(f"Failed to save history to {self.history_path}: {e}")
+
     def handle_input_submission(self, value: str) -> None:
         if self.pending_input_future and not self.pending_input_future.done():
             self.pending_input_future.set_result(value)
@@ -416,6 +431,7 @@ class MicroXTextualApp(App):
             if value:
                 self.history.append(value)
                 self.history_index = -1
+                self._save_to_history_file(value)
                 if self.shell_engine and self.shell_engine.main_normal_input_accept_handler_ref:
                     self.shell_engine.main_normal_input_accept_handler_ref(value)
 
@@ -427,8 +443,9 @@ class MicroXTextualApp(App):
         elif self.history_index > 0:
             self.history_index -= 1
         
-        self.input_widget.text = self.history[self.history_index]
-        self.input_widget.move_cursor((len(self.input_widget.text.split('\n')), 0))
+        val = self.history[self.history_index]
+        self.input_widget.text = val
+        self._move_cursor_to_end()
 
     def history_down(self) -> None:
         if self.history_index == -1:
@@ -441,7 +458,13 @@ class MicroXTextualApp(App):
             self.history_index = -1
             self.input_widget.text = ""
         
-        self.input_widget.move_cursor((len(self.input_widget.text.split('\n')), 0))
+        self._move_cursor_to_end()
+
+    def _move_cursor_to_end(self) -> None:
+        lines = self.input_widget.text.split('\n')
+        row = max(0, len(lines) - 1)
+        col = len(lines[row])
+        self.input_widget.move_cursor((row, col))
 
     def append_output(self, content: str, style_class: str = None) -> None:
         if not content: return
