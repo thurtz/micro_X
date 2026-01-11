@@ -70,8 +70,10 @@ class TextualUIManager:
 
                 elif user_choice == 'explain':
                     self.append_output(f"🤔 Explaining: {command}", "info")
+                    self.update_status_bar("🤔 AI is generating explanation...")
                     from modules.ai_handler import explain_linux_command_with_ai
                     explanation = await explain_linux_command_with_ai(command, self.config, self.append_output)
+                    self.update_status_bar("") # Clear status
                     if explanation:
                         self.append_output(f"💡 Explanation:\n{explanation}", "info") # Print to log
                         explanation_text = explanation # Also update menu
@@ -125,9 +127,12 @@ class TextualUIManager:
             self.categorization_flow_active = False
 
     def update_status_bar(self, text: str, style: str = None) -> None:
-        """Updates the status bar (Header subtitle in Textual)."""
+        """Updates the status bar by swapping the input area for a status message."""
         if self.app:
-            self.app.call_later(setattr, self.app, 'sub_title', text)
+            if text:
+                self.app.call_later(self.app.show_status, text)
+            else:
+                self.app.call_later(self.app.clear_status)
 
     def add_interaction_separator(self) -> None:
         """Adds a visual separator to the log."""
