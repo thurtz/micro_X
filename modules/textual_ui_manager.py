@@ -79,11 +79,12 @@ class TextualUIManager:
                 
                 elif user_choice == 'modify':
                     if self.app:
-                        # Load command into input
-                        self.app.call_later(setattr, self.app.input_widget, 'value', command)
-                        # Set cursor to end
-                        self.app.call_later(setattr, self.app.input_widget, 'cursor_position', len(command))
-                        self.app.call_later(self.app.input_widget.focus)
+                        # Load command into input (TextArea uses 'text')
+                        self.app.call_later(setattr, self.app.input_widget, 'text', command)
+                        # Set cursor to end (row 0, col len(command))
+                        self.app.call_later(self.app.input_widget.move_cursor, (0, len(command)))
+                    
+                    self.is_in_edit_mode = True
                     return {'action': 'edit_mode_engaged'}
 
                 else: # cancel or unknown
