@@ -18,8 +18,6 @@ class KeyboardSelectableLabel(Label):
     BINDINGS = [
         Binding("enter", "activate", "Select", show=False),
         Binding("space", "activate", "Select", show=False),
-        Binding("left", "app.focus_previous", "Previous", show=False),
-        Binding("right", "app.focus_next", "Next", show=False),
     ]
 
     def on_click(self) -> None:
@@ -32,13 +30,31 @@ class InlineConfirmation(Vertical):
     """Integrated confirmation widget."""
     
     BINDINGS = [
-        Binding("left", "focus_previous", "Previous", show=False),
-        Binding("right", "focus_next", "Next", show=False),
+        Binding("left", "prev_item", "Previous", show=False),
+        Binding("right", "next_item", "Next", show=False),
         Binding("escape", "cancel", "Cancel", show=False),
     ]
 
     def action_cancel(self) -> None:
         self.app.post_message(self.Selected("cancel"))
+
+    def action_next_item(self) -> None:
+        self._cycle_focus(1)
+
+    def action_prev_item(self) -> None:
+        self._cycle_focus(-1)
+
+    def _cycle_focus(self, direction: int) -> None:
+        items = [c for c in self.query("KeyboardSelectableLabel")]
+        if not items: return
+        
+        current = self.app.focused
+        try:
+            current_index = items.index(current)
+            next_index = (current_index + direction) % len(items)
+            items[next_index].focus()
+        except ValueError:
+            items[0].focus()
 
     DEFAULT_CSS = """
     InlineConfirmation {
@@ -114,13 +130,31 @@ class InlineCategorization(Vertical):
     """Inline categorization menu."""
     
     BINDINGS = [
-        Binding("left", "focus_previous", "Previous", show=False),
-        Binding("right", "focus_next", "Next", show=False),
+        Binding("left", "prev_item", "Previous", show=False),
+        Binding("right", "next_item", "Next", show=False),
         Binding("escape", "cancel", "Cancel", show=False),
     ]
 
     def action_cancel(self) -> None:
         self.app.post_message(self.Selected("cancel"))
+
+    def action_next_item(self) -> None:
+        self._cycle_focus(1)
+
+    def action_prev_item(self) -> None:
+        self._cycle_focus(-1)
+
+    def _cycle_focus(self, direction: int) -> None:
+        items = [c for c in self.query("KeyboardSelectableLabel")]
+        if not items: return
+        
+        current = self.app.focused
+        try:
+            current_index = items.index(current)
+            next_index = (current_index + direction) % len(items)
+            items[next_index].focus()
+        except ValueError:
+            items[0].focus()
 
     DEFAULT_CSS = """
     InlineCategorization {
