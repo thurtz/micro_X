@@ -220,21 +220,6 @@ class CommandInput(TextArea):
     def action_history_down(self) -> None:
         self.app.action_history_down()
 
-class KeyHintBar(Static):
-    """Display key bindings at the top."""
-    DEFAULT_CSS = """
-    KeyHintBar {
-        dock: top;
-        height: 1;
-        background: $primary;
-        color: $text;
-        text-align: center;
-        text-style: bold;
-    }
-    """
-    def compose(self) -> ComposeResult:
-        yield Label("F1: Help | Ctrl+Q: Quit | Ctrl+C: Cancel/Clear | Ctrl+L: Clear Log")
-
 class MicroXTextualApp(App):
     """The main Textual application for micro_X."""
     
@@ -242,6 +227,10 @@ class MicroXTextualApp(App):
     Screen {
         background: #1e1e1e;
         layout: vertical;
+    }
+
+    Footer {
+        dock: top;
     }
 
     .hidden {
@@ -282,10 +271,10 @@ class MicroXTextualApp(App):
     """
 
     BINDINGS = [
-        Binding("f1", "help", "Help", show=False),
-        Binding("ctrl+q", "quit", "Quit", show=False),
-        Binding("ctrl+c", "cancel_or_clear", "Cancel/Clear", show=False),
-        Binding("ctrl+l", "clear_screen", "Clear Output", show=False),
+        Binding("f1", "help", "Help", show=True),
+        Binding("ctrl+q", "quit", "Quit", show=True),
+        Binding("ctrl+c", "cancel_or_clear", "Cancel/Clear", show=True),
+        Binding("ctrl+l", "clear_screen", "Clear Output", show=True),
     ]
 
     def __init__(self, shell_engine=None, history=None, initial_logs=None, **kwargs):
@@ -300,12 +289,11 @@ class MicroXTextualApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        yield KeyHintBar()
+        yield Footer()
         yield RichLog(id="main_log", highlight=True, markup=True, wrap=True)
         with Vertical(id="bottom_container"):
             yield Vertical(id="interaction_zone", classes="hidden")
             yield CommandInput(id="input_field", soft_wrap=True, placeholder="Command... [Ctrl+Shift+V] Paste | [Shift+Select & Ctrl+Shift+C] Copy")
-        # Footer removed
 
     def show_status(self, message: str) -> None:
         """Display a status message in the interaction zone (swapping out input)."""
