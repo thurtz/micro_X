@@ -229,6 +229,10 @@ class MicroXTextualApp(App):
         layout: vertical;
     }
 
+    .hidden {
+        display: none;
+    }
+
     #main_log {
         background: #1e1e1e;
         color: #d4d4d4;
@@ -238,20 +242,19 @@ class MicroXTextualApp(App):
 
     #bottom_container {
         dock: bottom;
-        height: auto;
+        height: 5;
         background: #252526;
     }
 
     #interaction_zone {
-        height: 5;
-        min-height: 5;
+        height: 100%;
         border-top: solid $primary;
         overflow-y: auto;
         background: #252526;
     }
 
     CommandInput {
-        height: 5;
+        height: 100%;
         border: tall #333333;
         background: #252526;
         color: #cccccc;
@@ -283,7 +286,7 @@ class MicroXTextualApp(App):
         yield Header(show_clock=True)
         yield RichLog(id="main_log", highlight=True, markup=True, wrap=True)
         with Vertical(id="bottom_container"):
-            yield Vertical(id="interaction_zone")
+            yield Vertical(id="interaction_zone", classes="hidden")
             yield CommandInput(id="input_field", soft_wrap=True, placeholder="Command... [Ctrl+Shift+V] Paste | [Shift+Select & Ctrl+Shift+C] Copy")
         yield Footer()
 
@@ -300,8 +303,7 @@ class MicroXTextualApp(App):
         """Handle Ctrl+C: Cancel current interaction or clear input."""
         if self.current_confirmation_future and not self.current_confirmation_future.done():
             self.current_confirmation_future.set_result("cancel")
-            self.interaction_zone.remove_children()
-            self.input_widget.focus()
+            self.switch_to_input()
             return
 
         if self.input_widget.text:
@@ -309,6 +311,16 @@ class MicroXTextualApp(App):
             return
         
         self.notify("Press Ctrl+Q to Quit", timeout=2)
+
+    def switch_to_menu(self) -> None:
+        self.input_widget.add_class("hidden")
+        self.interaction_zone.remove_class("hidden")
+
+    def switch_to_input(self) -> None:
+        self.interaction_zone.remove_children()
+        self.interaction_zone.add_class("hidden")
+        self.input_widget.remove_class("hidden")
+        self.input_widget.focus()
 
     async def on_mount(self) -> None:
         self.log_widget = self.query_one("#main_log")
@@ -327,14 +339,12 @@ class MicroXTextualApp(App):
     def on_inline_confirmation_selected(self, message: InlineConfirmation.Selected) -> None:
         if self.current_confirmation_future and not self.current_confirmation_future.done():
             self.current_confirmation_future.set_result(message.action)
-        self.interaction_zone.remove_children()
-        self.input_widget.focus()
+        self.switch_to_input()
 
     def on_inline_categorization_selected(self, message: InlineCategorization.Selected) -> None:
         if self.current_confirmation_future and not self.current_confirmation_future.done():
             self.current_confirmation_future.set_result(message.action)
-        self.interaction_zone.remove_children()
-        self.input_widget.focus()
+        self.switch_to_input()
 
     def action_submit_command(self) -> None:
         cmd = self.input_widget.text.strip()
@@ -410,6 +420,7 @@ class MicroXTextualApp(App):
         self.current_confirmation_future = loop.create_future()
         widget = InlineConfirmation(command, query, explanation_text)
         await self.interaction_zone.mount(widget)
+        self.switch_to_menu()
         # Focus the first option ("Run" usually)
         widget.query_one("#execute").focus()
         return await self.current_confirmation_future
@@ -420,6 +431,7 @@ class MicroXTextualApp(App):
         self.current_confirmation_future = loop.create_future()
         widget = InlineCategorization(command)
         await self.interaction_zone.mount(widget)
+        self.switch_to_menu()
         # Focus the first option
         widget.query_one("#simple").focus()
         return await self.current_confirmation_future
