@@ -577,8 +577,12 @@ class ShellEngine:
                     self.category_manager_module.add_command_to_category(command_str_original, forced_category)
                 elif action == 'execute':
                     command_str_original = confirmation_result.get('command', command_str_original)
-                    # "Run Once" behavior: force default category without saving it
-                    forced_category = self.config['behavior']['default_category_for_unclassified']
+                    # "Run Once" behavior: Check if command is already known
+                    known_cat = self.category_manager_module.classify_command(command_str_original)
+                    if known_cat != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
+                        forced_category = known_cat
+                    else:
+                        forced_category = self.config['behavior']['default_category_for_unclassified']
                 elif action == 'cancel': self.ui_manager.append_output(f"❌ Execution of '{command_str_original}' cancelled.", style_class='info'); return
                 else: return
 
