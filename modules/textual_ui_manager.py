@@ -109,6 +109,9 @@ class TextualUIManager:
         try:
             user_choice = await self.app.show_categorization_modal(command)
             
+            if user_choice == 'execute':
+                return {'action': 'execute_once', 'command': command}
+
             mapping = {
                 'simple': 'simple',
                 'semi': 'semi_interactive',

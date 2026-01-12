@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>modules.shell_engine &mdash; micro_X 0.0.1000 documentation</title>
+  <title>modules.shell_engine &mdash; micro_X 0.0.1011 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=4ff0bc1c"></script>
+      <script src="../../_static/documentation_options.js?v=8f47e841"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -671,7 +671,10 @@
                     <span class="n">command_str_original</span> <span class="o">=</span> <span class="n">confirmation_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;command&#39;</span><span class="p">,</span> <span class="n">command_str_original</span><span class="p">)</span>
                     <span class="n">forced_category</span> <span class="o">=</span> <span class="n">confirmation_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;category&#39;</span><span class="p">)</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">category_manager_module</span><span class="o">.</span><span class="n">add_command_to_category</span><span class="p">(</span><span class="n">command_str_original</span><span class="p">,</span> <span class="n">forced_category</span><span class="p">)</span>
-                <span class="k">elif</span> <span class="n">action</span> <span class="o">==</span> <span class="s1">&#39;execute&#39;</span><span class="p">:</span> <span class="n">command_str_original</span> <span class="o">=</span> <span class="n">confirmation_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;command&#39;</span><span class="p">,</span> <span class="n">command_str_original</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">action</span> <span class="o">==</span> <span class="s1">&#39;execute&#39;</span><span class="p">:</span>
+                    <span class="n">command_str_original</span> <span class="o">=</span> <span class="n">confirmation_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;command&#39;</span><span class="p">,</span> <span class="n">command_str_original</span><span class="p">)</span>
+                    <span class="c1"># &quot;Run Once&quot; behavior: force default category without saving it</span>
+                    <span class="n">forced_category</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;behavior&#39;</span><span class="p">][</span><span class="s1">&#39;default_category_for_unclassified&#39;</span><span class="p">]</span>
                 <span class="k">elif</span> <span class="n">action</span> <span class="o">==</span> <span class="s1">&#39;cancel&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">ui_manager</span><span class="o">.</span><span class="n">append_output</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Execution of &#39;</span><span class="si">{</span><span class="n">command_str_original</span><span class="si">}</span><span class="s2">&#39; cancelled.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">);</span> <span class="k">return</span>
                 <span class="k">else</span><span class="p">:</span> <span class="k">return</span>
 
@@ -681,6 +684,9 @@
                 <span class="n">action_cat</span> <span class="o">=</span> <span class="n">categorization_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;action&#39;</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">action_cat</span> <span class="o">==</span> <span class="s1">&#39;cancel_execution&#39;</span><span class="p">:</span>
                     <span class="n">append_output_func</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Execution of &#39;</span><span class="si">{</span><span class="n">command_str_original</span><span class="si">}</span><span class="s2">&#39; cancelled.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">);</span> <span class="k">return</span>
+                <span class="k">elif</span> <span class="n">action_cat</span> <span class="o">==</span> <span class="s1">&#39;execute_once&#39;</span><span class="p">:</span>
+                    <span class="c1"># Use default category without saving</span>
+                    <span class="n">category</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;behavior&#39;</span><span class="p">][</span><span class="s1">&#39;default_category_for_unclassified&#39;</span><span class="p">]</span>
                 <span class="k">elif</span> <span class="n">action_cat</span> <span class="o">==</span> <span class="s1">&#39;categorize_and_execute&#39;</span><span class="p">:</span>
                     <span class="n">command_str_original</span> <span class="o">=</span> <span class="n">categorization_result</span><span class="p">[</span><span class="s1">&#39;command&#39;</span><span class="p">]</span>
                     <span class="n">category</span> <span class="o">=</span> <span class="n">categorization_result</span><span class="p">[</span><span class="s1">&#39;category&#39;</span><span class="p">]</span>

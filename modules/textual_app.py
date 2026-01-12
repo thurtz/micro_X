@@ -118,7 +118,7 @@ class InlineConfirmation(Vertical):
         yield Label(f"AI suggests: {self.command}", id="command_display")
         
         with Horizontal():
-            yield KeyboardSelectableLabel("Run", classes="success", id="execute")
+            yield KeyboardSelectableLabel("Run Once", classes="success", id="execute")
             yield KeyboardSelectableLabel("Simple", classes="primary", id="execute_simple")
             yield KeyboardSelectableLabel("Semi", classes="primary", id="execute_semi")
             yield KeyboardSelectableLabel("TUI", classes="primary", id="execute_tui")
@@ -216,6 +216,7 @@ class InlineCategorization(Vertical):
         yield Label(f"Categorize: {self.command}", id="command_display")
         
         with Horizontal():
+            yield KeyboardSelectableLabel("Run Once", classes="success", id="execute")
             yield KeyboardSelectableLabel("Simple", classes="primary", id="simple")
             yield KeyboardSelectableLabel("Semi-Interactive", classes="primary", id="semi")
             yield KeyboardSelectableLabel("TUI", classes="primary", id="tui")

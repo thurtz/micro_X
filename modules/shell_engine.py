@@ -575,7 +575,10 @@ class ShellEngine:
                     command_str_original = confirmation_result.get('command', command_str_original)
                     forced_category = confirmation_result.get('category')
                     self.category_manager_module.add_command_to_category(command_str_original, forced_category)
-                elif action == 'execute': command_str_original = confirmation_result.get('command', command_str_original)
+                elif action == 'execute':
+                    command_str_original = confirmation_result.get('command', command_str_original)
+                    # "Run Once" behavior: force default category without saving it
+                    forced_category = self.config['behavior']['default_category_for_unclassified']
                 elif action == 'cancel': self.ui_manager.append_output(f"❌ Execution of '{command_str_original}' cancelled.", style_class='info'); return
                 else: return
 
@@ -585,6 +588,9 @@ class ShellEngine:
                 action_cat = categorization_result.get('action')
                 if action_cat == 'cancel_execution':
                     append_output_func(f"Execution of '{command_str_original}' cancelled.", style_class='info'); return
+                elif action_cat == 'execute_once':
+                    # Use default category without saving
+                    category = self.config['behavior']['default_category_for_unclassified']
                 elif action_cat == 'categorize_and_execute':
                     command_str_original = categorization_result['command']
                     category = categorization_result['category']
