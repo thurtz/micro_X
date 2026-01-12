@@ -144,10 +144,13 @@ class TextualUIManager:
         return self.app
 
     async def prompt_for_caution_confirmation(self, command: str) -> dict:
-        """Prompts for confirmation for dangerous commands."""
-        if not self.app: return {'action': 'cancel'}
-        result = await self.prompt_for_command_confirmation(command, "CAUTION: Dangerous Command")
-        return {'action': 'confirm' if result['action'] == 'execute' else 'cancel'}
+        """Prompts for confirmation for dangerous commands using the safety modal."""
+        if not self.app: return {'proceed': False}
+        
+        # Use the specialized safety modal
+        proceed = await self.app.show_safety_modal(command, "Potentially Dangerous Command")
+        
+        return {'proceed': proceed}
 
     async def prompt_for_api_input(self, prompt: str) -> str:
         """Mock for API input."""

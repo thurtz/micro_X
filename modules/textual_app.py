@@ -597,6 +597,23 @@ class MicroXTextualApp(App):
         widget.query_one("#simple").focus()
         return await self.current_confirmation_future
 
+    async def show_safety_modal(self, command: str, reason: str = "Caution") -> bool:
+        await self.interaction_zone.remove_children()
+        loop = asyncio.get_running_loop()
+        self.current_confirmation_future = loop.create_future()
+        widget = InlineSafetyWarning(command, reason)
+        await self.interaction_zone.mount(widget)
+        self.switch_to_menu()
+        # Focus Cancel by default for safety
+        widget.query_one("#cancel").focus()
+        result = await self.current_confirmation_future
+        return result == 'proceed'
+
+    def on_inline_safety_warning_selected(self, message: InlineSafetyWarning.Selected) -> None:
+        if self.current_confirmation_future and not self.current_confirmation_future.done():
+            self.current_confirmation_future.set_result(message.action)
+        self.switch_to_input()
+
 if __name__ == "__main__":
     app = MicroXTextualApp()
     app.run()
