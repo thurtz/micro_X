@@ -1,5 +1,7 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, TextArea, RichLog, Label, Static
+from textual.screen import Screen
+from textual.widgets import Header, Footer, TextArea, RichLog, Label, Static, OptionList, Input
+from textual.widgets.option_list import Option
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
@@ -9,6 +11,52 @@ import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
+
+class HistorySearchScreen(Screen):
+    """Screen for searching command history."""
+    
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
+    def __init__(self, history: list[str]):
+        super().__init__()
+        self.history = history
+
+    def compose(self) -> ComposeResult:
+        yield Label("Search History:", classes="search-label")
+        yield Input(placeholder="Type to filter...", id="search_input")
+        yield OptionList(id="search_results")
+
+    def on_mount(self) -> None:
+        self.query_one("#search_input").focus()
+        self.update_results("")
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        self.update_results(event.value)
+
+    def update_results(self, query: str) -> None:
+        results = self.query_one("#search_results")
+        results.clear_options()
+        if not query:
+            matches = self.history[:20]
+        else:
+            q = query.lower()
+            matches = [h for h in self.history if q in h.lower()]
+            seen = set()
+            unique_matches = []
+            for m in matches:
+                if m not in seen:
+                    unique_matches.append(m)
+                    seen.add(m)
+            matches = unique_matches[:50]
+
+        for m in matches:
+            results.add_option(Option(m))
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        self.dismiss(str(event.option.prompt))
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
 class KeyboardSelectableLabel(Label):
     """A label that can be focused and activated via keyboard or mouse."""
@@ -318,6 +366,7 @@ class CommandInput(TextArea):
         Binding("enter", "submit", "Submit Command", show=False),
         Binding("up", "history_up", "History Up", show=False),
         Binding("down", "history_down", "History Down", show=False),
+        Binding("ctrl+r", "history_search", "Search History", show=True),
     ]
 
     def on_key(self, event) -> None:
@@ -343,6 +392,9 @@ class CommandInput(TextArea):
 
     def action_history_down(self) -> None:
         self.app.action_history_down()
+
+    def action_history_search(self) -> None:
+        self.app.action_history_search()
 
 class MicroXTextualApp(App):
     """The main Textual application for micro_X."""
@@ -392,6 +444,30 @@ class MicroXTextualApp(App):
     CommandInput:focus {
         border: tall #007acc;
     }
+
+    HistorySearchScreen {
+        align: center middle;
+        background: #1e1e1e 80%; /* Semi-transparent overlay */
+    }
+
+    HistorySearchScreen > Label {
+        margin-top: 1;
+        width: 80%;
+        color: $accent;
+        text-style: bold;
+    }
+
+    HistorySearchScreen > Input {
+        width: 80%;
+        margin-bottom: 1;
+    }
+
+    HistorySearchScreen > OptionList {
+        width: 80%;
+        height: 60%;
+        border: tall $primary;
+        background: $surface;
+    }
     """
 
     BINDINGS = [
@@ -399,6 +475,7 @@ class MicroXTextualApp(App):
         Binding("ctrl+q", "quit", "Quit", show=True),
         Binding("ctrl+c", "cancel_or_clear", "Cancel/Clear", show=True),
         Binding("ctrl+l", "clear_screen", "Clear Output", show=True),
+        Binding("ctrl+r", "history_search", "Search History", show=True),
     ]
 
     def __init__(self, shell_engine=None, history=None, initial_logs=None, history_path=None, **kwargs):
@@ -498,6 +575,15 @@ class MicroXTextualApp(App):
 
     def action_history_down(self) -> None:
         self.history_down()
+
+    def action_history_search(self) -> None:
+        def on_search_complete(result: str | None) -> None:
+            if result:
+                self.input_widget.text = result
+                self.input_widget.move_cursor((0, len(result)))
+            self.input_widget.focus()
+
+        self.push_screen(HistorySearchScreen(self.history), on_search_complete)
 
     def _save_to_history_file(self, value: str) -> None:
         """Append a command to the persistent history file."""
