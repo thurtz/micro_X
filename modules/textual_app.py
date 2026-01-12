@@ -221,6 +221,95 @@ class InlineCategorization(Vertical):
             yield KeyboardSelectableLabel("TUI", classes="primary", id="tui")
             yield KeyboardSelectableLabel("Cancel", classes="error", id="cancel")
 
+class InlineSafetyWarning(Vertical):
+    """Integrated safety warning widget."""
+    
+    BINDINGS = [
+        Binding("left", "prev_item", "Previous", show=False),
+        Binding("right", "next_item", "Next", show=False),
+        Binding("escape", "cancel", "Cancel", show=False),
+    ]
+
+    def action_cancel(self) -> None:
+        self.app.post_message(self.Selected("cancel"))
+
+    def action_next_item(self) -> None:
+        self._cycle_focus(1)
+
+    def action_prev_item(self) -> None:
+        self._cycle_focus(-1)
+
+    def _cycle_focus(self, direction: int) -> None:
+        items = [c for c in self.query("KeyboardSelectableLabel")]
+        if not items: return
+        
+        current = self.app.focused
+        try:
+            current_index = items.index(current)
+            next_index = (current_index + direction) % len(items)
+            items[next_index].focus()
+        except ValueError:
+            items[0].focus()
+
+    DEFAULT_CSS = """
+    InlineSafetyWarning {
+        height: auto;
+        padding: 0 1;
+        background: $error-darken-2;
+    }
+
+    #warning_display {
+        width: 100%;
+        background: $error;
+        padding: 0 1;
+        margin: 0;
+        color: white;
+        text-style: bold;
+        text-align: center;
+    }
+    
+    Horizontal {
+        align: center middle;
+        height: auto;
+        margin-top: 1;
+    }
+
+    KeyboardSelectableLabel {
+        padding: 0 1;
+        margin: 0 1;
+        color: white;
+        text-style: underline;
+    }
+
+    KeyboardSelectableLabel:hover {
+        background: $error-lighten-1;
+        text-style: bold underline;
+    }
+
+    KeyboardSelectableLabel:focus {
+        background: white;
+        color: $error;
+        text-style: bold;
+    }
+    """
+
+    class Selected(Message):
+        def __init__(self, action: str):
+            self.action = action
+            super().__init__()
+
+    def __init__(self, command: str, reason: str = "Potentially Dangerous Command"):
+        super().__init__()
+        self.command = command
+        self.reason = reason
+
+    def compose(self) -> ComposeResult:
+        yield Label(f"⚠️ {self.reason}: {self.command}", id="warning_display")
+        
+        with Horizontal():
+            yield KeyboardSelectableLabel("Cancel", id="cancel")
+            yield KeyboardSelectableLabel("Proceed Anyway", id="proceed")
+
 class CommandInput(TextArea):
     """Custom TextArea for command input that handles Enter key for submission."""
     

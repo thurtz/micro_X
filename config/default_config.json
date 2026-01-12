@@ -1,6 +1,6 @@
 {
   "application": {
-    "version": "0.0.1009"
+    "version": "0.0.1010"
   },
   "ai_models": {
     "primary_translator": {
@@ -44,7 +44,7 @@
     "enable_startup_separator": true,
     "startup_separator_string": "🚀 micro_X Initialized & Ready 🚀\n──────────────────────────────\n",
     "enable_mouse_support": true,
-    "ui_backend": "prompt_toolkit"
+    "ui_backend": "textual"
   },
   "intent_classification": {
     "embedding_model": "nomic-embed-text",
