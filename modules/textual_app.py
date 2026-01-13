@@ -476,6 +476,7 @@ class MicroXTextualApp(App):
         Binding("ctrl+c", "cancel_or_clear", "Cancel/Clear", show=True),
         Binding("ctrl+l", "clear_screen", "Clear Output", show=True),
         Binding("ctrl+r", "history_search", "Search History", show=True),
+        Binding("ctrl+t", "spawn_shell", "New Shell", show=True),
     ]
 
     def __init__(self, shell_engine=None, history=None, initial_logs=None, history_path=None, **kwargs):
@@ -489,6 +490,13 @@ class MicroXTextualApp(App):
         self.current_confirmation_future = None
         self.log_widget = None
         self._pending_logs = initial_logs or []
+
+    def action_spawn_shell(self) -> None:
+        """Spawn a new shell in a tmux window."""
+        if self.shell_engine:
+            shell_cmd = self.shell_engine.config.get("behavior", {}).get("default_shell_command", "bash")
+            # We use 'interactive_tui' category to treat it as a foreground TUI application (which a shell is)
+            asyncio.create_task(self.shell_engine.execute_command_in_tmux(shell_cmd, "New Shell Session", "interactive_tui"))
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)

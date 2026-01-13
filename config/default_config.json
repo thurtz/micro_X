@@ -1,6 +1,6 @@
 {
   "application": {
-    "version": "0.0.1013"
+    "version": "0.0.1014"
   },
   "ai_models": {
     "primary_translator": {
@@ -34,7 +34,8 @@
     "tui_detection_line_threshold_pct": 30,
     "tui_detection_char_threshold_pct": 3,
     "use_strict_extraction_for_primary_translator": false,
-    "verbosity_level": "default"
+    "verbosity_level": "default",
+    "default_shell_command": "bash"
   },
   "ui": {
     "max_prompt_length": 20,
