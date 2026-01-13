@@ -367,6 +367,7 @@ class CommandInput(TextArea):
         Binding("up", "history_up", "History Up", show=False),
         Binding("down", "history_down", "History Down", show=False),
         Binding("ctrl+r", "history_search", "Search History", show=True),
+        Binding("ctrl+d", "docs", "Docs", show=True),
     ]
 
     def on_key(self, event) -> None:
@@ -395,6 +396,9 @@ class CommandInput(TextArea):
 
     def action_history_search(self) -> None:
         self.app.action_history_search()
+
+    def action_docs(self) -> None:
+        self.app.action_docs()
 
 class MicroXTextualApp(App):
     """The main Textual application for micro_X."""
@@ -472,11 +476,12 @@ class MicroXTextualApp(App):
 
     BINDINGS = [
         Binding("f1", "help", "Help", show=True),
+        Binding("ctrl+d", "docs", "Docs", show=True),
         Binding("ctrl+q", "quit", "Quit", show=True),
-        Binding("ctrl+c", "cancel_or_clear", "Cancel/Clear", show=True),
-        Binding("ctrl+l", "clear_screen", "Clear Output", show=True),
-        Binding("ctrl+r", "history_search", "Search History", show=True),
-        Binding("ctrl+t", "spawn_shell", "New Shell", show=True),
+        Binding("ctrl+c", "cancel_or_clear", "Cancel", show=True),
+        Binding("ctrl+l", "clear_screen", "Clear", show=True),
+        Binding("ctrl+r", "history_search", "Search", show=True),
+        Binding("ctrl+t", "spawn_shell", "Shell", show=True),
     ]
 
     def __init__(self, shell_engine=None, history=None, initial_logs=None, history_path=None, **kwargs):
@@ -524,6 +529,11 @@ class MicroXTextualApp(App):
         """Trigger the /help command."""
         if self.shell_engine:
             asyncio.create_task(self.shell_engine.handle_built_in_command("/help"))
+
+    def action_docs(self) -> None:
+        """Trigger the /docs command."""
+        if self.shell_engine:
+            asyncio.create_task(self.shell_engine.handle_built_in_command("/docs"))
 
     def action_cancel_or_clear(self) -> None:
         """Handle Ctrl+C: Cancel current interaction or clear input."""
