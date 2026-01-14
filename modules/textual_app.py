@@ -7,6 +7,7 @@ from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from rich.text import Text
 from rich.markdown import Markdown
+from textual import events
 import asyncio
 import logging
 
@@ -57,6 +58,55 @@ class HistorySearchScreen(Screen):
 
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+class KeyHint(Static):
+    """Clickable hint for the top bar."""
+    def __init__(self, label: str, action: str, classes: str = ""):
+        super().__init__(label, classes=classes)
+        self.action_name = action
+    
+    async def on_click(self, event: events.Click) -> None:
+        await self.app.run_action(self.action_name)
+
+class KeyHintBar(Horizontal):
+    """Display interactive key bindings at the top."""
+    DEFAULT_CSS = """
+    KeyHintBar {
+        dock: top;
+        height: 1;
+        background: #252526;
+        color: #cccccc;
+    }
+    KeyHint {
+        padding: 0 1;
+        width: auto;
+        color: #cccccc;
+    }
+    KeyHint:hover {
+        text-style: bold;
+        background: $primary; 
+        color: white;
+    }
+    .spacer {
+        width: 1fr;
+    }
+    .quit {
+        background: $error;
+        color: white;
+        text-style: bold;
+    }
+    """
+    def compose(self) -> ComposeResult:
+        yield KeyHint("F1 Help", "help")
+        yield KeyHint("^D Docs", "docs")
+        yield KeyHint("^R Search", "history_search")
+        yield KeyHint("^T Shell", "spawn_shell")
+        yield KeyHint("^L Clear", "clear_screen")
+        yield KeyHint("^C Cancel", "cancel_or_clear")
+        
+        yield Static(classes="spacer")
+        
+        yield KeyHint("^Q Quit", "quit", classes="quit")
 
 class KeyboardSelectableLabel(Label):
     """A label that can be focused and activated via keyboard or mouse."""
