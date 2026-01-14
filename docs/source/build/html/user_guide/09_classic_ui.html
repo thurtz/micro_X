@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>6. Developer Mode &amp; Code Integrity &mdash; micro_X 0.0.1017 documentation</title>
+  <title>Classic UI (Prompt Toolkit) &mdash; micro_X 0.0.1017 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
 
@@ -19,8 +19,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="7. Advanced Topics" href="07_advanced_topics.html" />
-    <link rel="prev" title="5. Management &amp; Utilities" href="05_management_and_utils.html" /> 
+    <link rel="next" title="Developer Documentation" href="../developer/index.html" />
+    <link rel="prev" title="8. Troubleshooting" href="08_troubleshooting.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -50,16 +50,15 @@
 <li class="toctree-l2"><a class="reference internal" href="03_ai_features.html"><strong>3. AI Features</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="04_command_categorization.html"><strong>4. Command Categorization</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="05_management_and_utils.html"><strong>5. Management &amp; Utilities</strong></a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#"><strong>6. Developer Mode &amp; Code Integrity</strong></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#purpose"><strong>Purpose</strong></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#developer-mode-dev-branch"><strong>Developer Mode (dev branch)</strong></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#protected-mode-main-and-testing-branches"><strong>Protected Mode (main and testing branches)</strong></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#behavior-on-other-branches"><strong>Behavior on Other Branches</strong></a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="06_developer_mode.html"><strong>6. Developer Mode &amp; Code Integrity</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="07_advanced_topics.html"><strong>7. Advanced Topics</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="08_troubleshooting.html"><strong>8. Troubleshooting</strong></a></li>
-<li class="toctree-l2"><a class="reference internal" href="09_classic_ui.html"><strong>Classic UI (Prompt Toolkit)</strong></a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#"><strong>Classic UI (Prompt Toolkit)</strong></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#the-interface"><strong>The Interface</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#keybindings"><strong>Keybindings</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#interactive-flows"><strong>Interactive Flows</strong></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Documentation</a></li>
@@ -81,9 +80,9 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="index.html">User Guide</a></li>
-      <li class="breadcrumb-item active"><strong>6. Developer Mode &amp; Code Integrity</strong></li>
+      <li class="breadcrumb-item active"><strong>Classic UI (Prompt Toolkit)</strong></li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/user_guide/06_developer_mode.md.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/user_guide/09_classic_ui.md.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -91,41 +90,32 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="developer-mode-code-integrity">
-<h1><strong>6. Developer Mode &amp; Code Integrity</strong><a class="headerlink" href="#developer-mode-code-integrity" title="Link to this heading"></a></h1>
-<p>To enhance reliability and security, micro_X implements a branch-aware system that adjusts its behavior based on the current Git branch.</p>
-<section id="purpose">
-<h2><strong>Purpose</strong><a class="headerlink" href="#purpose" title="Link to this heading"></a></h2>
-<p>This system ensures that users running micro_X from its stable (main) or testing branches are using verified and synchronized code. For developers, it provides a seamless and unrestricted experience on the development (dev) branch.</p>
-</section>
-<section id="developer-mode-dev-branch">
-<h2><strong>Developer Mode (dev branch)</strong><a class="headerlink" href="#developer-mode-dev-branch" title="Link to this heading"></a></h2>
+  <section id="classic-ui-prompt-toolkit">
+<h1><strong>Classic UI (Prompt Toolkit)</strong><a class="headerlink" href="#classic-ui-prompt-toolkit" title="Link to this heading"></a></h1>
+<p>While <code class="docutils literal notranslate"><span class="pre">textual</span></code> is the modern default interface for micro_X, the original <code class="docutils literal notranslate"><span class="pre">prompt_toolkit</span></code> backend remains fully supported. You can switch to it by setting <code class="docutils literal notranslate"><span class="pre">ui_backend</span></code> to <code class="docutils literal notranslate"><span class="pre">prompt_toolkit</span></code> in your <code class="docutils literal notranslate"><span class="pre">user_config.json</span></code>.</p>
+<section id="the-interface">
+<h2><strong>The Interface</strong><a class="headerlink" href="#the-interface" title="Link to this heading"></a></h2>
+<p>The classic interface is divided into three main parts:</p>
 <ul class="simple">
-<li><p><strong>Activation</strong>: Automatically activated when micro_X detects it is running from the dev Git branch, or if the Git context is unavailable (e.g., not a Git repository).</p></li>
-<li><p><strong>Behavior</strong>: In this mode, startup integrity checks are informational or bypassed. micro_X will run even if there are local uncommitted changes, allowing for active development without interruption.</p></li>
+<li><p><strong>Output Area</strong>: The top, larger pane displays command output, AI messages, and logs.</p></li>
+<li><p><strong>Input Area</strong>: The bottom pane with a prompt (e.g., <code class="docutils literal notranslate"><span class="pre">(~)</span> <span class="pre">&gt;</span></code>) is where you type your commands or <code class="docutils literal notranslate"><span class="pre">/translate</span></code> queries.</p></li>
+<li><p><strong>Key Help Bar</strong>: A single line at the very bottom shows common keybindings.</p></li>
 </ul>
 </section>
-<section id="protected-mode-main-and-testing-branches">
-<h2><strong>Protected Mode (main and testing branches)</strong><a class="headerlink" href="#protected-mode-main-and-testing-branches" title="Link to this heading"></a></h2>
+<section id="keybindings">
+<h2><strong>Keybindings</strong><a class="headerlink" href="#keybindings" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><strong>Activation</strong>: Active when micro_X detects it is running from the main or testing Git branches.</p></li>
-<li><p><strong>Integrity Checks Performed at Startup</strong>:</p>
-<ol class="arabic simple">
-<li><p><strong>Clean Working Directory</strong>: Verifies there are no uncommitted modifications to tracked files.</p></li>
-<li><p><strong>Sync with Remote</strong>: Verifies the local branch is synchronized with its remote-tracking branch on origin.</p></li>
-</ol>
-</li>
-<li><p><strong>Consequences of Failure</strong>:</p>
-<ul>
-<li><p>If critical integrity issues are found (e.g., uncommitted local changes), micro_X will display an error message and <strong>halt execution</strong>.</p></li>
-<li><p>If the local branch is merely behind the remote, a warning will be displayed, and /update will be suggested. micro_X will continue to run.</p></li>
-</ul>
-</li>
+<li><p><strong>Enter</strong>: Submits the current command or query.</p></li>
+<li><p><strong>Ctrl+C / Ctrl+D</strong>: Exits micro_X or cancels an active interactive flow (like categorization or confirmation).</p></li>
+<li><p><strong>Ctrl+N</strong>: Inserts a newline in the input field for multi-line commands.</p></li>
+<li><p><strong>Up/Down Arrows</strong>: Navigates through your command history.</p></li>
+<li><p><strong>Tab</strong>: Attempts command completion.</p></li>
+<li><p><strong>PageUp / PageDown</strong>: Scrolls the main output area.</p></li>
 </ul>
 </section>
-<section id="behavior-on-other-branches">
-<h2><strong>Behavior on Other Branches</strong><a class="headerlink" href="#behavior-on-other-branches" title="Link to this heading"></a></h2>
-<p>If you are on a feature branch (not dev, main, or testing), micro_X assumes a developer-like mode where integrity checks are informational and do not halt execution.</p>
+<section id="interactive-flows">
+<h2><strong>Interactive Flows</strong><a class="headerlink" href="#interactive-flows" title="Link to this heading"></a></h2>
+<p>In the classic UI, interactive menus (like command confirmation or categorization) are presented as text-based lists in the output area, requiring you to type a number (1-7) to select an option.</p>
 </section>
 </section>
 
@@ -133,8 +123,8 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="05_management_and_utils.html" class="btn btn-neutral float-left" title="5. Management &amp; Utilities" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="07_advanced_topics.html" class="btn btn-neutral float-right" title="7. Advanced Topics" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="08_troubleshooting.html" class="btn btn-neutral float-left" title="8. Troubleshooting" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../developer/index.html" class="btn btn-neutral float-right" title="Developer Documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

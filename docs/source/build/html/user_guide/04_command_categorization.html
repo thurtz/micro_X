@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>4. Command Categorization &mdash; micro_X 0.0.1016 documentation</title>
+  <title>4. Command Categorization &mdash; micro_X 0.0.1017 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=44ce788c"></script>
+      <script src="../_static/documentation_options.js?v=e0b6fc95"></script>
       <script src="../_static/doctools.js?v=9bcbadda"></script>
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
@@ -50,7 +50,7 @@
 <li class="toctree-l2"><a class="reference internal" href="03_ai_features.html"><strong>3. AI Features</strong></a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#"><strong>4. Command Categorization</strong></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#categories"><strong>Categories</strong></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#categorization-prompt"><strong>Categorization Prompt</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#categorization-menu"><strong>Categorization Menu</strong></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#managing-categories-command-subsystem"><strong>Managing Categories (/command subsystem)</strong></a></li>
 </ul>
 </li>
@@ -58,6 +58,7 @@
 <li class="toctree-l2"><a class="reference internal" href="06_developer_mode.html"><strong>6. Developer Mode &amp; Code Integrity</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="07_advanced_topics.html"><strong>7. Advanced Topics</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="08_troubleshooting.html"><strong>8. Troubleshooting</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="09_classic_ui.html"><strong>Classic UI (Prompt Toolkit)</strong></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Documentation</a></li>
@@ -95,35 +96,30 @@
 <section id="categories">
 <h2><strong>Categories</strong><a class="headerlink" href="#categories" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><strong>simple</strong>: For commands that run quickly and produce non-interactive output (e.g., ls, echo, cat). They are executed directly, and their output is captured in the main UI.</p></li>
-<li><p><strong>semi_interactive</strong>: For commands that might run for a while, produce a lot of output, or have minimal interactivity (e.g., apt update, ping google.com). These are run in a new tmux window, and their output is displayed after the command finishes.</p></li>
-<li><p><strong>interactive_tui</strong>: For fully interactive terminal applications (e.g., nano, vim, htop, ssh). These are run in a new tmux window that takes over the screen until you exit the application.</p></li>
+<li><p><strong>simple</strong>: For commands that run quickly and produce non-interactive output (e.g., <code class="docutils literal notranslate"><span class="pre">ls</span></code>, <code class="docutils literal notranslate"><span class="pre">echo</span></code>, <code class="docutils literal notranslate"><span class="pre">cat</span></code>). They are executed directly, and their output is captured in the main UI.</p></li>
+<li><p><strong>semi_interactive</strong>: For commands that might run for a while, produce a lot of output, or have minimal interactivity (e.g., <code class="docutils literal notranslate"><span class="pre">apt</span> <span class="pre">update</span></code>, <code class="docutils literal notranslate"><span class="pre">ping</span> <span class="pre">google.com</span></code>). These are run in a new tmux window, and their output is displayed after the command finishes.</p></li>
+<li><p><strong>interactive_tui</strong>: For fully interactive terminal applications (e.g., <code class="docutils literal notranslate"><span class="pre">nano</span></code>, <code class="docutils literal notranslate"><span class="pre">vim</span></code>, <code class="docutils literal notranslate"><span class="pre">htop</span></code>, <code class="docutils literal notranslate"><span class="pre">ssh</span></code>). These are run in a new tmux window that takes over the screen until you exit the application.</p></li>
 </ul>
 </section>
-<section id="categorization-prompt">
-<h2><strong>Categorization Prompt</strong><a class="headerlink" href="#categorization-prompt" title="Link to this heading"></a></h2>
-<p>When an unknown command is entered, you will see a prompt like this:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Command to categorize: &#39;my_script.sh&#39;
-How to categorize this command?
-  [1] simple             (For simple, non-interactive commands)
-  [2] semi_interactive   (For commands that might run for a while)
-  [3] interactive_tui    (For fully interactive applications)
-  [4] Modify command before categorizing
-  [5] Execute as default &#39;semi_interactive&#39; (once, no save)
-  [6] Cancel categorization &amp; execution
-[Categorize] Action (1-6):
-</pre></div>
-</div>
-<p>Your choice will be saved in your user configuration for future use.</p>
+<section id="categorization-menu">
+<h2><strong>Categorization Menu</strong><a class="headerlink" href="#categorization-menu" title="Link to this heading"></a></h2>
+<p>When an unknown command is entered, the <strong>Interaction Zone</strong> above the input field will display a menu:</p>
+<ul class="simple">
+<li><p><strong>Run Once</strong>: Execute the command immediately using the default category (usually <code class="docutils literal notranslate"><span class="pre">semi_interactive</span></code>) <strong>without saving</strong> it. This is ideal for testing or one-time use.</p></li>
+<li><p><strong>Simple</strong>: Save as simple and run.</p></li>
+<li><p><strong>Semi-Interactive</strong>: Save as semi-interactive and run.</p></li>
+<li><p><strong>TUI</strong>: Save as interactive TUI and run.</p></li>
+<li><p><strong>Cancel</strong>: Abort.</p></li>
+</ul>
 </section>
 <section id="managing-categories-command-subsystem">
 <h2><strong>Managing Categories (/command subsystem)</strong><a class="headerlink" href="#managing-categories-command-subsystem" title="Link to this heading"></a></h2>
-<p>You can manage your saved command categorizations using the /command utility.</p>
+<p>You can manage your saved command categorizations using the <code class="docutils literal notranslate"><span class="pre">/command</span></code> utility.</p>
 <ul class="simple">
 <li><p><strong>/command list</strong>: Shows all categorized commands.</p></li>
 <li><p><strong>/command add “&lt;command&gt;” &lt;category&gt;</strong>: Adds or updates a command’s category.</p>
 <ul>
-<li><p><em>Example</em>: /command add “htop” interactive_tui</p></li>
+<li><p><em>Example</em>: <code class="docutils literal notranslate"><span class="pre">/command</span> <span class="pre">add</span> <span class="pre">&quot;htop&quot;</span> <span class="pre">interactive_tui</span></code></p></li>
 </ul>
 </li>
 <li><p><strong>/command remove “&lt;command&gt;”</strong>: Removes a command from your user settings.</p></li>

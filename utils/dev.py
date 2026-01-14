@@ -347,26 +347,34 @@ def run_tests_for_branch(environment_root, branch_name, branch_project_root_path
     run_command(test_command, branch_project_root_path, f"Running tests for {branch_name}")
 
 def update_docs(environment_root):
-    """Builds the Sphinx documentation in the dev branch."""
-    print("📚 Building documentation in the 'dev' branch environment...")
-
-    dev_branch_dir = os.path.join(environment_root, DEV_BRANCH_DIR_NAME)
-
-    if not os.path.isdir(dev_branch_dir):
-        print(f"❌ Error: 'dev' branch directory not found at '{dev_branch_dir}'.")
-        print("   Please run '/dev --activate' first.")
+    """Builds the Sphinx documentation."""
+    
+    dev_subdir = os.path.join(environment_root, DEV_BRANCH_DIR_NAME)
+    
+    if os.path.isdir(dev_subdir):
+        # We are in the main root, and the dev sub-branch exists.
+        # Update the dev branch docs (original behavior).
+        target_dir = dev_subdir
+        print(f"📚 Detected multi-branch root. Building docs for '{DEV_BRANCH_DIR_NAME}'...")
+    elif os.path.isdir(os.path.join(environment_root, 'docs', 'source')):
+        # We are likely INSIDE the dev branch or a clone.
+        target_dir = environment_root
+        print(f"📚 Building docs for current environment: {os.path.basename(target_dir)}")
+    else:
+        print(f"❌ Error: Could not locate a valid project structure to build docs.")
+        print(f"   Checked '{dev_subdir}' and '{environment_root}'.")
         return
 
-    # Run make command in the dev branch directory
-    docs_source_dir = os.path.join(dev_branch_dir, 'docs', 'source')
+    # Run make command in the target directory
+    docs_source_dir = os.path.join(target_dir, 'docs', 'source')
     if not os.path.isdir(docs_source_dir):
-        print(f"❌ Error: Documentation source directory not found in 'dev' branch at '{docs_source_dir}'")
+        print(f"❌ Error: Documentation source directory not found at '{docs_source_dir}'")
         return
 
     make_command = ['make', '-C', docs_source_dir, 'html']
-    if run_command(make_command, dev_branch_dir, "Building Sphinx documentation for dev branch"):
-        print("\n✅ Documentation build complete in the 'dev' branch.")
-        print(f"   You can view the updated docs by running micro_X from the '{DEV_BRANCH_DIR_NAME}' directory and using '/docs'.")
+    if run_command(make_command, target_dir, "Building Sphinx documentation"):
+        print("\n✅ Documentation build complete.")
+        print(f"   You can view the updated docs by running micro_X from the '{os.path.basename(target_dir)}' directory and using '/docs'.")
 
 def update_docs_knowledge_base(environment_root):
     """Updates the knowledge base for the micro_X documentation in the dev branch."""
@@ -485,17 +493,22 @@ def main():
 
     args = parser.parse_args()
     
-    environment_root = find_environment_root()
+    # For documentation updates, we always want to target the LOCAL environment (e.g. the clone we are in),
+    # not the parent multi-branch manager.
+    if args.update_docs or args.update_docs_kb:
+        environment_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    else:
+        environment_root = find_environment_root()
+    
     if environment_root is None:
-        # Fallback for when the script is run from a non-activated environment
-        # This allows --activate to still work
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if args.activate:
-             activate_dev_environment(project_root)
-             return
-        print("❌ Error: Could not find the micro_X multi-branch environment root.")
-        print("   Ensure you are running this from within an activated environment, or run '/dev --activate' from the main branch.")
-        sys.exit(1)
+        # Fallback: Check if we are in a standalone/clone environment (local root)
+        local_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if os.path.isfile(os.path.join(local_root, "main.py")):
+             environment_root = local_root
+        else:
+            print("❌ Error: Could not find the micro_X multi-branch environment root or valid standalone root.")
+            print("   Ensure you are running this from within an activated environment, or run '/dev --activate' from the main branch.")
+            sys.exit(1)
 
     # Get the name of the main branch directory, which might be different from the env root basename
     main_branch_dir = os.path.join(environment_root)

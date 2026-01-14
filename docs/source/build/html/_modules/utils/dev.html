@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>utils.dev &mdash; micro_X 1.0 documentation</title>
+  <title>utils.dev &mdash; micro_X 0.0.1017 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../../_static/documentation_options.js?v=e0b6fc95"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -446,26 +446,34 @@
 <div class="viewcode-block" id="update_docs">
 <a class="viewcode-back" href="../../api_reference.html#utils.dev.update_docs">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">update_docs</span><span class="p">(</span><span class="n">environment_root</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Builds the Sphinx documentation in the dev branch.&quot;&quot;&quot;</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;📚 Building documentation in the &#39;dev&#39; branch environment...&quot;</span><span class="p">)</span>
-
-    <span class="n">dev_branch_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">environment_root</span><span class="p">,</span> <span class="n">DEV_BRANCH_DIR_NAME</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">dev_branch_dir</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: &#39;dev&#39; branch directory not found at &#39;</span><span class="si">{</span><span class="n">dev_branch_dir</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   Please run &#39;/dev --activate&#39; first.&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Builds the Sphinx documentation.&quot;&quot;&quot;</span>
+    
+    <span class="n">dev_subdir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">environment_root</span><span class="p">,</span> <span class="n">DEV_BRANCH_DIR_NAME</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">dev_subdir</span><span class="p">):</span>
+        <span class="c1"># We are in the main root, and the dev sub-branch exists.</span>
+        <span class="c1"># Update the dev branch docs (original behavior).</span>
+        <span class="n">target_dir</span> <span class="o">=</span> <span class="n">dev_subdir</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📚 Detected multi-branch root. Building docs for &#39;</span><span class="si">{</span><span class="n">DEV_BRANCH_DIR_NAME</span><span class="si">}</span><span class="s2">&#39;...&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">environment_root</span><span class="p">,</span> <span class="s1">&#39;docs&#39;</span><span class="p">,</span> <span class="s1">&#39;source&#39;</span><span class="p">)):</span>
+        <span class="c1"># We are likely INSIDE the dev branch or a clone.</span>
+        <span class="n">target_dir</span> <span class="o">=</span> <span class="n">environment_root</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📚 Building docs for current environment: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: Could not locate a valid project structure to build docs.&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Checked &#39;</span><span class="si">{</span><span class="n">dev_subdir</span><span class="si">}</span><span class="s2">&#39; and &#39;</span><span class="si">{</span><span class="n">environment_root</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
         <span class="k">return</span>
 
-    <span class="c1"># Run make command in the dev branch directory</span>
-    <span class="n">docs_source_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dev_branch_dir</span><span class="p">,</span> <span class="s1">&#39;docs&#39;</span><span class="p">,</span> <span class="s1">&#39;source&#39;</span><span class="p">)</span>
+    <span class="c1"># Run make command in the target directory</span>
+    <span class="n">docs_source_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">target_dir</span><span class="p">,</span> <span class="s1">&#39;docs&#39;</span><span class="p">,</span> <span class="s1">&#39;source&#39;</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">docs_source_dir</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: Documentation source directory not found in &#39;dev&#39; branch at &#39;</span><span class="si">{</span><span class="n">docs_source_dir</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: Documentation source directory not found at &#39;</span><span class="si">{</span><span class="n">docs_source_dir</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
         <span class="k">return</span>
 
     <span class="n">make_command</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;make&#39;</span><span class="p">,</span> <span class="s1">&#39;-C&#39;</span><span class="p">,</span> <span class="n">docs_source_dir</span><span class="p">,</span> <span class="s1">&#39;html&#39;</span><span class="p">]</span>
-    <span class="k">if</span> <span class="n">run_command</span><span class="p">(</span><span class="n">make_command</span><span class="p">,</span> <span class="n">dev_branch_dir</span><span class="p">,</span> <span class="s2">&quot;Building Sphinx documentation for dev branch&quot;</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">✅ Documentation build complete in the &#39;dev&#39; branch.&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   You can view the updated docs by running micro_X from the &#39;</span><span class="si">{</span><span class="n">DEV_BRANCH_DIR_NAME</span><span class="si">}</span><span class="s2">&#39; directory and using &#39;/docs&#39;.&quot;</span><span class="p">)</span></div>
+    <span class="k">if</span> <span class="n">run_command</span><span class="p">(</span><span class="n">make_command</span><span class="p">,</span> <span class="n">target_dir</span><span class="p">,</span> <span class="s2">&quot;Building Sphinx documentation&quot;</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">✅ Documentation build complete.&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   You can view the updated docs by running micro_X from the &#39;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39; directory and using &#39;/docs&#39;.&quot;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="update_docs_knowledge_base">
@@ -590,17 +598,22 @@
 
     <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
     
-    <span class="n">environment_root</span> <span class="o">=</span> <span class="n">find_environment_root</span><span class="p">()</span>
+    <span class="c1"># For documentation updates, we always want to target the LOCAL environment (e.g. the clone we are in),</span>
+    <span class="c1"># not the parent multi-branch manager.</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">update_docs</span> <span class="ow">or</span> <span class="n">args</span><span class="o">.</span><span class="n">update_docs_kb</span><span class="p">:</span>
+        <span class="n">environment_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">environment_root</span> <span class="o">=</span> <span class="n">find_environment_root</span><span class="p">()</span>
+    
     <span class="k">if</span> <span class="n">environment_root</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="c1"># Fallback for when the script is run from a non-activated environment</span>
-        <span class="c1"># This allows --activate to still work</span>
-        <span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)))</span>
-        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">activate</span><span class="p">:</span>
-             <span class="n">activate_dev_environment</span><span class="p">(</span><span class="n">project_root</span><span class="p">)</span>
-             <span class="k">return</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;❌ Error: Could not find the micro_X multi-branch environment root.&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   Ensure you are running this from within an activated environment, or run &#39;/dev --activate&#39; from the main branch.&quot;</span><span class="p">)</span>
-        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># Fallback: Check if we are in a standalone/clone environment (local root)</span>
+        <span class="n">local_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">local_root</span><span class="p">,</span> <span class="s2">&quot;main.py&quot;</span><span class="p">)):</span>
+             <span class="n">environment_root</span> <span class="o">=</span> <span class="n">local_root</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;❌ Error: Could not find the micro_X multi-branch environment root or valid standalone root.&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   Ensure you are running this from within an activated environment, or run &#39;/dev --activate&#39; from the main branch.&quot;</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
 
     <span class="c1"># Get the name of the main branch directory, which might be different from the env root basename</span>
     <span class="n">main_branch_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">environment_root</span><span class="p">)</span>

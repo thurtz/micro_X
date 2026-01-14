@@ -555,7 +555,7 @@ class MicroXTextualApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        yield Footer()
+        yield KeyHintBar()
         yield RichLog(id="main_log", highlight=True, markup=True, wrap=True)
         with Vertical(id="bottom_container"):
             yield Vertical(id="interaction_zone", classes="hidden")
