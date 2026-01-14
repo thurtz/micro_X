@@ -559,7 +559,7 @@ class MicroXTextualApp(App):
         yield RichLog(id="main_log", highlight=True, markup=True, wrap=True)
         with Vertical(id="bottom_container"):
             yield Vertical(id="interaction_zone", classes="hidden")
-            yield CommandInput(id="input_field", soft_wrap=True, placeholder="Command... [Ctrl+Shift+V] Paste | [Shift+Select & Ctrl+Shift+C] Copy")
+            yield CommandInput(id="input_field", soft_wrap=True, language="bash", placeholder="Command... [Ctrl+Shift+V] Paste | [Shift+Select & Ctrl+Shift+C] Copy")
 
     def show_status(self, message: str) -> None:
         """Display a status message in the interaction zone (swapping out input)."""
