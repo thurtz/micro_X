@@ -480,18 +480,6 @@ async def main_async_runner():
       ui_manager_instance.shell_engine_instance = shell_engine_instance
       ui_manager_instance.main_exit_app_ref = _exit_app_main
     
-    if isinstance(ui_manager_instance, TextualUIManager):
-        # Initialize Textual App
-        history_strings = list(history.load_history_strings())
-        # Pass the current output buffer as initial logs
-        app_instance = MicroXTextualApp(
-            shell_engine=shell_engine_instance, 
-            history=history_strings,
-            initial_logs=list(ui_manager_instance.output_buffer),
-            history_path=HISTORY_FILE_PATH
-        )
-        ui_manager_instance.app = app_instance
-        app_instance.shell_engine = shell_engine_instance # Circular link
     # --- FIX END ---
 
     # Initialize Git context after the shell engine has its ui_manager
@@ -561,14 +549,25 @@ async def main_async_runner():
             kb_hint = "\nℹ️  Documentation Knowledge Base is missing. Run '/docs' to build it."
 
         version = config.get("application", {}).get("version", "unknown")
-        initial_welcome_message = (
-            f"Welcome to micro_X Shell 🚀 (Version: {version})\n"
-            "Type a Linux command, or try '/translate your query'.\n"
-            "• Copy: Hold Shift + Select text, then press Ctrl+Shift+C.\n"
-            "• Paste: Press Ctrl+Shift+V.\n"
-            "• Help: Type '/help' or press F1.\n"
-            "• Quit: Press Ctrl+Q.\n"
-        )
+        try:
+            current_branch = await git_context_manager_instance.get_current_branch()
+        except:
+            current_branch = "N/A"
+
+        initial_welcome_message = f"""
+# Welcome to micro_X Shell 🚀
+**Version:** {version} | **Branch:** {current_branch}
+
+**Getting Started:**
+* Type a standard Linux command (e.g., `ls -la`).
+* Type a natural language query (e.g., "show me large files").
+
+**Shortcuts:**
+* **Copy:** Hold `Shift` + Select, then `Ctrl+Shift+C`
+* **Paste:** `Ctrl+Shift+V`
+* **Help:** `F1` or type `/help`
+* **Quit:** `Ctrl+Q`
+"""
         initial_welcome_message += kb_hint
 
         initial_buffer_for_ui = list(ui_manager_instance.output_buffer)
@@ -607,9 +606,19 @@ async def main_async_runner():
         await ui_manager_instance.run_async()
     elif ui_backend_choice == "textual":
         logger.info("Starting Textual App...")
-        # Add welcome message
-        if initial_buffer_for_ui:
-             pass
+        # Initialize Textual App
+        history_strings = list(history.load_history_strings())
+        # Pass the current output buffer as initial logs
+        app_instance = MicroXTextualApp(
+            shell_engine=shell_engine_instance, 
+            history=history_strings,
+            initial_logs=initial_buffer_for_ui,
+            history_path=HISTORY_FILE_PATH
+        )
+        if isinstance(ui_manager_instance, TextualUIManager):
+            ui_manager_instance.app = app_instance
+        app_instance.shell_engine = shell_engine_instance
+        
         await app_instance.run_async()
     else:
         # This is the original path for the prompt_toolkit backend.

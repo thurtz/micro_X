@@ -254,6 +254,8 @@ class ShellEngine:
             logger.warning(f"Attempted to execute empty command: '{command_to_execute}' from input: '{original_user_input_display}'")
             return
 
+        self.ui_manager.update_status_bar(f"Running: {command_to_execute}...")
+
         try:
             self.current_process = await asyncio.create_subprocess_shell(
                 command_to_execute,
