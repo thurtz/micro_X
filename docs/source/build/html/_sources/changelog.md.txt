@@ -5,6 +5,11 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1027] - 2026-01-16
+### Changed
+- **Workflow:** Updated `development_directives.md` to explicitly include changelog maintenance in the versioning workflow.
+- **Dev Utilities:** Enhanced `/dev --update-docs` to automatically sync the root `CHANGELOG.md` into the documentation source before building.
+
 ## [0.0.1026] - 2026-01-16
 ### Added
 - Integrated this `CHANGELOG.md` into the official Sphinx documentation.

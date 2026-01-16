@@ -371,6 +371,16 @@ def update_docs(environment_root):
         print(f"❌ Error: Documentation source directory not found at '{docs_source_dir}'")
         return
 
+    # Sync Changelog
+    changelog_src = os.path.join(target_dir, 'CHANGELOG.md')
+    changelog_dest = os.path.join(docs_source_dir, 'changelog.md')
+    if os.path.exists(changelog_src):
+        try:
+            shutil.copy2(changelog_src, changelog_dest)
+            print(f"Synced CHANGELOG.md to {changelog_dest}")
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to copy CHANGELOG.md to docs: {e}")
+
     make_command = ['make', '-C', docs_source_dir, 'html']
     if run_command(make_command, target_dir, "Building Sphinx documentation"):
         print("\n✅ Documentation build complete.")

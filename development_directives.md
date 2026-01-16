@@ -51,8 +51,9 @@ Before committing significant changes or releases to the `dev` branch, follow th
 
 1.  **Update Version (If Applicable)**: If the changes warrant a version bump (patch, minor, or major), update the `application.version` key in `config/default_config.json`.
 2.  **Sync Version**: Run `/version_sync` (or `python3 utils/version_sync.py`) to propagate the version number to all metadata files (`micro_X.desktop`, `docs/source/conf.py`, whitepaper).
-3.  **Update Documentation**: Run `/dev --update-docs` (or `python3 utils/dev.py --update-docs`) to rebuild the Sphinx documentation. This ensures the HTML output reflects the latest code and version.
-4.  **Verify**: Check `git diff` to confirm that version numbers and documentation builds are updated and consistent before staging.
+3.  **Update Changelog**: Add an entry to `CHANGELOG.md` detailing the changes, following the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
+4.  **Update Documentation**: Run `/dev --update-docs` (or `python3 utils/dev.py --update-docs`) to rebuild the Sphinx documentation. This ensures the HTML output reflects the latest code, version, and changelog.
+5.  **Verify**: Check `git diff` to confirm that version numbers and documentation builds are updated and consistent before staging.
 
 ## 8. Clone-Based Development Workflow
 
@@ -65,5 +66,5 @@ For significant features, refactoring, or risky changes, use the following workf
     *   Example: `cd clones/clone_v0.0.1021 && ./micro_X.sh`
     *   Example: `cd clones/clone_v0.0.1021 && pytest`
 4.  **Merge to Dev**: Once verified, copy the modified files from the clone back to the `dev` branch root and commit them.
-    *   *Note*: Ensure you update version numbers and documentation within the clone *before* merging.
+    *   *Note*: Ensure you update version numbers, documentation, and the changelog within the clone *before* merging.
 5.  **Commit**: Commit the changes to the `dev` branch as usual.
