@@ -400,3 +400,45 @@ async def test_submit_user_input_cd_command(shell_engine):
 
         mock_handle_cd.assert_awaited_once_with(user_input)
         mock_process_command.assert_not_awaited()
+
+@pytest.mark.asyncio
+async def test_bang_prefix_handling(shell_engine):
+    """Test handling of the '!' prefix for commands."""
+    
+    # Mock classify_command
+    unknown = shell_engine.category_manager_module.UNKNOWN_CATEGORY_SENTINEL
+    
+    # 1. Test with an unknown command
+    # We set side_effect to return unknown for any input initially
+    shell_engine.category_manager_module.classify_command.side_effect = lambda cmd: unknown
+    
+    with patch.object(shell_engine, 'process_command', new_callable=AsyncMock) as mock_process:
+        await shell_engine.submit_user_input("!unknown_cmd")
+        
+        # Should print the "not known" message
+        shell_engine.ui_manager.append_output.assert_any_call(
+            "✨ 'unknown_cmd' is not a known command. Starting categorization...", 
+            style_class='info'
+        )
+        # Should call process_command with stripped command
+        mock_process.assert_called_with("unknown_cmd", "!unknown_cmd")
+
+    # Reset mocks
+    shell_engine.ui_manager.append_output.reset_mock()
+    
+    # 2. Test with a known command
+    # Set side_effect to return 'simple' for 'known_cmd'
+    shell_engine.category_manager_module.classify_command.side_effect = lambda cmd: "simple" if cmd == "known_cmd" else unknown
+    
+    with patch.object(shell_engine, 'process_command', new_callable=AsyncMock) as mock_process:
+        await shell_engine.submit_user_input("!known_cmd")
+        
+        # Should NOT print the "not known" message
+        # Verify no call with that specific text was made
+        for call_args in shell_engine.ui_manager.append_output.call_args_list:
+            args, _ = call_args
+            if args:
+                assert "is not a known command" not in args[0]
+            
+        # Should still call process_command
+        mock_process.assert_called_with("known_cmd", "!known_cmd")

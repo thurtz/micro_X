@@ -779,7 +779,11 @@ class ShellEngine:
                 if not command_to_categorize:
                     self.ui_manager.append_output(f"❌ Empty command after '!' prefix.", style_class='error')
                     return
-                self.ui_manager.append_output(f"✨ '{command_to_categorize}' is not a known command. Starting categorization...", style_class='info')
+                
+                # Check classification to avoid misleading message for known commands
+                if self.category_manager_module.classify_command(command_to_categorize) == self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
+                    self.ui_manager.append_output(f"✨ '{command_to_categorize}' is not a known command. Starting categorization...", style_class='info')
+                
                 await self.process_command(command_to_categorize, user_input_stripped)
                 return
 
