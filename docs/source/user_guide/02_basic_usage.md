@@ -15,9 +15,9 @@ If you installed the desktop entry during setup on Linux, you can also launch it
 The micro_X interface is divided into distinct zones:
 
 * **Top Bar (Key Hints)**: A toolbar at the very top displaying clickable shortcuts for common actions (Help, Docs, Quit, etc.).
-* **Output Log**: The large central area displays command output, AI messages, and logs. It wraps text automatically and supports scrolling.
+* **Output Log**: The large central area displays command output, AI messages, and logs. It supports **Markdown rendering** for rich text formatting and wraps text automatically.
 * **Interaction Zone**: A dynamic area near the bottom that appears when micro_X needs your input (e.g., confirming an AI suggestion) or to show a live status (e.g., "Thinking...").
-* **Command Input**: The bottom-most field where you type commands or queries. It supports multi-line wrapping.
+* **Command Input**: The bottom-most field where you type commands or queries. It features **real-time syntax highlighting** for shell commands and supports multi-line wrapping.
 
 ## **Keybindings**
 
