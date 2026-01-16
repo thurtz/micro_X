@@ -546,7 +546,7 @@ async def main_async_runner():
         kb_path = os.path.join(SCRIPT_DIR, "knowledge_bases", "micro_X_docs")
         kb_hint = ""
         if not os.path.exists(kb_path):
-            kb_hint = "\nℹ️  Documentation Knowledge Base is missing. Run '/docs' to build it."
+            kb_hint = "\nℹ️  Documentation Knowledge Base is missing. Run '/docs --build-kb' to build it."
 
         version = config.get("application", {}).get("version", "unknown")
         try:
