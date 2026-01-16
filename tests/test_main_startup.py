@@ -4,7 +4,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Import the custom exception from main to test for it specifically
-from main import StartupIntegrityError
+from modules.startup.integrity import StartupIntegrityError, perform_startup_integrity_checks
 from modules.git_context_manager import FETCH_SUCCESS, FETCH_TIMEOUT, FETCH_OFFLINE, FETCH_ERROR
 
 # We need to import the function we want to test from main.py.
@@ -55,13 +55,13 @@ def mock_git_context_manager(mocker):
 @pytest.mark.asyncio
 async def test_git_not_available(mock_main_globals, mock_git_context_manager):
     """Test scenario where Git command is not available."""
-    from main import perform_startup_integrity_checks
+    # perform_startup_integrity_checks imported at top level
     mock_gcm_instance, _ = mock_git_context_manager
-    mock_ui, _ = mock_main_globals
+    mock_ui, mock_cfg = mock_main_globals
 
     mock_gcm_instance.is_git_available.return_value = False
 
-    is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
+    is_dev_mode, integrity_ok = await perform_startup_integrity_checks(mock_cfg, mock_ui, "/fake/project_root", mock_gcm_instance)
 
     assert is_dev_mode is True # Should default to dev mode
     assert integrity_ok is True # Checks are skipped, so considered "ok" in this context
@@ -73,14 +73,14 @@ async def test_git_not_available(mock_main_globals, mock_git_context_manager):
 @pytest.mark.asyncio
 async def test_not_a_git_repository(mock_main_globals, mock_git_context_manager):
     """Test scenario where the project directory is not a Git repository."""
-    from main import perform_startup_integrity_checks
+    # perform_startup_integrity_checks imported at top level
     mock_gcm_instance, _ = mock_git_context_manager
-    mock_ui, _ = mock_main_globals
+    mock_ui, mock_cfg = mock_main_globals
 
     mock_gcm_instance.is_git_available.return_value = True
     mock_gcm_instance.is_repository.return_value = False
 
-    is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
+    is_dev_mode, integrity_ok = await perform_startup_integrity_checks(mock_cfg, mock_ui, "/fake/project_root", mock_gcm_instance)
 
     assert is_dev_mode is True # Should default to dev mode
     assert integrity_ok is True # Checks are skipped
@@ -98,7 +98,7 @@ async def test_not_a_git_repository(mock_main_globals, mock_git_context_manager)
 @pytest.mark.asyncio
 async def test_on_developer_branch(mock_main_globals, mock_git_context_manager):
     """Test behavior when on the designated developer branch."""
-    from main import perform_startup_integrity_checks
+    # perform_startup_integrity_checks imported at top level
     mock_gcm_instance, _ = mock_git_context_manager
     mock_ui, mock_cfg = mock_main_globals
     
@@ -109,7 +109,7 @@ async def test_on_developer_branch(mock_main_globals, mock_git_context_manager):
     mock_gcm_instance.get_current_branch.return_value = dev_branch_name
     mock_gcm_instance.get_head_commit_hash.return_value = "devcommit123"
 
-    is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
+    is_dev_mode, integrity_ok = await perform_startup_integrity_checks(mock_cfg, mock_ui, "/fake/project_root", mock_gcm_instance)
 
     assert is_dev_mode is True
     assert integrity_ok is True 
@@ -128,7 +128,7 @@ async def test_on_developer_branch(mock_main_globals, mock_git_context_manager):
 @pytest.mark.asyncio
 async def test_on_protected_branch_all_clear(mock_main_globals, mock_git_context_manager):
     """Test behavior on a protected branch when all integrity checks pass."""
-    from main import perform_startup_integrity_checks
+    # perform_startup_integrity_checks imported at top level
     mock_gcm_instance, _ = mock_git_context_manager
     mock_ui, mock_cfg = mock_main_globals
     
@@ -141,7 +141,7 @@ async def test_on_protected_branch_all_clear(mock_main_globals, mock_git_context
     mock_gcm_instance.is_working_directory_clean.return_value = True
     mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("synced", "maincommit123", "maincommit123", FETCH_SUCCESS)
 
-    is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
+    is_dev_mode, integrity_ok = await perform_startup_integrity_checks(mock_cfg, mock_ui, "/fake/project_root", mock_gcm_instance)
 
     assert is_dev_mode is False
     assert integrity_ok is True
@@ -166,7 +166,7 @@ async def test_on_protected_branch_all_clear(mock_main_globals, mock_git_context
 @pytest.mark.asyncio
 async def test_on_protected_branch_not_clean(mock_main_globals, mock_git_context_manager):
     """Test behavior on a protected branch when the working directory is not clean."""
-    from main import perform_startup_integrity_checks
+    # perform_startup_integrity_checks imported at top level
     mock_gcm_instance, _ = mock_git_context_manager
     mock_ui, mock_cfg = mock_main_globals
     protected_branch = mock_cfg["integrity_check"]["protected_branches"][0]
@@ -179,13 +179,13 @@ async def test_on_protected_branch_not_clean(mock_main_globals, mock_git_context
     mock_gcm_instance._run_git_command.return_value = (True, " M some_file.py", "") 
 
     with pytest.raises(StartupIntegrityError, match="Uncommitted local changes"):
-        await perform_startup_integrity_checks()
+        await perform_startup_integrity_checks(mock_cfg, mock_ui, "/fake/project_root", mock_gcm_instance)
 
 
 @pytest.mark.asyncio
 async def test_on_protected_branch_not_synced_ahead(mock_main_globals, mock_git_context_manager):
     """Test behavior on a protected branch when it's ahead of remote."""
-    from main import perform_startup_integrity_checks
+    # perform_startup_integrity_checks imported at top level
     mock_gcm_instance, _ = mock_git_context_manager
     mock_ui, mock_cfg = mock_main_globals
     protected_branch = mock_cfg["integrity_check"]["protected_branches"][0]
@@ -198,12 +198,12 @@ async def test_on_protected_branch_not_synced_ahead(mock_main_globals, mock_git_
     mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("ahead", "local_ahead", "remote_base", FETCH_SUCCESS)
 
     with pytest.raises(StartupIntegrityError, match="Local branch has 'ahead'"):
-        await perform_startup_integrity_checks()
+        await perform_startup_integrity_checks(mock_cfg, mock_ui, "/fake/project_root", mock_gcm_instance)
 
 @pytest.mark.asyncio
 async def test_on_protected_branch_behind_and_disallowed(mock_main_globals, mock_git_context_manager):
     """Test halting when branch is behind and config disallows running."""
-    from main import perform_startup_integrity_checks
+    # perform_startup_integrity_checks imported at top level
     mock_gcm_instance, _ = mock_git_context_manager
     mock_ui, mock_cfg = mock_main_globals
     protected_branch = mock_cfg["integrity_check"]["protected_branches"][0]
@@ -216,12 +216,12 @@ async def test_on_protected_branch_behind_and_disallowed(mock_main_globals, mock
     mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("behind", "local_base", "remote_new", FETCH_SUCCESS)
 
     with pytest.raises(StartupIntegrityError, match=r"behind \(and configuration disallows running\)"):
-        await perform_startup_integrity_checks()
+        await perform_startup_integrity_checks(mock_cfg, mock_ui, "/fake/project_root", mock_gcm_instance)
 
 @pytest.mark.asyncio
 async def test_on_protected_branch_fetch_offline_and_ahead_cache(mock_main_globals, mock_git_context_manager):
     """Test halting when fetch is offline and local cache shows 'ahead'."""
-    from main import perform_startup_integrity_checks
+    # perform_startup_integrity_checks imported at top level
     mock_gcm_instance, _ = mock_git_context_manager
     mock_ui, mock_cfg = mock_main_globals
     protected_branch = mock_cfg["integrity_check"]["protected_branches"][0]
@@ -233,12 +233,12 @@ async def test_on_protected_branch_fetch_offline_and_ahead_cache(mock_main_globa
     mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("ahead_local_cache", "local_ahead", "remote_base", FETCH_OFFLINE)
 
     with pytest.raises(StartupIntegrityError, match="Local branch has unpushed changes or diverged"):
-        await perform_startup_integrity_checks()
+        await perform_startup_integrity_checks(mock_cfg, mock_ui, "/fake/project_root", mock_gcm_instance)
 
 @pytest.mark.asyncio
 async def test_on_protected_branch_fetch_offline_and_synced_cache(mock_main_globals, mock_git_context_manager):
     """Test proceeding when fetch is offline but local cache is synced."""
-    from main import perform_startup_integrity_checks
+    # perform_startup_integrity_checks imported at top level
     mock_gcm_instance, _ = mock_git_context_manager
     mock_ui, mock_cfg = mock_main_globals
     protected_branch = mock_cfg["integrity_check"]["protected_branches"][0]
@@ -249,7 +249,7 @@ async def test_on_protected_branch_fetch_offline_and_synced_cache(mock_main_glob
     mock_gcm_instance.is_working_directory_clean.return_value = True
     mock_gcm_instance.compare_head_with_remote_tracking.return_value = ("synced_local_cache", "common_hash", "common_hash", FETCH_TIMEOUT)
 
-    is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
+    is_dev_mode, integrity_ok = await perform_startup_integrity_checks(mock_cfg, mock_ui, "/fake/project_root", mock_gcm_instance)
 
     assert is_dev_mode is False
     assert integrity_ok is True # Integrity is considered OK in this case
@@ -266,9 +266,9 @@ async def test_on_protected_branch_fetch_offline_and_synced_cache(mock_main_glob
 @pytest.mark.asyncio
 async def test_on_other_branch_defaults_to_dev_mode(mock_main_globals, mock_git_context_manager):
     """Test behavior on an unrecognized branch (e.g., feature branch)."""
-    from main import perform_startup_integrity_checks
+    # perform_startup_integrity_checks imported at top level
     mock_gcm_instance, _ = mock_git_context_manager
-    mock_ui, _ = mock_main_globals
+    mock_ui, mock_cfg = mock_main_globals
     
     other_branch = "feature/new-stuff"
 
@@ -277,7 +277,7 @@ async def test_on_other_branch_defaults_to_dev_mode(mock_main_globals, mock_git_
     mock_gcm_instance.get_current_branch.return_value = other_branch
     mock_gcm_instance.get_head_commit_hash.return_value = "featurecommit"
 
-    is_dev_mode, integrity_ok = await perform_startup_integrity_checks()
+    is_dev_mode, integrity_ok = await perform_startup_integrity_checks(mock_cfg, mock_ui, "/fake/project_root", mock_gcm_instance)
 
     assert is_dev_mode is True
     assert integrity_ok is True 
