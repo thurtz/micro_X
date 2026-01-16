@@ -8,7 +8,7 @@ This file contains the rules and guidelines for the Gemini AI assistant when wor
 
 - **testing branch (`~/micro_X/micro_X-testing/`)**: This branch is for release candidates and pre-production testing. It should only be used as a reference for the current testing baseline. **DO NOT MODIFY this branch.** The `development_directives.md` file in this branch is a reference and should not be modified directly. Changes should be merged from the `dev` branch.
 
-- **dev branch (`~/micro_X/micro_X-dev/`)**: This is the primary development branch. **All code modifications must be made in this branch.** The `development_directives.md` file is actively maintained in this branch. Ask for confirmation before moving from one coding task to another when there is a list of bugs or tasks to be worked on.
+- **dev branch (`~/micro_X/micro_X-dev/`)**: This is the primary development branch. Code modifications can be made here directly for minor fixes, but **significant changes should use the Clone-Based Workflow (Section 8).** The `development_directives.md` file is actively maintained in this branch.
 
 ## 2. Workspace Structure
 
@@ -53,3 +53,17 @@ Before committing significant changes or releases to the `dev` branch, follow th
 2.  **Sync Version**: Run `/version_sync` (or `python3 utils/version_sync.py`) to propagate the version number to all metadata files (`micro_X.desktop`, `docs/source/conf.py`, whitepaper).
 3.  **Update Documentation**: Run `/dev --update-docs` (or `python3 utils/dev.py --update-docs`) to rebuild the Sphinx documentation. This ensures the HTML output reflects the latest code and version.
 4.  **Verify**: Check `git diff` to confirm that version numbers and documentation builds are updated and consistent before staging.
+
+## 8. Clone-Based Development Workflow
+
+For significant features, refactoring, or risky changes, use the following workflow to ensure stability:
+
+1.  **Create a Clone**: Use the `/clone` utility (or `utils/clone.py`) to create an isolated copy of the current environment.
+    *   Example: `/clone create clone_v0.0.1021`
+2.  **Develop in Clone**: Make all code changes, configuration updates, and tests *within* the clone directory (e.g., `clones/clone_v0.0.1021/`).
+3.  **Test in Clone**: Run the application and unit tests (`pytest`) inside the clone to verify functionality.
+    *   Example: `cd clones/clone_v0.0.1021 && ./micro_X.sh`
+    *   Example: `cd clones/clone_v0.0.1021 && pytest`
+4.  **Merge to Dev**: Once verified, copy the modified files from the clone back to the `dev` branch root and commit them.
+    *   *Note*: Ensure you update version numbers and documentation within the clone *before* merging.
+5.  **Commit**: Commit the changes to the `dev` branch as usual.
