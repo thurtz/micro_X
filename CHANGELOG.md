@@ -5,6 +5,10 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1028] - 2026-01-16
+### Fixed
+- Fixed a bug where `/translate` commands were sometimes misinterpreted as help requests by the intent classifier. Prioritized explicit command handling over fuzzy intent matching.
+
 ## [0.0.1027] - 2026-01-16
 ### Changed
 - **Workflow:** Updated `development_directives.md` to explicitly include changelog maintenance in the versioning workflow.
