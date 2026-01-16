@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>modules.shell_engine &mdash; micro_X 0.0.1024 documentation</title>
+  <title>modules.shell_engine &mdash; micro_X 0.0.1025 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=7a1e0633"></script>
+      <script src="../../_static/documentation_options.js?v=de66822a"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -877,7 +877,11 @@
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">command_to_categorize</span><span class="p">:</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">ui_manager</span><span class="o">.</span><span class="n">append_output</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Empty command after &#39;!&#39; prefix.&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;error&#39;</span><span class="p">)</span>
                     <span class="k">return</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">ui_manager</span><span class="o">.</span><span class="n">append_output</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✨ &#39;</span><span class="si">{</span><span class="n">command_to_categorize</span><span class="si">}</span><span class="s2">&#39; is not a known command. Starting categorization...&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">)</span>
+                
+                <span class="c1"># Check classification to avoid misleading message for known commands</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">category_manager_module</span><span class="o">.</span><span class="n">classify_command</span><span class="p">(</span><span class="n">command_to_categorize</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">category_manager_module</span><span class="o">.</span><span class="n">UNKNOWN_CATEGORY_SENTINEL</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">ui_manager</span><span class="o">.</span><span class="n">append_output</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✨ &#39;</span><span class="si">{</span><span class="n">command_to_categorize</span><span class="si">}</span><span class="s2">&#39; is not a known command. Starting categorization...&quot;</span><span class="p">,</span> <span class="n">style_class</span><span class="o">=</span><span class="s1">&#39;info&#39;</span><span class="p">)</span>
+                
                 <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">process_command</span><span class="p">(</span><span class="n">command_to_categorize</span><span class="p">,</span> <span class="n">user_input_stripped</span><span class="p">)</span>
                 <span class="k">return</span>
 
