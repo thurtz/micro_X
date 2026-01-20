@@ -15,6 +15,7 @@ from typing import Optional
 from modules.output_analyzer import is_tui_like_output
 
 from modules.router_agent import create_router_agent, run_router_agent
+from modules.messages import ShellMessages
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,7 @@ class ShellEngine:
     async def kill_current_process(self):
         """Terminates the currently tracked process, if any."""
         if not self.current_process or self.current_process.returncode is not None:
-            self.ui_manager.append_output("ℹ️ No active command to kill.", style_class='info')
+            self.ui_manager.append_output(ShellMessages.NO_ACTIVE_PROCESS, style_class='info')
             logger.info("kill_current_process called but no active process found.")
             return
 
@@ -145,16 +146,16 @@ class ShellEngine:
         try:
             self.current_process.terminate()
             await asyncio.wait_for(self.current_process.wait(), timeout=2.0)
-            self.ui_manager.append_output(f"✅ Terminated command: {self.current_process_command}", style_class='success')
+            self.ui_manager.append_output(ShellMessages.PROCESS_TERMINATED.format(command=self.current_process_command), style_class='success')
             logger.info(f"Process {self.current_process.pid} terminated successfully.")
         except asyncio.TimeoutError:
             logger.warning(f"Process {self.current_process.pid} did not terminate gracefully. Sending SIGKILL.")
             self.current_process.kill()
             await self.current_process.wait() # Ensure it's cleaned up
-            self.ui_manager.append_output(f"✅ Killed command: {self.current_process_command}", style_class='success')
+            self.ui_manager.append_output(ShellMessages.PROCESS_KILLED.format(command=self.current_process_command), style_class='success')
         except Exception as e:
             logger.error(f"Error terminating process {self.current_process.pid}: {e}", exc_info=True)
-            self.ui_manager.append_output(f"❌ Error killing command: {e}", style_class='error')
+            self.ui_manager.append_output(ShellMessages.KILL_ERROR.format(error=e), style_class='error')
         finally:
             self.current_process = None
             self.current_process_command = ""
@@ -167,7 +168,7 @@ class ShellEngine:
                     return json.load(f)
             except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"Error loading alias file {os.path.basename(file_path)}: {e}")
-                self.ui_manager.append_output(f"⚠️ Could not load {os.path.basename(file_path)}: {e}", style_class='warning')
+                self.ui_manager.append_output(ShellMessages.ALIAS_LOAD_ERROR.format(filename=os.path.basename(file_path), error=e), style_class='warning')
         return {}
 
     def _load_and_merge_aliases(self):
@@ -204,11 +205,11 @@ class ShellEngine:
             try:
                 if re.search(pattern, command):
                     logger.warning(f"DANGEROUS command blocked (matched pattern '{pattern}'): '{command}' (original input: '{original_input_for_log}')")
-                    self.ui_manager.append_output(f"🛡️ Command blocked by security pattern: {command}", style_class='security-critical')
+                    self.ui_manager.append_output(ShellMessages.COMMAND_BLOCKED.format(command=command), style_class='security-critical')
                     return None
             except re.error as e:
                 logger.error(f"Invalid regex pattern in security config: '{pattern}'. Error: {e}")
-                self.ui_manager.append_output(f"⚠️ Invalid security regex pattern in config: '{pattern}'.", style_class='warning')
+                self.ui_manager.append_output(ShellMessages.INVALID_REGEX.format(pattern=pattern), style_class='warning')
         return command
 
     async def handle_cd_command(self, full_cd_command: str):
@@ -231,13 +232,13 @@ class ShellEngine:
             if os.path.isdir(new_dir_abs):
                 self.current_directory = new_dir_abs
                 self.ui_manager.update_input_prompt(self.current_directory)
-                append_output_func(f"📂 Changed directory to: {self.current_directory}", style_class='info')
+                append_output_func(ShellMessages.DIR_CHANGED.format(path=self.current_directory), style_class='info')
                 logger.info(f"Directory changed to: {self.current_directory}")
             else:
-                append_output_func(f"❌ Error: Directory '{target_dir_str}' (resolved to '{new_dir_abs}') does not exist.", style_class='error')
+                append_output_func(ShellMessages.DIR_NOT_FOUND.format(target=target_dir_str, resolved=new_dir_abs), style_class='error')
                 logger.warning(f"Failed cd to '{new_dir_abs}'. Target '{target_dir_str}' does not exist or is not a directory.")
         except Exception as e:
-            append_output_func(f"❌ Error processing 'cd' command: {e}", style_class='error')
+            append_output_func(ShellMessages.CD_ERROR.format(error=e), style_class='error')
             logger.exception(f"Error in handle_cd_command for '{full_cd_command}'")
         finally:
             if self.main_restore_normal_input_ref:
@@ -250,7 +251,7 @@ class ShellEngine:
         logger.info(f"Executing simple command: '{command_to_execute}' in '{self.current_directory}'")
         
         if not command_to_execute.strip():
-            append_output_func("⚠️ Empty command cannot be executed.", style_class='warning')
+            append_output_func(ShellMessages.EMPTY_COMMAND, style_class='warning')
             logger.warning(f"Attempted to execute empty command: '{command_to_execute}' from input: '{original_user_input_display}'")
             return
 
@@ -276,28 +277,27 @@ class ShellEngine:
             if stdout:
                 decoded_stdout = stdout.decode(errors='replace').strip()
                 if show_verbose_prefix:
-                    append_output_func(f"Output from '{original_user_input_display}':\n{decoded_stdout}")
+                    append_output_func(f"{ShellMessages.OUTPUT_HEADER.format(command=original_user_input_display)}\n{decoded_stdout}")
                 else:
                     append_output_func(decoded_stdout)
 
             if stderr:
-                append_output_func(f"Stderr from '{original_user_input_display}':\n{stderr.decode(errors='replace').strip()}", style_class='warning')
+                append_output_func(f"{ShellMessages.STDERR_HEADER.format(command=original_user_input_display)}\n{stderr.decode(errors='replace').strip()}", style_class='warning')
             
             if not stdout and not stderr and self.current_process and self.current_process.returncode == 0:
                 if show_verbose_prefix:
-                    append_output_func(f"Output from '{original_user_input_display}': (No output)", style_class='info')
+                    append_output_func(ShellMessages.NO_OUTPUT.format(command=original_user_input_display), style_class='info')
             
             if self.current_process and self.current_process.returncode != 0:
                 logger.warning(f"Command '{command_to_execute}' exited with code {self.current_process.returncode}")
                 if not stderr:
-                    append_output_func(f"⚠️ Command '{original_user_input_display}' exited with code {self.current_process.returncode}.", style_class='warning')
+                    append_output_func(ShellMessages.COMMAND_EXITED.format(command=original_user_input_display, code=self.current_process.returncode), style_class='warning')
 
         except FileNotFoundError:
-            append_output_func(f"❌ Shell (bash) or command not found for: {command_to_execute}", style_class='error')
+            append_output_func(ShellMessages.SHELL_NOT_FOUND.format(command=command_to_execute), style_class='error')
             logger.error(f"Shell (bash) or command not found for: {command_to_execute}")
         except Exception as e:
-            append_output_func(f"❌ Error executing '{command_to_execute}': {e}", style_class='error')
-            logger.exception(f"Error executing shell command: {e}")
+            append_output_func(ShellMessages.EXECUTION_ERROR.format(command=command_to_execute, error=e), style_class='error')
         finally:
             self.ui_manager.update_status_bar("")
             logger.info(f"Process for command '{self.current_process_command}' finished.")
@@ -311,7 +311,7 @@ class ShellEngine:
         logger.info(f"Executing tmux command ({category}): '{command_to_execute}' in '{self.current_directory}'")
         
         if shutil.which("tmux") is None:
-            append_output_func("❌ Error: tmux not found. Cannot execute command in tmux.", style_class='error')
+            append_output_func(ShellMessages.TMUX_NOT_FOUND, style_class='error')
             logger.error("tmux not found for tmux execution.")
             return
 
@@ -324,7 +324,7 @@ class ShellEngine:
             else: # "interactive_tui"
                 await self._run_interactive_tui_tmux(command_to_execute, original_user_input_display, window_name)
         except Exception as e:
-            append_output_func(f"❌ Unexpected error during tmux execution: {e}", style_class='error')
+            append_output_func(ShellMessages.TMUX_UNEXPECTED_ERROR.format(error=e), style_class='error')
             logger.exception(f"Unexpected error during tmux execution for command '{command_to_execute}': {e}")
         finally:
             self.ui_manager.update_status_bar("")
@@ -350,11 +350,11 @@ class ShellEngine:
             await self.current_process.wait()
 
             if self.current_process.returncode != 0:
-                append_output_func(f"❌ Error launching semi-interactive tmux session '{window_name}'.", style_class='error')
+                append_output_func(ShellMessages.TMUX_LAUNCH_ERROR.format(window=window_name), style_class='error')
                 return
 
             if self.config.get("behavior", {}).get("verbosity_level") == "verbose":
-                append_output_func(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output...", style_class='info')
+                append_output_func(ShellMessages.TMUX_LAUNCH_WAIT.format(window=window_name), style_class='info')
             if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
             # Polling logic remains the same as it checks for window existence, not process completion
@@ -368,7 +368,7 @@ class ShellEngine:
                     window_closed_or_cmd_done = True; break
             
             if not window_closed_or_cmd_done:
-                append_output_func(f"⚠️ Tmux window '{window_name}' poll timed out.", style_class='warning')
+                append_output_func(ShellMessages.TMUX_POLL_TIMEOUT.format(window=window_name), style_class='warning')
 
             temp_log_file.seek(0)
             output_content = temp_log_file.read().strip()
@@ -377,11 +377,11 @@ class ShellEngine:
             tui_char_threshold = self.config.get('behavior', {}).get('tui_detection_char_threshold_pct', 3.0)
             if output_content and is_tui_like_output(output_content, tui_line_threshold, tui_char_threshold):
                 suggestion_command = f'/command move "{command_to_execute}" interactive_tui'
-                append_output_func(f"Output from '{original_user_input_display}':\n[Semi-interactive TUI-like output not displayed directly.]\n💡 Tip: Try: {suggestion_command}", style_class='info')
+                append_output_func(f"{ShellMessages.OUTPUT_HEADER.format(command=original_user_input_display)}\n[Semi-interactive TUI-like output not displayed directly.]\n{ShellMessages.TUI_DETECTED_TIP.format(command=command_to_execute)}", style_class='info')
             elif output_content:
-                append_output_func(f"Output from '{original_user_input_display}':\n{output_content}")
+                append_output_func(f"{ShellMessages.OUTPUT_HEADER.format(command=original_user_input_display)}\n{output_content}")
             elif window_closed_or_cmd_done:
-                append_output_func(f"Output from '{original_user_input_display}': (No output captured)", style_class='info')
+                append_output_func(ShellMessages.NO_OUTPUT.format(command=original_user_input_display), style_class='info')
 
     async def _run_interactive_tui_tmux(self, command_to_execute, original_user_input_display, window_name):
         append_output_func = self.ui_manager.append_output
@@ -389,7 +389,7 @@ class ShellEngine:
         
         logger.info(f"Launching interactive_tui tmux: {' '.join(shlex.quote(s) for s in tmux_cmd_list)}")
         if self.config.get("behavior", {}).get("verbosity_level") == "verbose":
-            append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait...", style_class='info')
+            append_output_func(ShellMessages.TMUX_LAUNCH_INTERACTIVE.format(window=window_name), style_class='info')
         if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
         self.current_process = await asyncio.create_subprocess_exec(*tmux_cmd_list, cwd=self.current_directory)
@@ -397,9 +397,9 @@ class ShellEngine:
         await self.current_process.wait()
 
         if self.current_process.returncode == 0:
-            append_output_func(f"✅ Interactive tmux session for '{original_user_input_display}' ended.", style_class='success')
+            append_output_func(ShellMessages.TMUX_SESSION_ENDED.format(command=original_user_input_display), style_class='success')
         else:
-            append_output_func(f"❌ Error or non-zero exit in tmux session '{window_name}': exited with code {self.current_process.returncode}", style_class='error')
+            append_output_func(ShellMessages.TMUX_SESSION_ERROR.format(window=window_name, code=self.current_process.returncode), style_class='error')
 
     async def _handle_script_command_async(self, full_command_str: str, script_dir_path: str, script_dir_name: str, command_name: str):
         """Generic handler for executing scripts from a specified directory (e.g., utils or user_scripts)."""
@@ -411,7 +411,7 @@ class ShellEngine:
         except ValueError as e:
             self.ui_manager.append_output(f"❌ Error parsing /{command_name} command: {e}", style_class='error'); return
 
-        if len(parts) < 2: self.ui_manager.append_output(f"ℹ️ Usage: /{command_name} <script_name> [args... | help] | list", style_class='info'); return
+        if len(parts) < 2: self.ui_manager.append_output(ShellMessages.SCRIPT_USAGE.format(command=command_name), style_class='info'); return
 
         subcommand = parts[1]
         if subcommand.lower() == "list":
@@ -421,12 +421,12 @@ class ShellEngine:
 
         script_path = os.path.join(script_dir_path, f"{subcommand}.py")
         if not os.path.isfile(script_path):
-            self.ui_manager.append_output(f"❌ Script not found: {subcommand}.py in '{script_dir_name}'.", style_class='error'); return
+            self.ui_manager.append_output(ShellMessages.SCRIPT_NOT_FOUND.format(script=subcommand, dir=script_dir_name), style_class='error'); return
 
         # Use -u for unbuffered output to ensure we see prints immediately
         command_to_execute_list = [sys.executable, "-u", script_path] + parts[2:]
         if self.config.get("behavior", {}).get("verbosity_level") == "verbose":
-            self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute_list)}", style_class='info')
+            self.ui_manager.append_output(ShellMessages.SCRIPT_EXEC_LOG.format(command=' '.join(command_to_execute_list)), style_class='info')
 
         async def run_script_and_handle_output():
             try:
@@ -441,7 +441,7 @@ class ShellEngine:
                 self.current_process_command = full_command_str
 
                 # Print the header once before the output starts
-                self.ui_manager.append_output(f"Output from '{subcommand}.py':", style_class='info')
+                self.ui_manager.append_output(ShellMessages.OUTPUT_HEADER.format(command=f"{subcommand}.py"), style_class='info')
 
                 async def read_stream(stream, style):
                     while True:
@@ -463,12 +463,12 @@ class ShellEngine:
                     return
 
                 if self.current_process.returncode == 0:
-                    self.ui_manager.append_output(f"✅ Script '{subcommand}.py' completed.", style_class='success')
+                    self.ui_manager.append_output(ShellMessages.SCRIPT_COMPLETED.format(script=subcommand), style_class='success')
                     if subcommand == 'alias': self._reload_aliases()
                 else:
-                    self.ui_manager.append_output(f"⚠️ Script '{subcommand}.py' exited with code {self.current_process.returncode}.", style_class='warning')
+                    self.ui_manager.append_output(ShellMessages.SCRIPT_EXITED.format(script=subcommand, code=self.current_process.returncode), style_class='warning')
             except Exception as e:
-                self.ui_manager.append_output(f"❌ Failed to execute script: {e}", style_class='error')
+                self.ui_manager.append_output(ShellMessages.SCRIPT_ERROR.format(error=e), style_class='error')
             finally:
                 self.ui_manager.update_status_bar("")
                 self.current_process = None
@@ -521,7 +521,7 @@ class ShellEngine:
                         final_command = expanded_command
 
                     if self.config.get("behavior", {}).get("verbosity_level") == "verbose":
-                        self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
+                        self.ui_manager.append_output(ShellMessages.ALIAS_EXPANDED.format(alias=alias_name, command=final_command), style_class='info')
                     
                     user_input_stripped = final_command
                     alias_found = True
@@ -547,7 +547,7 @@ class ShellEngine:
 
         logger.info(f"ShellEngine.handle_built_in_command received: '{user_input_stripped}'")
         if user_input_stripped.lower() in {"exit", "quit", "/exit", "/quit"}:
-            self.ui_manager.append_output("Exiting micro_X Shell 🚪", style_class='info')
+            self.ui_manager.append_output(ShellMessages.EXITING, style_class='info')
             logger.info("Exit command received. Requesting clean exit from UI manager.")
             app_instance = self.ui_manager.get_app_instance()
             if app_instance and app_instance.is_running:
@@ -744,7 +744,7 @@ class ShellEngine:
                 logger.info(f"Handling input as intent '{intent}' with score {score:.2f}")
 
                 if intent == "exit_shell":
-                    self.ui_manager.append_output("Exiting micro_X Shell 🚪", style_class='info')
+                    self.ui_manager.append_output(ShellMessages.EXITING, style_class='info')
                     app_instance = self.ui_manager.get_app_instance()
                     if app_instance and hasattr(app_instance, 'is_running') and app_instance.is_running:
                         app_instance.exit()
@@ -779,18 +779,20 @@ class ShellEngine:
             if user_input_stripped.startswith('!'):
                 command_to_categorize = user_input_stripped[1:].strip()
                 if not command_to_categorize:
-                    self.ui_manager.append_output(f"❌ Empty command after '!' prefix.", style_class='error')
+                    self.ui_manager.append_output(ShellMessages.EMPTY_BANG_COMMAND, style_class='error')
                     return
                 
                 # Check classification to avoid misleading message for known commands
                 if self.category_manager_module.classify_command(command_to_categorize) == self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
-                    self.ui_manager.append_output(f"✨ '{command_to_categorize}' is not a known command. Starting categorization...", style_class='info')
+                    self.ui_manager.append_output(ShellMessages.UNKNOWN_BANG_COMMAND.format(command=command_to_categorize), style_class='info')
                 
                 await self.process_command(command_to_categorize, user_input_stripped)
                 return
 
+        
+
             if user_input_stripped.startswith('/'):
-                self.ui_manager.append_output(f"❌ Unknown command: {user_input_stripped}", style_class='error')
+                self.ui_manager.append_output(ShellMessages.UNKNOWN_COMMAND_PREFIX.format(command=user_input_stripped), style_class='error')
                 return
 
             if not await self.ollama_manager_module.is_ollama_server_running():
@@ -798,7 +800,7 @@ class ShellEngine:
                 return
 
             # --- 1. Try the Router Agent ---
-            self.ui_manager.update_status_bar(f"✨ '{user_input_stripped}' is not a known command. Checking with Router AI...", style='class:status-bar.thinking')
+            self.ui_manager.update_status_bar(ShellMessages.ROUTER_CHECK.format(command=user_input_stripped), style='class:status-bar.thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
             
             router_command = await run_router_agent(self.router_agent_instance, user_input_stripped)
@@ -811,7 +813,7 @@ class ShellEngine:
                 return
 
             # --- 2. Fallback to Translator Agent ---
-            self.ui_manager.update_status_bar(f"🤔 Router found no tool. Trying with Translator AI...", style='class:status-bar.thinking')
+            self.ui_manager.update_status_bar(ShellMessages.TRANSLATOR_FALLBACK, style='class:status-bar.thinking')
             if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
 
             linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(user_input_stripped, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
@@ -820,5 +822,7 @@ class ShellEngine:
                 await self.process_command(linux_command, f"'{user_input_stripped}'", ai_raw_candidate, user_input_stripped, is_ai_generated=True)
             else:
                 # --- 3. Final fallback ---
-                self.ui_manager.append_output("🤔 AI translation failed. Trying original input as a direct command.", style_class='warning')
+                self.ui_manager.append_output(ShellMessages.TRANSLATION_FAILED, style_class='warning')
                 await self.process_command(user_input_stripped, user_input_stripped, ai_raw_candidate)
+
+        
