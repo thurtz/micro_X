@@ -353,7 +353,7 @@ class ShellEngine:
                 append_output_func(f"❌ Error launching semi-interactive tmux session '{window_name}'.", style_class='error')
                 return
 
-            if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+            if self.config.get("behavior", {}).get("verbosity_level") == "verbose":
                 append_output_func(f"⚡ Launched semi-interactive command in tmux (window: {window_name}). Waiting for output...", style_class='info')
             if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
@@ -388,7 +388,7 @@ class ShellEngine:
         tmux_cmd_list = ["tmux", "new-window", "-n", window_name, "bash", "-c", command_to_execute]
         
         logger.info(f"Launching interactive_tui tmux: {' '.join(shlex.quote(s) for s in tmux_cmd_list)}")
-        if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+        if self.config.get("behavior", {}).get("verbosity_level") == "verbose":
             append_output_func(f"⚡ Launching interactive command in tmux (window: {window_name}). micro_X will wait...", style_class='info')
         if self.ui_manager.get_app_instance(): self.ui_manager.get_app_instance().invalidate()
 
@@ -425,7 +425,7 @@ class ShellEngine:
 
         # Use -u for unbuffered output to ensure we see prints immediately
         command_to_execute_list = [sys.executable, "-u", script_path] + parts[2:]
-        if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+        if self.config.get("behavior", {}).get("verbosity_level") == "verbose":
             self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute_list)}", style_class='info')
 
         async def run_script_and_handle_output():
@@ -520,7 +520,7 @@ class ShellEngine:
                     else:
                         final_command = expanded_command
 
-                    if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
+                    if self.config.get("behavior", {}).get("verbosity_level") == "verbose":
                         self.ui_manager.append_output(f"↪️ Alias expanded: '{alias_name}' -> '{final_command}'", style_class='info')
                     
                     user_input_stripped = final_command

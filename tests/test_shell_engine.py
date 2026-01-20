@@ -301,6 +301,7 @@ async def test_execute_shell_command_empty_command(shell_engine):
 
 @pytest.mark.asyncio
 async def test_execute_command_in_tmux_semi_interactive_success(shell_engine, mocker):
+    shell_engine.config["behavior"]["verbosity_level"] = "verbose"
     mock_tmux_launch_process = AsyncMock(returncode=0)
     mock_tmux_launch_process.communicate.return_value = (b"", b"")
 
@@ -361,6 +362,7 @@ async def test_execute_command_in_tmux_semi_interactive_tui_detected(shell_engin
 
 @pytest.mark.asyncio
 async def test_execute_command_in_tmux_interactive_tui_success(shell_engine):
+    shell_engine.config["behavior"]["verbosity_level"] = "verbose"
     mock_process = AsyncMock()
     mock_process.wait.return_value = 0
     mock_process.returncode = 0
