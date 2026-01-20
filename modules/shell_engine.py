@@ -254,6 +254,8 @@ class ShellEngine:
             logger.warning(f"Attempted to execute empty command: '{command_to_execute}' from input: '{original_user_input_display}'")
             return
 
+        self.ui_manager.update_status_bar(f"Running: {command_to_execute}...")
+
         try:
             self.current_process = await asyncio.create_subprocess_shell(
                 command_to_execute,
@@ -421,7 +423,8 @@ class ShellEngine:
         if not os.path.isfile(script_path):
             self.ui_manager.append_output(f"❌ Script not found: {subcommand}.py in '{script_dir_name}'.", style_class='error'); return
 
-        command_to_execute_list = [sys.executable, script_path] + parts[2:]
+        # Use -u for unbuffered output to ensure we see prints immediately
+        command_to_execute_list = [sys.executable, "-u", script_path] + parts[2:]
         if self.config.get("behavior", {}).get("verbosity_level", "normal") != "quiet":
             self.ui_manager.append_output(f"🚀 Executing script: {' '.join(command_to_execute_list)}", style_class='info')
 
@@ -574,7 +577,14 @@ class ShellEngine:
                     command_str_original = confirmation_result.get('command', command_str_original)
                     forced_category = confirmation_result.get('category')
                     self.category_manager_module.add_command_to_category(command_str_original, forced_category)
-                elif action == 'execute': command_str_original = confirmation_result.get('command', command_str_original)
+                elif action == 'execute':
+                    command_str_original = confirmation_result.get('command', command_str_original)
+                    # "Run Once" behavior: Check if command is already known
+                    known_cat = self.category_manager_module.classify_command(command_str_original)
+                    if known_cat != self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
+                        forced_category = known_cat
+                    else:
+                        forced_category = self.config['behavior']['default_category_for_unclassified']
                 elif action == 'cancel': self.ui_manager.append_output(f"❌ Execution of '{command_str_original}' cancelled.", style_class='info'); return
                 else: return
 
@@ -584,6 +594,9 @@ class ShellEngine:
                 action_cat = categorization_result.get('action')
                 if action_cat == 'cancel_execution':
                     append_output_func(f"Execution of '{command_str_original}' cancelled.", style_class='info'); return
+                elif action_cat == 'execute_once':
+                    # Use default category without saving
+                    category = self.config['behavior']['default_category_for_unclassified']
                 elif action_cat == 'categorize_and_execute':
                     command_str_original = categorization_result['command']
                     category = categorization_result['category']
@@ -650,6 +663,22 @@ class ShellEngine:
         # --- FIX: Handle 'cd' command directly ---
         if user_input_stripped.startswith("cd ") or user_input_stripped == "cd":
             await self.handle_cd_command(user_input_stripped)
+            return
+
+        # --- Handle /translate explicitly BEFORE intents ---
+        current_app_inst = self.ui_manager.get_app_instance()
+        if user_input_stripped.startswith("/translate "):
+            if not await self.ollama_manager_module.is_ollama_server_running():
+                self.ui_manager.append_output("⚠️ Ollama service is not available.", style_class='warning'); return
+            human_query = user_input_stripped[len("/translate "):].strip()
+            if not human_query: self.ui_manager.append_output("⚠️ AI query empty.", style_class='warning'); return
+            self.ui_manager.append_output(f"🤖 AI Query: {human_query}", style_class='ai-query')
+            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
+            linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(human_query, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
+            if linux_command: await self.process_command(linux_command, f"'/translate {human_query}'", ai_raw_candidate, None, is_ai_generated=True)
+            else:
+                self.ui_manager.append_output("🤔 AI could not produce a validated command.", style_class='warning')
+                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
             return
 
         # --- INTENT CLASSIFICATION (NEW) ---
@@ -733,20 +762,6 @@ class ShellEngine:
                     return
         # --- END INTENT CLASSIFICATION ---
 
-        current_app_inst = self.ui_manager.get_app_instance()
-        if user_input_stripped.startswith("/translate "):
-            if not await self.ollama_manager_module.is_ollama_server_running():
-                self.ui_manager.append_output("⚠️ Ollama service is not available.", style_class='warning'); return
-            human_query = user_input_stripped[len("/translate "):].strip()
-            if not human_query: self.ui_manager.append_output("⚠️ AI query empty.", style_class='warning'); return
-            self.ui_manager.append_output(f"🤖 AI Query: {human_query}", style_class='ai-query')
-            if current_app_inst and current_app_inst.is_running: current_app_inst.invalidate()
-            linux_command, ai_raw_candidate = await self.ai_handler_module.get_validated_ai_command(human_query, self.config, self.ui_manager.append_output, self.ui_manager.get_app_instance)
-            if linux_command: await self.process_command(linux_command, f"'/translate {human_query}'", ai_raw_candidate, None, is_ai_generated=True)
-            else:
-                self.ui_manager.append_output("🤔 AI could not produce a validated command.", style_class='warning')
-                if self.main_restore_normal_input_ref: self.main_restore_normal_input_ref()
-            return
 
         if from_edit_mode:
             await self.process_command(user_input_stripped, user_input_stripped); return
@@ -766,7 +781,11 @@ class ShellEngine:
                 if not command_to_categorize:
                     self.ui_manager.append_output(f"❌ Empty command after '!' prefix.", style_class='error')
                     return
-                self.ui_manager.append_output(f"✨ '{command_to_categorize}' is not a known command. Starting categorization...", style_class='info')
+                
+                # Check classification to avoid misleading message for known commands
+                if self.category_manager_module.classify_command(command_to_categorize) == self.category_manager_module.UNKNOWN_CATEGORY_SENTINEL:
+                    self.ui_manager.append_output(f"✨ '{command_to_categorize}' is not a known command. Starting categorization...", style_class='info')
+                
                 await self.process_command(command_to_categorize, user_input_stripped)
                 return
 

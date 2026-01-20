@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>5. Management &amp; Utilities &mdash; micro_X 1.0 documentation</title>
+  <title>5. Management &amp; Utilities &mdash; micro_X 0.0.1028 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../_static/documentation_options.js?v=a5fc2f9b"></script>
       <script src="../_static/doctools.js?v=9bcbadda"></script>
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
@@ -53,17 +53,19 @@
 <li class="toctree-l3"><a class="reference internal" href="#managing-the-ollama-service-ollama"><strong>Managing the Ollama Service (/ollama)</strong></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#web-based-configuration-manager-config"><strong>Web-Based Configuration Manager (/config)</strong></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#updating-micro-x-update"><strong>Updating micro_X (/update)</strong></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#querying-the-documentation-docs"><strong>Querying the Documentation (/docs)</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#documentation-docs"><strong>Documentation (/docs)</strong></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#using-utility-scripts-utils"><strong>Using Utility Scripts (/utils)</strong></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="06_developer_mode.html"><strong>6. Developer Mode &amp; Code Integrity</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="07_advanced_topics.html"><strong>7. Advanced Topics</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="08_troubleshooting.html"><strong>8. Troubleshooting</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="09_classic_ui.html"><strong>Classic UI (Prompt Toolkit)</strong></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
 </ul>
 
         </div>
@@ -115,16 +117,20 @@
 </section>
 <section id="updating-micro-x-update">
 <h2><strong>Updating micro_X (/update)</strong><a class="headerlink" href="#updating-micro-x-update" title="Link to this heading"></a></h2>
-<p>The /update command checks for and downloads the latest changes for micro_X from its official Git repository.<br />
-/update</p>
-<p>If changes are downloaded, you will be prompted to restart micro_X for them to take effect.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">/update</span></code> command checks for and downloads the latest changes for micro_X from its official Git repository.
+If changes are downloaded, you will be prompted to restart micro_X.</p>
 </section>
-<section id="querying-the-documentation-docs">
-<h2><strong>Querying the Documentation (/docs)</strong><a class="headerlink" href="#querying-the-documentation-docs" title="Link to this heading"></a></h2>
-<p>You can search the project’s documentation using natural language queries.</p>
+<section id="documentation-docs">
+<h2><strong>Documentation (/docs)</strong><a class="headerlink" href="#documentation-docs" title="Link to this heading"></a></h2>
+<p>Accessing the documentation is easy:</p>
 <ul class="simple">
-<li><p><strong>/docs –query <question></strong>: Queries the documentation knowledge base and returns relevant excerpts.</p></li>
-<li><p><strong>/docs –query <question> –rag</strong>: Queries the documentation with a language model to generate a natural language response.</p></li>
+<li><p><strong>/docs</strong>: Opens the full HTML documentation in your system’s default web browser.</p></li>
+<li><p><strong>Ctrl+D</strong>: Shortcut key to open documentation instantly.</p></li>
+<li><p><strong>Shortcut File</strong>: A <code class="docutils literal notranslate"><span class="pre">view_docs.html</span></code> file is available in the <code class="docutils literal notranslate"><span class="pre">docs/</span></code> directory for quick access from a file manager.</p></li>
+</ul>
+<p><strong>Advanced Queries:</strong></p>
+<ul class="simple">
+<li><p><strong>/docs –query <question></strong>: Queries the documentation knowledge base using AI.</p></li>
 </ul>
 </section>
 <section id="using-utility-scripts-utils">
@@ -134,17 +140,11 @@
 <li><p><strong>/utils list</strong>: Displays a list of available utility scripts.</p></li>
 <li><p><strong>/utils &lt;script_name&gt; [args…]</strong>: Executes the specified utility script.</p>
 <ul>
-<li><p><em>Example</em>: /utils generate_tree</p></li>
+<li><p><em>Example</em>: <code class="docutils literal notranslate"><span class="pre">/utils</span> <span class="pre">generate_tree</span></code></p></li>
 </ul>
 </li>
 </ul>
-<p><strong>Note:</strong> While you can run utility scripts directly, it is recommended to use their corresponding aliases (e.g., <code class="docutils literal notranslate"><span class="pre">/tree</span></code> instead of <code class="docutils literal notranslate"><span class="pre">/utils</span> <span class="pre">generate_tree</span></code>) for a better experience. The aliases are designed to be more memorable and provide a consistent interface.</p>
-<ul>
-<li><p><strong>Web Config Manager</strong>: A key utility is the web-based configuration manager. Launch it with:<br />
-/utils config_manager –start</p>
-<p>This will start a local web server and open a page in your browser for editing your configuration files.</p>
-</li>
-</ul>
+<p><strong>Note:</strong> While you can run utility scripts directly, it is recommended to use their corresponding aliases (e.g., <code class="docutils literal notranslate"><span class="pre">/tree</span></code> instead of <code class="docutils literal notranslate"><span class="pre">/utils</span> <span class="pre">generate_tree</span></code>) for a better experience.</p>
 </section>
 </section>
 

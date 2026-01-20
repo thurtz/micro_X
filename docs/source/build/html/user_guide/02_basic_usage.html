@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>2. Basic Usage &mdash; micro_X 1.0 documentation</title>
+  <title>2. Basic Usage &mdash; micro_X 0.0.1028 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../_static/documentation_options.js?v=a5fc2f9b"></script>
       <script src="../_static/doctools.js?v=9bcbadda"></script>
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
@@ -48,7 +48,7 @@
 <li class="toctree-l2"><a class="reference internal" href="01_installation.html"><strong>1. Installation and Setup</strong></a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#"><strong>2. Basic Usage</strong></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#launching-micro-x"><strong>Launching micro_X</strong></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#the-interface"><strong>The Interface</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#the-interface-default-textual-ui"><strong>The Interface (Default Textual UI)</strong></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#keybindings"><strong>Keybindings</strong></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#executing-standard-linux-commands"><strong>Executing Standard Linux Commands</strong></a></li>
 </ul>
@@ -59,10 +59,12 @@
 <li class="toctree-l2"><a class="reference internal" href="06_developer_mode.html"><strong>6. Developer Mode &amp; Code Integrity</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="07_advanced_topics.html"><strong>7. Advanced Topics</strong></a></li>
 <li class="toctree-l2"><a class="reference internal" href="08_troubleshooting.html"><strong>8. Troubleshooting</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="09_classic_ui.html"><strong>Classic UI (Prompt Toolkit)</strong></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
 </ul>
 
         </div>
@@ -96,33 +98,44 @@
 <section id="launching-micro-x">
 <h2><strong>Launching micro_X</strong><a class="headerlink" href="#launching-micro-x" title="Link to this heading"></a></h2>
 <p>The recommended way to launch micro_X is by using the provided shell script from within the project directory:<br />
-./micro_X.sh</p>
+<code class="docutils literal notranslate"><span class="pre">./micro_X.sh</span></code></p>
 <p>This script correctly handles activating the Python virtual environment and managing the underlying tmux session.<br />
 If you installed the desktop entry during setup on Linux, you can also launch it from your application menu.</p>
 </section>
-<section id="the-interface">
-<h2><strong>The Interface</strong><a class="headerlink" href="#the-interface" title="Link to this heading"></a></h2>
-<p>The micro_X interface is divided into three main parts:</p>
+<section id="the-interface-default-textual-ui">
+<h2><strong>The Interface (Default Textual UI)</strong><a class="headerlink" href="#the-interface-default-textual-ui" title="Link to this heading"></a></h2>
+<p>The micro_X interface is divided into distinct zones:</p>
 <ul class="simple">
-<li><p><strong>Output Area</strong>: The top, larger pane displays command output, AI messages, and logs. It is scrollable.</p></li>
-<li><p><strong>Input Area</strong>: The bottom pane with a prompt (e.g., (~) &gt;) is where you type your commands or /translate queries.</p></li>
-<li><p><strong>Key Help Bar</strong>: A single line at the very bottom shows common keybindings.</p></li>
+<li><p><strong>Top Bar (Key Hints)</strong>: A toolbar at the very top displaying clickable shortcuts for common actions (Help, Docs, Quit, etc.).</p></li>
+<li><p><strong>Output Log</strong>: The large central area displays command output, AI messages, and logs. It supports <strong>Markdown rendering</strong> for rich text formatting and wraps text automatically.</p></li>
+<li><p><strong>Interaction Zone</strong>: A dynamic area near the bottom that appears when micro_X needs your input (e.g., confirming an AI suggestion) or to show a live status (e.g., “Thinking…”).</p></li>
+<li><p><strong>Command Input</strong>: The bottom-most field where you type commands or queries. It features <strong>real-time syntax highlighting</strong> for shell commands and supports multi-line wrapping.</p></li>
 </ul>
 </section>
 <section id="keybindings">
 <h2><strong>Keybindings</strong><a class="headerlink" href="#keybindings" title="Link to this heading"></a></h2>
+<p><strong>Global Shortcuts:</strong></p>
 <ul class="simple">
-<li><p><strong>Enter</strong>: Submits the current command or query.</p></li>
-<li><p><strong>Ctrl+C / Ctrl+D</strong>: Exits micro_X or cancels an active interactive flow (like categorization or confirmation).</p></li>
-<li><p><strong>Ctrl+N</strong>: Inserts a newline in the input field for multi-line commands.</p></li>
-<li><p><strong>Up/Down Arrows</strong>: Navigates through your command history or moves the cursor in a multi-line command.</p></li>
-<li><p><strong>Tab</strong>: Attempts command completion or inserts 4 spaces.</p></li>
-<li><p><strong>PageUp / PageDown</strong>: Scrolls the main output area.</p></li>
+<li><p><strong>F1</strong>: Show Help.</p></li>
+<li><p><strong>Ctrl+D</strong>: Open Documentation in your browser.</p></li>
+<li><p><strong>Ctrl+R</strong>: Search Command History (Interactive Filter).</p></li>
+<li><p><strong>Ctrl+T</strong>: Spawn a new raw shell session (bash) in a new tmux window.</p></li>
+<li><p><strong>Ctrl+L</strong>: Clear the output log.</p></li>
+<li><p><strong>Ctrl+C</strong>: Cancel the current action or clear the input line.</p></li>
+<li><p><strong>Ctrl+Q</strong>: Quit micro_X.</p></li>
+</ul>
+<p><strong>Input &amp; Navigation:</strong></p>
+<ul class="simple">
+<li><p><strong>Enter</strong>: Submit command.</p></li>
+<li><p><strong>Up / Down Arrows</strong>: Navigate command history.</p></li>
+<li><p><strong>Shift + Select</strong>: Select text in the output log (bypass mouse capture) for copying.</p></li>
+<li><p><strong>Ctrl + Shift + C</strong>: Copy selected text (standard Linux terminal).</p></li>
+<li><p><strong>Ctrl + Shift + V</strong>: Paste text.</p></li>
 </ul>
 </section>
 <section id="executing-standard-linux-commands">
 <h2><strong>Executing Standard Linux Commands</strong><a class="headerlink" href="#executing-standard-linux-commands" title="Link to this heading"></a></h2>
-<p>Simply type any Linux command (e.g., ls -l, echo “hello world”, git status) and press <strong>Enter</strong>. The output will appear in the output area above the prompt.</p>
+<p>Simply type any Linux command (e.g., <code class="docutils literal notranslate"><span class="pre">ls</span> <span class="pre">-l</span></code>, <code class="docutils literal notranslate"><span class="pre">echo</span> <span class="pre">&quot;hello</span> <span class="pre">world&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">status</span></code>) and press <strong>Enter</strong>. The output will appear in the scrollable log area.</p>
 </section>
 </section>
 

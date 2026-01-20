@@ -400,3 +400,74 @@ async def test_submit_user_input_cd_command(shell_engine):
 
         mock_handle_cd.assert_awaited_once_with(user_input)
         mock_process_command.assert_not_awaited()
+
+@pytest.mark.asyncio
+async def test_bang_prefix_handling(shell_engine):
+    """Test handling of the '!' prefix for commands."""
+    
+    # Mock classify_command
+    unknown = shell_engine.category_manager_module.UNKNOWN_CATEGORY_SENTINEL
+    
+    # 1. Test with an unknown command
+    # We set side_effect to return unknown for any input initially
+    shell_engine.category_manager_module.classify_command.side_effect = lambda cmd: unknown
+    
+    with patch.object(shell_engine, 'process_command', new_callable=AsyncMock) as mock_process:
+        await shell_engine.submit_user_input("!unknown_cmd")
+        
+        # Should print the "not known" message
+        shell_engine.ui_manager.append_output.assert_any_call(
+            "✨ 'unknown_cmd' is not a known command. Starting categorization...", 
+            style_class='info'
+        )
+        # Should call process_command with stripped command
+        mock_process.assert_called_with("unknown_cmd", "!unknown_cmd")
+
+    # Reset mocks
+    shell_engine.ui_manager.append_output.reset_mock()
+    
+    # 2. Test with a known command
+    # Set side_effect to return 'simple' for 'known_cmd'
+    shell_engine.category_manager_module.classify_command.side_effect = lambda cmd: "simple" if cmd == "known_cmd" else unknown
+    
+    with patch.object(shell_engine, 'process_command', new_callable=AsyncMock) as mock_process:
+        await shell_engine.submit_user_input("!known_cmd")
+        
+        # Should NOT print the "not known" message
+        # Verify no call with that specific text was made
+        for call_args in shell_engine.ui_manager.append_output.call_args_list:
+            args, _ = call_args
+            if args:
+                assert "is not a known command" not in args[0]
+            
+        # Should still call process_command
+        mock_process.assert_called_with("known_cmd", "!known_cmd")
+
+@pytest.mark.asyncio
+async def test_translate_priority_over_intent(shell_engine):
+    """Test that /translate commands are handled before intent classification."""
+    
+    # Mock embedding manager to return a high score for an intent (e.g., show_help)
+    # This simulates the bug where /translate was misclassified
+    shell_engine.embedding_manager_instance = MagicMock()
+    shell_engine.embedding_manager_instance.classify_intent.return_value = ("show_help", 0.99)
+    
+    # Mock ollama manager to say server is running
+    shell_engine.ollama_manager_module.is_ollama_server_running = AsyncMock(return_value=True)
+    
+    # Mock ai handler to return a fake command
+    shell_engine.ai_handler_module.get_validated_ai_command = AsyncMock(return_value=("echo translated", "raw output"))
+    
+    with patch.object(shell_engine, 'process_command', new_callable=AsyncMock) as mock_process, \
+         patch.object(shell_engine, 'handle_built_in_command', new_callable=AsyncMock) as mock_builtin:
+        
+        await shell_engine.submit_user_input("/translate hello world")
+        
+        # Should NOT call handle_built_in_command (which handles help intent)
+        mock_builtin.assert_not_called()
+        
+        # Should call process_command with the translated command
+        mock_process.assert_called()
+        args, kwargs = mock_process.call_args
+        assert args[0] == "echo translated"
+        assert kwargs.get('is_ai_generated') is True

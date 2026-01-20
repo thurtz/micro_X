@@ -1,0 +1,80 @@
+# Changelog
+
+All notable changes to the **micro_X** project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.0.1028] - 2026-01-16
+### Fixed
+- Fixed a bug where `/translate` commands were sometimes misinterpreted as help requests by the intent classifier. Prioritized explicit command handling over fuzzy intent matching.
+
+## [0.0.1027] - 2026-01-16
+### Changed
+- **Workflow:** Updated `development_directives.md` to explicitly include changelog maintenance in the versioning workflow.
+- **Dev Utilities:** Enhanced `/dev --update-docs` to automatically sync the root `CHANGELOG.md` into the documentation source before building.
+
+## [0.0.1026] - 2026-01-16
+### Added
+- Integrated this `CHANGELOG.md` into the official Sphinx documentation.
+
+## [0.0.1025] - 2026-01-16
+### Added
+- Created this `CHANGELOG.md` to track project history.
+
+## [0.0.1024] - 2026-01-16
+### Fixed
+- Fixed an issue where known commands prefixed with `!` (e.g., `!pwd`) were incorrectly flagged as unknown and forced into categorization.
+
+## [0.0.1023] - 2026-01-16
+### Refactored
+- **Major Refactor of Startup Logic:** Extracted configuration loading, integrity checks, and API server initialization from `main.py` into a new `modules/startup` package.
+- Improved error handling in startup sequence by removing a bare `except:` block.
+
+## [0.0.1022] - 2026-01-15
+### Added
+- New `/docs --build-kb` command flag to explicitly build and index the documentation knowledge base.
+### Changed
+- Updated the startup hint message to provide the correct command for building the missing knowledge base.
+
+## [0.0.1021] - 2026-01-15
+### Documentation
+- Updated `development_directives.md` to formalize the "Clone-Based Development Workflow".
+- Synchronized version numbers across all metadata files.
+
+## [0.0.1020] - 2026-01-15
+### Documentation
+- Updated `README.md` and User Guide to fully document modern Textual UI features, including syntax highlighting, Markdown rendering, and the new interactive top bar.
+
+## [0.0.1019] - 2026-01-14
+### Added
+- **UI Polish:** Implemented Markdown rendering for the welcome message and execution feedback in the Textual UI.
+
+## [0.0.1018] - 2026-01-13
+### Added
+- **Syntax Highlighting:** Real-time syntax highlighting for shell commands in the input field.
+
+## [0.0.1017] - 2026-01-13
+### Added
+- **Compact Top Bar:** New interactive top bar layout with right-aligned "Quit" button.
+
+## [0.0.1016] - 2026-01-12
+### Added
+- **Spawn New Shell:** Added `Ctrl+T` shortcut to spawn a new raw shell session in a new tmux window.
+
+## [0.0.1015] - 2026-01-12
+### Fixed
+- Improved "Run Once" behavior to respect known command categories instead of always defaulting to `semi_interactive`.
+
+## [0.0.1014] - 2026-01-11
+### Added
+- **Run Once:** Implemented "Run Once" execution option in the categorization menu to execute commands immediately without saving them.
+
+## [0.0.1013] - 2026-01-11
+### Added
+- **Safety UI:** Implemented specific Safety Warning Modal for dangerous commands.
+- **Default UI:** Set `textual` as the default UI backend.
+
+## [0.0.1012] - 2026-01-10
+### Added
+- **Persistent History:** Implemented persistent command history for the Textual UI backend.

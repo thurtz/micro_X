@@ -12,4 +12,5 @@
 06_developer_mode.md
 07_advanced_topics.md
 08_troubleshooting.md
+09_classic_ui.md
 ```

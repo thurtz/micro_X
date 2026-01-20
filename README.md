@@ -3,6 +3,7 @@
 micro_X is an intelligent, interactive shell environment designed to bridge the gap between natural language and executable Linux commands. It leverages local large language models (LLMs) via Ollama to translate your queries, validate commands, explain their functionality, and streamline your command-line workflow. It also features branch-aware integrity checks to ensure code reliability when running on stable or testing branches.
 GitHub Repository: https://github.com/thurtz/micro_X.git
 Detailed User Guide: docs/user_guide/index.md
+Changelog: CHANGELOG.md
 
 ## **Quick Start / Installation**
 
@@ -38,15 +39,16 @@ If you wish to contribute to development or test new features, you can activate 
 
 ## **Overview**
 
-micro_X provides a text-based user interface (TUI) where you can:
+micro_X provides a modern text-based user interface (TUI) where you can:
 
-*   Type standard Linux commands.
+*   Type standard Linux commands with **syntax highlighting** in the input field.
 *   Enter natural language queries and have them automatically translated into shell commands.
 *   Force a query to be treated as a natural language command by prefixing it with `/translate`.
 *   **Query Documentation:** Ask questions about the project's documentation in natural language using the `/docs --query` command.
-*   **Confirm AI-Generated Commands:** Review, get explanations, modify, or cancel commands suggested by the AI before execution.
+*   **Confirm AI-Generated Commands:** Review, get explanations, modify, or cancel commands suggested by the AI before execution via an interactive menu.
+*   **Run Once:** Execute commands immediately without permanent categorization.
 *   Categorize commands (simple, semi_interactive, interactive_tui) for appropriate execution, including running interactive commands in tmux.
-*   **Run Custom Scripts:** Add your own Python scripts to a dedicated `user_scripts/` directory (which you may need to create) and run them with the `/run` command.
+*   **Run Custom Scripts:** Add your own Python scripts to a dedicated `user_scripts/` directory and run them with the `/run` command.
 *   **Create Command Aliases:** Use the built-in alias utility to create shortcuts for your favorite or frequently used commands.
 *   Manage command history and categorizations.
 *   Control the underlying Ollama service directly from within the shell.
@@ -60,13 +62,22 @@ micro_X provides a text-based user interface (TUI) where you can:
     *   **AI-Powered Command Validation:** Employs a configurable Ollama model to assess command validity.
     *   **AI-Powered Command Explanation:** Request an explanation for AI-generated commands to understand their purpose and potential impact.
     *   **Interactive Command Confirmation:** For AI-generated commands, micro_X prompts for user action:
-        *   `[1] Yes`: Execute the command (will prompt for categorization if new).
-        *   `[2] Simple & Run`: Execute and categorize as 'simple'.
-        *   `[3] Semi-Interactive & Run`: Execute and categorize as 'semi_interactive'.
-        *   `[4] TUI & Run`: Execute and categorize as 'interactive_tui'.
-        *   `[5] Explain`: Ask AI to explain before deciding.
-        *   `[6] Modify`: Load command into input field for editing.
-        *   `[7] Cancel`: Do not execute.
+        *   **Run Once**: Execute immediately without saving categorization.
+        *   **Simple / Semi-Interactive / TUI**: Execute and save to the respective category.
+        *   **Explain**: Ask AI to explain the command before deciding.
+        *   **Modify**: Load the command into the input field for editing.
+        *   **Cancel**: Do not execute.
+
+*   **Modern TUI Experience (Textual):**
+    *   **Interactive Top Bar**: Quick access to Help, Docs, and Quit.
+    *   **Syntax Highlighting**: Real-time highlighting for shell commands as you type.
+    *   **Markdown Rendering**: Rich formatting for welcome messages and execution feedback.
+    *   **Global Shortcuts**:
+        *   `F1`: Help.
+        *   `Ctrl+D`: Documentation (in browser).
+        *   `Ctrl+T`: Spawn new shell session.
+        *   `Ctrl+R`: Search command history.
+        *   `Ctrl+Q`: Quit.
 
 *   **Command Categorization & Execution:**
     *   `simple`: Direct execution, output captured in micro_X.

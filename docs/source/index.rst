@@ -13,3 +13,6 @@ micro_X documentation
    user_guide/index.md
    developer/index.md
    api_reference.rst
+   changelog.md
+
+   

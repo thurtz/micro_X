@@ -20,6 +20,7 @@ This utility opens the local micro_X Sphinx documentation or allows you to query
 
 Usage:
   /docs                       Opens documentation in the default graphical web browser.
+  /docs --build-kb            Builds/Indexes the documentation knowledge base.
   /docs --query <question>    Queries the documentation knowledge base.
   /docs --query <question> --rag Queries the documentation with a language model for a natural language response.
   /docs --lynx                Opens documentation in the Lynx text-based browser.
@@ -53,6 +54,11 @@ def main():
         action='store_true', 
         help='Use a language model to generate a natural language response.'
     )
+    parser.add_argument(
+        '--build-kb', 
+        action='store_true', 
+        help='Build/Index the documentation knowledge base.'
+    )
 
     args = parser.parse_args()
 
@@ -68,7 +74,7 @@ def main():
         logging.getLogger().addHandler(handler)
         logging.getLogger().setLevel(log_level)
 
-    if args.query:
+    if args.query or args.build_kb:
         # --- Check if Knowledge Base is Built ---
         # We need to import the necessary modules here, inside the 'if' block,
         # to avoid loading them when just opening the browser.
@@ -90,40 +96,52 @@ def main():
         rag_manager = RAGManager(config, name='micro_X_docs')
         rag_manager.initialize()
 
-        if rag_manager.vector_store and rag_manager.vector_store._collection.count() == 0:
+        needs_build = False
+        if args.build_kb:
+            needs_build = True
+        elif rag_manager.vector_store and rag_manager.vector_store._collection.count() == 0:
             print("⚠️  The 'micro_X_docs' knowledge base is empty or has not been built yet.")
             choice = get_input("Would you like to build it now? This process may take around 20 minutes. [y/N]: ").strip().lower()
             
             if choice == 'y':
-                print("\n🚀 Starting build process...")
-                knowledge_script = os.path.join(os.path.dirname(__file__), 'knowledge.py')
-                docs_source = os.path.join(project_root_dir, 'docs', 'source')
-                
-                try:
-                    subprocess.run(
-                        [sys.executable, knowledge_script, '--name', 'micro_X_docs', 'add-dir', docs_source],
-                        check=True
-                    )
-                    print("\n✅ Knowledge base built successfully! Retrying query...")
-                    # Re-initialize to ensure fresh state
-                    rag_manager = RAGManager(config, name='micro_X_docs')
-                    rag_manager.initialize()
-                except subprocess.CalledProcessError as e:
-                    print(f"\n❌ Error building knowledge base: {e}")
-                    sys.exit(1)
+                needs_build = True
             else:
                 print("\nTo enable documentation queries later, please run:")
-                print("    /knowledge --name micro_X_docs add-dir docs/source\n")
+                print("    /docs --build-kb\n")
                 sys.exit(0)
 
+        if needs_build:
+            print("\n🚀 Starting build process...")
+            knowledge_script = os.path.join(os.path.dirname(__file__), 'knowledge.py')
+            docs_source = os.path.join(project_root_dir, 'docs', 'source')
+            
+            try:
+                subprocess.run(
+                    [sys.executable, knowledge_script, '--name', 'micro_X_docs', 'add-dir', docs_source],
+                    check=True
+                )
+                print("\n✅ Knowledge base built successfully!")
+                # Re-initialize to ensure fresh state
+                rag_manager = RAGManager(config, name='micro_X_docs')
+                rag_manager.initialize()
+                
+                if not args.query:
+                    sys.exit(0)
+                    
+                print("Retrying query...")
+            except subprocess.CalledProcessError as e:
+                print(f"\n❌ Error building knowledge base: {e}")
+                sys.exit(1)
+
         # --- Proceed with Query ---
-        query_text = " ".join(args.query)
-        if args.rag:
-            response = asyncio.run(query_knowledge_base_rag(kb_name="micro_X_docs", query=query_text))
-        else:
-            response = query_knowledge_base(kb_name="micro_X_docs", query=query_text)
-        print("\nResponse:")
-        print(response)
+        if args.query:
+            query_text = " ".join(args.query)
+            if args.rag:
+                response = asyncio.run(query_knowledge_base_rag(kb_name="micro_X_docs", query=query_text))
+            else:
+                response = query_knowledge_base(kb_name="micro_X_docs", query=query_text)
+            print("\nResponse:")
+            print(response)
         sys.exit(0)
 
     try:
