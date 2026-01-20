@@ -54,9 +54,7 @@ async def perform_startup_integrity_checks(
 
     # Set verbosity based on branch if not overridden by user
     if config.get("behavior", {}).get("verbosity_level") == "default":
-        if current_branch in protected_branches:
-            config["behavior"]["verbosity_level"] = "quiet"
-        elif current_branch == developer_branch:
+        if current_branch == developer_branch:
             config["behavior"]["verbosity_level"] = "normal"
 
     head_commit = await git_context_manager.get_head_commit_hash()

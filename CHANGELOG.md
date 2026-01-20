@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.0.1028] - 2026-01-16
+### Changed
+- **UX:** Removed the automatic 'quiet' verbosity override for protected branches (`main`, `testing`). Startup banners and status checks now appear by default on all branches.
+- **UX:** Execution-time informational logs (alias expansion, tmux launch notifications) now require the `verbosity_level` to be set to `verbose` to keep the default shell experience clean.
 ### Fixed
 - Fixed a bug where `/translate` commands were sometimes misinterpreted as help requests by the intent classifier. Prioritized explicit command handling over fuzzy intent matching.
 
