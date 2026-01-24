@@ -5,6 +5,10 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1030] - 2026-01-23
+### Fixed
+- **Utility:** Fixed a `TypeError` in `utils/ollama_cli.py` where `load_configuration_early()` was called with missing arguments. Removed the redundant call as configuration is handled during module import.
+
 ## [0.0.1029] - 2026-01-19
 ### Refactored
 - **Code Polish:** Externalized user-facing messages and prompts from `ShellEngine` into a centralized `modules/messages.py` file to improve maintainability and consistency.
