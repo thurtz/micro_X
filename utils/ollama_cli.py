@@ -60,10 +60,8 @@ async def main():
     """Main async function to parse arguments and execute ollama management commands."""
     # Load the main application configuration
     try:
-        # We need to call the global function from main, not an instance method
-        load_configuration_early()
-        # The configuration is loaded into a global 'config' variable in main.py,
-        # which we need to access.
+        # The configuration is loaded into a global 'config' variable in main.py
+        # when it is imported.
         from main import config
     except Exception as e:
         print(f"❌ Error: Failed to load application configuration: {e}", file=sys.stderr)
