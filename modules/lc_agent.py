@@ -271,6 +271,19 @@ def route_after_validator(state: AgentState) -> Literal["secondary_translator", 
         return "secondary_translator"
 
 
+def route_after_secondary(state: AgentState) -> Literal["validator", "__end__"]:
+    """
+    Determines the next step after the secondary translator.
+    If it produced a command, validate it. Otherwise, fail.
+    """
+    if state.get("primary_command"):
+        logger.info("Routing to: Validator")
+        return "validator"
+    else:
+        logger.info("Routing to: END (Secondary Failed)")
+        return END
+
+
 # --- Graph Definition ---
 
 async def run_agent(human_query: str, config_param: dict) -> tuple[str | None, str | None]:
@@ -301,9 +314,15 @@ async def run_agent(human_query: str, config_param: dict) -> tuple[str | None, s
             "__end__": END
         }
     )
-    # After the secondary translator, we re-route to the validator.
-    # This creates the loop.
-    workflow.add_edge("secondary_translator", "validator")
+    # After the secondary translator, check if we have a command to validate
+    workflow.add_conditional_edges(
+        "secondary_translator",
+        route_after_secondary,
+        {
+            "validator": "validator",
+            "__end__": END
+        }
+    )
 
     app = workflow.compile()
 
