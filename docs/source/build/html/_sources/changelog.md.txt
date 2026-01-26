@@ -5,6 +5,11 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1035] - 2026-01-25
+### Added
+- **Testing:** Added `tests/test_textual_ui_manager.py` to verify the adapter logic between the core shell engine and the Textual UI backend.
+- **Testing:** Overall test count increased to 204, further ensuring system stability across UI transitions.
+
 ## [0.0.1034] - 2026-01-25
 ### Added
 - **Clone Utility:** Added a `--bump` flag to the `/clone` utility (`utils/clone.py`). This allows developers to automatically name new clones by incrementing the project's current patch version (e.g., `clone_v0.0.1035`), streamlining the release workflow.
