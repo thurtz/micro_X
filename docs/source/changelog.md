@@ -5,6 +5,12 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1033] - 2026-01-25
+### Added
+- **Testing:** Added new test suites: `tests/test_rag_manager.py` and `tests/test_output_analyzer.py`.
+- **Testing:** Significantly expanded `tests/test_category_manager.py` to cover the command subsystem (`/command` parsing), listing, and removal logic.
+- **Testing:** Overall test count increased to 186, solidifying core system reliability.
+
 ## [0.0.1032] - 2026-01-25
 ### Added
 - **Testing:** Added comprehensive unit tests for `modules/router_agent.py`, `modules/router_tools.py`, and `modules/ollama_manager.py`, significantly improving test coverage for core AI routing and service management logic.
