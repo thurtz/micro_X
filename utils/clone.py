@@ -6,6 +6,7 @@ import argparse
 import sys
 import fnmatch
 import datetime
+import json
 
 HELP_TEXT = """
 micro_X Utility: Clone Project
@@ -15,11 +16,13 @@ Useful for creating sandboxes for testing dangerous commands or experimental fea
 without affecting your primary development environment.
 
 Usage:
-  /utils clone [name]
+  /utils clone [name] [--bump]
 
 Arguments:
   name    (Optional) The name of the new clone.
           If omitted, a name like 'clone_YYYYMMDD_HHMMSS' will be generated.
+  --bump  Auto-name the clone by incrementing the version found in config/default_config.json.
+          e.g., if version is 0.0.1034, clone name becomes 'clone_v0.0.1035'.
 
 Notes:
   - This utility ALWAYS clones the 'micro_X-dev' directory, regardless of which branch it is run from.
@@ -42,6 +45,26 @@ def find_micro_x_root():
         current = os.path.dirname(current)
     
     return current
+
+def get_next_version_name(source_dir):
+    """Reads config/default_config.json and calculates the next patch version."""
+    config_path = os.path.join(source_dir, "config", "default_config.json")
+    try:
+        with open(config_path, "r") as f:
+            config = json.load(f)
+            current_ver = config.get("application", {}).get("version", "0.0.0")
+            
+            parts = current_ver.split('.')
+            if len(parts) >= 3:
+                # Increment the patch version (last part)
+                parts[-1] = str(int(parts[-1]) + 1)
+                new_ver = ".".join(parts)
+                return f"clone_v{new_ver}"
+            else:
+                return f"clone_v{current_ver}_next"
+    except Exception as e:
+        print(f"Warning: Could not determine version from config at {config_path}: {e}")
+        return None
 
 def parse_gitignore(root_dir):
     """Parses .gitignore patterns from the directory."""
@@ -89,21 +112,35 @@ def should_ignore(path, names, root_dir, ignore_patterns):
 def main():
     parser = argparse.ArgumentParser(description="Clone the micro_X dev environment.")
     parser.add_argument("name", nargs="?", default=None, help="Name of the clone (optional).")
+    parser.add_argument("--bump", action="store_true", help="Auto-name clone by incrementing the current version.")
     args = parser.parse_args()
-
-    # Auto-generate name if missing
-    if not args.name:
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        args.name = f"clone_{timestamp}"
-        print(f"ℹ️  No name provided. Using auto-generated name: '{args.name}'")
 
     main_root = find_micro_x_root()
     source_dir = os.path.join(main_root, "micro_X-dev")
 
     if not os.path.isdir(source_dir):
+        # Fallback for when running inside a clone (self-cloning for testing?)
+        # Or if the directory structure is different.
+        # But per specs, we always clone micro_X-dev.
         print(f"Error: Could not locate 'micro_X-dev' directory at '{source_dir}'.")
         print("Please ensure you have activated the dev environment using '/dev --activate'.")
         sys.exit(1)
+
+    # Handle --bump logic
+    if args.bump:
+        generated_name = get_next_version_name(source_dir)
+        if generated_name:
+            args.name = generated_name
+            print(f"ℹ️  --bump specified. Using version-based name: '{args.name}'")
+        else:
+            print("❌ Failed to generate version-based name from config.")
+            sys.exit(1)
+
+    # Auto-generate timestamp name if still missing
+    if not args.name:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        args.name = f"clone_{timestamp}"
+        print(f"ℹ️  No name provided. Using auto-generated name: '{args.name}'")
 
     # Determine Destination
     clones_dir = os.path.join(source_dir, "clones")
