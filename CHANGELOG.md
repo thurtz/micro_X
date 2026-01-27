@@ -5,6 +5,11 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1038] - 2026-01-26
+### Added
+- **Testing:** Added new test suites: `tests/test_utils_knowledge.py` and `tests/test_utils_update.py`.
+- **Testing:** Overall test count increased to 247, adding coverage for the knowledge base CLI and the system update utility.
+
 ## [0.0.1037] - 2026-01-26
 ### Added
 - **Testing:** Added new test suites: `tests/test_utils_dev.py`, `tests/test_utils_help.py`, and `tests/test_utils_list_scripts.py`.
