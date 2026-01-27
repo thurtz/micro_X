@@ -5,6 +5,10 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1045] - 2026-01-27
+### Added
+- **Testing:** Improved test coverage for `modules/category_manager.py` (added edge cases for load/merge and subsystem commands) and `modules/output_analyzer.py` (TUI detection heuristics).
+
 ## [0.0.1044] - 2026-01-26
 ### Added
 - **Testing:** Improved test coverage for `modules/shell_engine.py` (from 67% to 82%), covering process management, script execution, and intent handling.

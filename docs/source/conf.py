@@ -14,8 +14,8 @@ project = 'micro_X'
 copyright = '2025, micro_X Team'
 author = 'micro_X Team'
 
-version = '0.0.1044'
-release = '0.0.1044'
+version = '0.0.1045'
+release = '0.0.1045'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

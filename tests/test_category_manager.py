@@ -293,3 +293,208 @@ def test_list_categorized_commands(monkeypatch):
     # Subheader for interactive_tui
     # Note: Description might vary, check basic presence
     assert any("interactive_tui" in str(arg) for call in mock_append.call_args_list for arg in call[0])
+    
+    # --- New Tests for Enhanced Coverage ---
+    
+    
+    
+    @patch("modules.category_manager._load_single_category_file")
+    
+    @patch("modules.category_manager.config_handler.save_json_file")
+    
+    def test_load_and_merge_create_default_if_missing(mock_save, mock_load_single, monkeypatch):
+    
+        monkeypatch.setattr(category_manager, 'DEFAULT_CATEGORY_FILE_PATH', '/tmp/default.json')
+    
+        monkeypatch.setattr(category_manager, 'USER_CATEGORY_FILE_PATH', '/tmp/user.json')
+    
+        
+    
+        with patch("os.path.exists", side_effect=[False]): # Default file missing
+    
+            mock_load_single.side_effect = [
+    
+                {}, # Default loaded (empty after creation attempt)
+    
+                {}  # User loaded
+    
+            ]
+    
+            mock_save.return_value = True
+    
+            
+    
+            category_manager.load_and_merge_command_categories()
+    
+            
+    
+            # Should attempt to save empty structure to default path
+    
+            mock_save.assert_called_once()
+    
+            args = mock_save.call_args
+    
+            assert args[0][0] == '/tmp/default.json'
+    
+            assert "simple" in args[0][1]
+    
+    
+    
+    @patch("modules.category_manager._load_single_category_file")
+    
+    
+    
+    def test_load_and_merge_logic(mock_load_single, monkeypatch):
+    
+    
+    
+        monkeypatch.setattr(category_manager, 'DEFAULT_CATEGORY_FILE_PATH', '/d')
+    
+    
+    
+        monkeypatch.setattr(category_manager, 'USER_CATEGORY_FILE_PATH', '/u')
+    
+    
+    
+    
+    
+    
+    
+    def test_add_command_empty(monkeypatch):
+    
+        mock_append = MagicMock()
+    
+        monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    
+        category_manager.add_command_to_category("", "simple")
+    
+        mock_append.assert_called_with("⚠️ Cannot add empty command.", style_class='warning')
+    
+    
+    
+    def test_add_command_invalid_category(monkeypatch):
+    
+        mock_append = MagicMock()
+    
+        monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    
+        category_manager.add_command_to_category("cmd", "invalid_cat")
+    
+        mock_append.assert_called_with("❌ Invalid category: 'invalid_cat'.", style_class='error')
+    
+    
+    
+    @patch("modules.category_manager._load_single_category_file")
+    
+    def test_add_command_already_exists_same_category(mock_load, monkeypatch):
+    
+        mock_load.return_value = {"simple": ["cmd"], "semi_interactive": []}
+    
+        mock_append = MagicMock()
+    
+        monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    
+        
+    
+        if not category_manager.CATEGORY_MAP:
+    
+             category_manager.CATEGORY_MAP = {"simple": "simple"}
+    
+    
+    
+        category_manager.add_command_to_category("cmd", "simple")
+    
+        mock_append.assert_called_with("ℹ️ Command 'cmd' is already set as 'simple'.", style_class='info')
+    
+    
+    
+    @patch("modules.category_manager._load_single_category_file")
+    
+    @patch("modules.category_manager._save_user_command_categories")
+    
+    @patch("modules.category_manager.load_and_merge_command_categories")
+    
+    def test_add_command_move_category(mock_merge, mock_save, mock_load, monkeypatch):
+    
+        # Command starts in simple, we move to semi_interactive
+    
+        mock_load.return_value = {"simple": ["cmd"], "semi_interactive": []}
+    
+        mock_append = MagicMock()
+    
+        monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    
+        
+    
+        if not category_manager.CATEGORY_MAP:
+    
+             category_manager.CATEGORY_MAP = {"simple": "simple", "semi_interactive": "semi_interactive"}
+    
+    
+    
+        category_manager.add_command_to_category("cmd", "semi_interactive")
+    
+        
+    
+        saved_data = mock_save.call_args[0][0]
+    
+        assert "cmd" not in saved_data["simple"]
+    
+        assert "cmd" in saved_data["semi_interactive"]
+    
+        mock_append.assert_any_call("✅ Command 'cmd' moved from 'simple' to 'semi_interactive'.", style_class='success')
+    
+    
+    
+    def test_remove_command_empty(monkeypatch):
+    
+        mock_append = MagicMock()
+    
+        monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    
+        category_manager.remove_command_from_category("")
+    
+        mock_append.assert_called_with("⚠️ Cannot remove empty command.", style_class='warning')
+    
+    
+    
+    def test_handle_command_subsystem_shlex_error(monkeypatch):
+    
+        mock_append = MagicMock()
+    
+        monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    
+        category_manager.handle_command_subsystem_input('/command add "unclosed quote')
+    
+        mock_append.assert_called()
+    
+        assert "Error parsing /command" in mock_append.call_args[0][0]
+    
+    
+    
+    def test_handle_command_subsystem_run_invalid_cat(monkeypatch):
+    
+        mock_append = MagicMock()
+    
+        monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    
+        category_manager.handle_command_subsystem_input('/command run invalid "cmd"')
+    
+        mock_append.assert_called_with("❌ Invalid category for 'run': 'invalid'.", style_class='error')
+    
+    
+    
+    def test_handle_command_subsystem_add_usage_error(monkeypatch):
+    
+        mock_append = MagicMock()
+    
+        monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    
+        category_manager.handle_command_subsystem_input('/command add "only_one_arg"')
+    
+        mock_append.assert_called()
+    
+        assert "Usage: /command add" in mock_append.call_args[0][0]
+    
+    
+    

@@ -81,3 +81,22 @@ def test_is_tui_like_output_line_threshold_isolation():
     
     # If we raise the line threshold to 60%, it should be False.
     assert output_analyzer.is_tui_like_output(text, line_threshold_pct=60.0, char_threshold_pct=100.0) is False
+
+def test_is_tui_like_output_char_threshold_isolation():
+    """Test the char-based heuristic in isolation."""
+    # 1 line. Line coverage will be 100% if we have ANSI. 
+    # We need to test char threshold, so we set line threshold to 101% (impossible)
+    
+    # Text with 100 chars, 5 ANSI. 5%.
+    padding = "a" * 95
+    text = f"{padding}\x1B[31m"
+    
+    # Default char threshold is 3.0%. 5% > 3%. Should be True.
+    assert output_analyzer.is_tui_like_output(text, line_threshold_pct=101.0) is True
+    
+    # Raise char threshold to 10%. Should be False.
+    assert output_analyzer.is_tui_like_output(text, line_threshold_pct=101.0, char_threshold_pct=10.0) is False
+
+def test_is_tui_like_output_no_lines():
+    """Test with string that splits to empty lines list."""
+    assert output_analyzer.is_tui_like_output("") is False
