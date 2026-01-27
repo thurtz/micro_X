@@ -98,3 +98,27 @@ def test_classify_intent_no_client(mock_config):
     assert intent is None
     assert score == 0.0
 
+def test_classify_intent_low_similarity(embedding_manager):
+    """
+    Test classification where similarity is low.
+    """
+    # Create an orthogonal vector (dot product 0)
+    input_embedding = [0.0] * 1024
+    # Just to be safe, make it slightly different
+    input_embedding[0] = 100.0 # High magnitude, orthogonal to small values? 
+    # If sample is [0.1, ...], dot([0.1,...], [100, 0...]) -> 10.0
+    # Norms: sqrt(10.24) ~ 3.2 vs 100. 
+    # Cosine = 10 / (3.2 * 100) = 0.03
+    
+    embedding_manager.client.embeddings.return_value = {'embedding': input_embedding}
+    
+    intent, score = embedding_manager.classify_intent("completely unrelated")
+    # Score should be very low
+    assert score < 0.1
+
+def test_classify_intent_exception(embedding_manager):
+    """Test exception handling during classification."""
+    embedding_manager.client.embeddings.side_effect = Exception("API Error")
+    intent, score = embedding_manager.classify_intent("trigger error")
+    assert intent is None
+    assert score == 0.0

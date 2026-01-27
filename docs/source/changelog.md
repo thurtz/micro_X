@@ -5,6 +5,14 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1039] - 2026-01-26
+### Added
+- **Testing:** Massive expansion of the test suite (49 new tests), bringing the total to 296 tests.
+- **Testing:** Added comprehensive coverage for:
+    - **Startup:** `modules/startup/config_loader.py`, `modules/startup/integrity.py`.
+    - **Core:** `modules/embedding_manager.py` (enhanced).
+    - **Utilities:** `git_branch`, `logs`, `ollama_cli`, `generate_snapshot`, `setup_brew`, `run_tests`, and `command`.
+
 ## [0.0.1038] - 2026-01-26
 ### Added
 - **Testing:** Added new test suites: `tests/test_utils_knowledge.py` and `tests/test_utils_update.py`.
