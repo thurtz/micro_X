@@ -63,7 +63,7 @@ def ui_manager_instance(mock_config):
     """
     manager = UIManager(mock_config)
     
-    manager.append_output = MagicMock() 
+    manager.append_output = MagicMock(wraps=manager.append_output) 
 
     mock_app_instance = MagicMock()
     mock_app_instance.invalidate = MagicMock()
@@ -413,5 +413,63 @@ class TestUIConfirmationFlow:
         assert result == {'action': 'cancel'}
         assert not ui_manager_instance.confirmation_flow_active
 
-# class TestKeyBindingsInUIManager: 
-#     pass
+class TestUIOtherFlows:
+    @pytest.mark.asyncio
+    async def test_hung_task_flow_kill(self, ui_manager_instance):
+        flow_task = asyncio.create_task(ui_manager_instance.prompt_for_hung_task("long_cmd"))
+        await simulate_input_sequence(
+            ui_manager_instance,
+            [('_handle_hung_task_response', '1')]
+        )
+        result = await flow_task
+        assert result == {'action': 'kill'}
+
+    @pytest.mark.asyncio
+    async def test_api_input_flow_success(self, ui_manager_instance):
+        flow_task = asyncio.create_task(ui_manager_instance.prompt_for_api_input("Enter name:"))
+        await simulate_input_sequence(
+            ui_manager_instance,
+            [('_handle_api_input_response', 'Alice')]
+        )
+        result = await flow_task
+        assert result == "Alice"
+
+    def test_append_output_buffer_trimming(self, ui_manager_instance):
+        ui_manager_instance.max_output_buffer_lines = 10
+        # Add 15 lines
+        for i in range(15):
+            ui_manager_instance.append_output(f"Line {i}")
+        
+        # Buffer should have been trimmed. 
+        # Logic is: lines_to_remove = 15 - 10 + (10 // 10) = 5 + 1 = 6.
+        # New size should be 15 - 6 = 9.
+        assert len(ui_manager_instance.output_buffer) == 9
+        assert "Line 14" in ui_manager_instance.output_buffer[-1][1]
+
+    def test_add_interaction_separator(self, ui_manager_instance):
+        ui_manager_instance.config["ui"]["enable_output_separator"] = True
+        ui_manager_instance.output_buffer = [('default', 'Some output\n')]
+        ui_manager_instance.last_output_was_separator = False
+        
+        ui_manager_instance.add_interaction_separator()
+        
+        assert ui_manager_instance.last_output_was_separator is True
+        # Check if separator was added to buffer
+        assert any("─" in content for style, content in ui_manager_instance.output_buffer)
+
+    def test_update_input_prompt_truncation(self, ui_manager_instance):
+        ui_manager_instance.config["ui"]["max_prompt_length"] = 10
+        long_dir = "/home/user/very/long/directory/path/that/needs/truncation"
+        
+        with patch("os.path.expanduser", return_value="/home/user"):
+            ui_manager_instance.update_input_prompt(long_dir)
+            
+        # Should be truncated with ...
+        assert "..." in ui_manager_instance.current_prompt_text
+        assert len(ui_manager_instance.current_prompt_text) <= 20 # 10 + chars for "() > "
+
+class TestKeyBindingsInUIManager:
+    def test_get_key_bindings(self, ui_manager_instance):
+        kb = ui_manager_instance.get_key_bindings()
+        assert kb is not None
+        assert len(kb.bindings) > 0

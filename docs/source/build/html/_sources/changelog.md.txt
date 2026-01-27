@@ -5,6 +5,11 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1046] - 2026-01-27
+### Added
+- **Testing:** Reached 100% test coverage for `modules/config_handler.py`.
+- **Testing:** Significantly improved test coverage for `modules/ui_manager.py` (from 53% to 65%), adding tests for Hung Task, API Input flows, and UI logic like buffer trimming and prompt truncation.
+
 ## [0.0.1045] - 2026-01-27
 ### Added
 - **Testing:** Improved test coverage for `modules/category_manager.py` (added edge cases for load/merge and subsystem commands) and `modules/output_analyzer.py` (TUI detection heuristics).
