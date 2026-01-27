@@ -76,3 +76,52 @@ async def test_integrity_behind_remote_warn(mock_config, mock_ui_manager, mock_g
     assert is_ok is True
     calls = [str(call) for call in mock_ui_manager.append_output.call_args_list]
     assert any("behind" in c for c in calls)
+
+# --- New Expansion Tests ---
+
+@pytest.mark.asyncio
+async def test_integrity_offline_synced(mock_config, mock_ui_manager, mock_git_manager):
+    # Fetch times out but local cache says synced
+    mock_git_manager.compare_head_with_remote_tracking.return_value = ("synced_local_cache", "abc", "abc", "timeout")
+    
+    is_dev, is_ok = await integrity.perform_startup_integrity_checks(
+        mock_config, mock_ui_manager, "/root", mock_git_manager
+    )
+    
+    assert is_ok is True
+    calls = [str(call) for call in mock_ui_manager.append_output.call_args_list]
+    assert any("offline-verified" in c for c in calls)
+
+@pytest.mark.asyncio
+async def test_integrity_offline_ahead_halt(mock_config, mock_ui_manager, mock_git_manager):
+    # Fetch fails and local cache says ahead -> halt
+    mock_git_manager.compare_head_with_remote_tracking.return_value = ("ahead_local_cache", "def", "abc", "offline_or_unreachable")
+    
+    with pytest.raises(integrity.StartupIntegrityError):
+        await integrity.perform_startup_integrity_checks(
+            mock_config, mock_ui_manager, "/root", mock_git_manager
+        )
+
+@pytest.mark.asyncio
+async def test_integrity_other_error_halt(mock_config, mock_ui_manager, mock_git_manager):
+    mock_git_manager.compare_head_with_remote_tracking.return_value = ("error", "abc", "abc", "other_error")
+    
+    with pytest.raises(integrity.StartupIntegrityError):
+        await integrity.perform_startup_integrity_checks(
+            mock_config, mock_ui_manager, "/root", mock_git_manager
+        )
+
+@pytest.mark.asyncio
+async def test_integrity_unrecognized_branch_assume_dev(mock_config, mock_ui_manager, mock_git_manager):
+    # Branch not in protected list
+    mock_git_manager.get_current_branch.return_value = "feature-x"
+    
+    is_dev, is_ok = await integrity.perform_startup_integrity_checks(
+        mock_config, mock_ui_manager, "/root", mock_git_manager
+    )
+    
+    assert is_dev is True
+    assert is_ok is True
+    calls = [str(call) for call in mock_ui_manager.append_output.call_args_list]
+    assert any("Developer mode assumed" in c for c in calls)
+

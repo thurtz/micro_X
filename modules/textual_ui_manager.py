@@ -139,8 +139,8 @@ class TextualUIManager:
 
     def add_interaction_separator(self) -> None:
         """Adds a visual separator to the log."""
-        self.last_output_was_separator = True
         self.append_output("─" * 40, style_class="dim")
+        self.last_output_was_separator = True
 
     def initialize_ui_elements(self, **kwargs):
         """Mock method for compatibility with main.py startup sequence."""

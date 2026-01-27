@@ -473,3 +473,149 @@ async def test_translate_priority_over_intent(shell_engine):
         args, kwargs = mock_process.call_args
         assert args[0] == "echo translated"
         assert kwargs.get('is_ai_generated') is True
+
+# --- New Expansion Tests ---
+
+@pytest.mark.asyncio
+async def test_kill_current_process_active(shell_engine):
+    mock_proc = MagicMock()
+    mock_proc.returncode = None
+    f = asyncio.Future()
+    f.set_result(0)
+    mock_proc.wait = MagicMock(return_value=f)
+    shell_engine.current_process = mock_proc
+    shell_engine.current_process_command = "long_run"
+    
+    await shell_engine.kill_current_process()
+    
+    mock_proc.terminate.assert_called_once()
+    assert shell_engine.current_process is None
+    shell_engine.ui_manager.append_output.assert_called()
+    assert "Terminated command" in str(shell_engine.ui_manager.append_output.call_args_list[0])
+
+@pytest.mark.asyncio
+async def test_kill_current_process_force(shell_engine, mocker):
+    mock_proc = MagicMock()
+    mock_proc.returncode = None
+    # Provide two futures: one for the initial wait_for (which will timeout), 
+    # and one for the final wait() after SIGKILL.
+    f1 = asyncio.Future()
+    f2 = asyncio.Future()
+    f2.set_result(0)
+    mock_proc.wait = MagicMock(side_effect=[f1, f2])
+    shell_engine.current_process = mock_proc
+    
+    # Mock wait_for to raise TimeoutError on first call
+    mocker.patch("asyncio.wait_for", side_effect=[asyncio.TimeoutError, None])
+    
+    await shell_engine.kill_current_process()
+    
+    mock_proc.terminate.assert_called_once()
+    mock_proc.kill.assert_called_once()
+    shell_engine.ui_manager.append_output.assert_called()
+    assert "Killed command" in str(shell_engine.ui_manager.append_output.call_args_list[-1])
+
+@pytest.mark.asyncio
+async def test_kill_current_process_none(shell_engine):
+    shell_engine.current_process = None
+    await shell_engine.kill_current_process()
+    shell_engine.ui_manager.append_output.assert_called_with("ℹ️ No active command to kill.", style_class='info')
+
+def test_expand_shell_variables_undefined(shell_engine):
+    # os.path.expandvars leaves undefined variables as is on some systems or empty.
+    # In micro_X it usually keeps them if not in os.environ.
+    res = shell_engine.expand_shell_variables("echo $NON_EXISTENT_VAR_12345")
+    assert "$NON_EXISTENT_VAR_12345" in res
+
+def test_sanitize_and_validate_invalid_regex(shell_engine):
+    shell_engine.config["security"]["dangerous_patterns"] = ["[invalid regex"]
+    res = shell_engine.sanitize_and_validate("ls", "ls")
+    assert res == "ls"
+    shell_engine.ui_manager.append_output.assert_called()
+    assert "Invalid security regex" in str(shell_engine.ui_manager.append_output.call_args)
+
+@pytest.mark.asyncio
+async def test_handle_built_in_command_alias_expansion_with_args(shell_engine):
+    shell_engine.aliases = {"/l": "ls -la"}
+    shell_engine.config["behavior"]["verbosity_level"] = "verbose"
+    
+    # Mock process_command to stop there
+    with patch.object(shell_engine, 'process_command', new_callable=AsyncMock) as mock_process:
+        res = await shell_engine.handle_built_in_command("/l /tmp")
+        assert res is True
+        mock_process.assert_called_with("ls -la /tmp", "/l /tmp")
+
+@pytest.mark.asyncio
+async def test_handle_built_in_command_exit(shell_engine):
+    res = await shell_engine.handle_built_in_command("exit")
+    assert res is True
+    shell_engine.ui_manager.get_app_instance().exit.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_handle_script_command_list_redirect(shell_engine):
+    # Test /utils list redirects to /utils list_scripts
+    with patch.object(shell_engine, '_handle_utils_command_async', new_callable=AsyncMock) as mock_utils:
+        await shell_engine._handle_script_command_async("/utils list", "/path", "utils", "utils")
+        mock_utils.assert_called_with("/utils list_scripts")
+
+@pytest.mark.asyncio
+async def test_handle_script_command_not_found(shell_engine):
+    with patch("os.path.isfile", return_value=False):
+        await shell_engine._handle_script_command_async("/utils unknown", "/path", "utils", "utils")
+        shell_engine.ui_manager.append_output.assert_called()
+        assert "Script not found" in str(shell_engine.ui_manager.append_output.call_args)
+
+@pytest.mark.asyncio
+async def test_execute_shell_command_file_not_found(shell_engine):
+    with patch('asyncio.create_subprocess_shell', side_effect=FileNotFoundError):
+        await shell_engine.execute_shell_command("cmd", "cmd")
+        shell_engine.ui_manager.append_output.assert_any_call(
+            "❌ Shell (bash) or command not found for: cmd", style_class='error'
+        )
+
+@pytest.mark.asyncio
+async def test_process_command_ai_generated_cancel(shell_engine):
+    shell_engine.ui_manager.prompt_for_command_confirmation = AsyncMock(return_value={'action': 'cancel'})
+    
+    await shell_engine.process_command("ls", "list", is_ai_generated=True)
+    
+    shell_engine.ui_manager.append_output.assert_called_with("❌ Execution of 'ls' cancelled.", style_class='info')
+
+@pytest.mark.asyncio
+async def test_process_command_caution_cancel(shell_engine):
+    shell_engine.config["security"]["warn_on_commands"] = ["rm"]
+    shell_engine.ui_manager.prompt_for_caution_confirmation = AsyncMock(return_value={'proceed': False})
+    
+    # Mock category manager to return 'simple'
+    shell_engine.category_manager_module.classify_command.return_value = 'simple'
+    
+    await shell_engine.process_command("rm file", "rm file")
+    
+    shell_engine.ui_manager.append_output.assert_called_with("🛡️ Execution of 'rm file' cancelled by user.", style_class='info')
+
+@pytest.mark.asyncio
+async def test_submit_user_input_router_success(shell_engine):
+    shell_engine.ollama_manager_module.is_ollama_server_running = AsyncMock(return_value=True)
+    # Ensure command is unclassified to reach router
+    shell_engine.category_manager_module.classify_command.return_value = shell_engine.category_manager_module.UNKNOWN_CATEGORY_SENTINEL
+    
+    with patch("modules.shell_engine.run_router_agent", new_callable=AsyncMock) as mock_router, \
+         patch.object(shell_engine, "handle_built_in_command", new_callable=AsyncMock) as mock_builtin:
+        
+        mock_router.return_value = "/help topic"
+        await shell_engine.submit_user_input("tell me about topic")
+        
+        mock_router.assert_called_once()
+        mock_builtin.assert_called_with("/help topic")
+
+@pytest.mark.asyncio
+async def test_submit_user_input_ollama_down_direct_exec(shell_engine):
+    shell_engine.ollama_manager_module.is_ollama_server_running = AsyncMock(return_value=False)
+    # Ensure command is unclassified
+    shell_engine.category_manager_module.classify_command.return_value = shell_engine.category_manager_module.UNKNOWN_CATEGORY_SENTINEL
+    
+    with patch.object(shell_engine, "process_command", new_callable=AsyncMock) as mock_process:
+        await shell_engine.submit_user_input("ls -l")
+        # Should just run it as a direct command since AI is unavailable
+        mock_process.assert_called_with("ls -l", "ls -l")
+

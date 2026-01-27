@@ -5,6 +5,14 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1040] - 2026-01-26
+### Added
+- **Testing:** Massive expansion of test coverage, reaching **322 unit tests**.
+- **Testing:** Added `tests/test_startup_api_server.py` to verify the optional API server logic.
+- **Testing:** Significantly expanded coverage for `modules/shell_engine.py` (process management, script handling), `modules/textual_ui_manager.py` (modal interactions), `modules/git_context_manager.py` (offline fetch scenarios), and `modules/config_handler.py`.
+### Fixed
+- **UI Manager:** Fixed a bug in `modules/textual_ui_manager.py` where `last_output_was_separator` was being prematurely reset by subsequent output calls.
+
 ## [0.0.1039] - 2026-01-26
 ### Added
 - **Testing:** Massive expansion of the test suite (49 new tests), bringing the total to 296 tests.
