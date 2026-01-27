@@ -5,6 +5,16 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1042] - 2026-01-26
+### Added
+- **Testing:** Significantly improved test coverage for `modules/ollama_manager.py` (from 39% to 71%), adding scenarios for error handling, service management, and edge cases.
+- **Testing:** Added `tests/test_utils_config_manager.py`, raising coverage for `utils/config_manager.py` from 0% to 63%.
+
+## [0.0.1041] - 2026-01-26
+### Added
+- **Testing:** Added `tests/test_utils_version_sync.py` to cover the version synchronization utility.
+- **Testing:** Integrated `pytest-cov` into `requirements.txt` for automated code coverage reporting.
+
 ## [0.0.1040] - 2026-01-26
 ### Added
 - **Testing:** Massive expansion of test coverage, reaching **322 unit tests**.
