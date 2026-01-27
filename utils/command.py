@@ -61,8 +61,12 @@ def main():
 
     # Initialize the category manager to load categories and set up paths
     # This is crucial for all other functions in the module to work correctly.
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    category_manager.init_category_manager(project_root, "config", lambda msg, style_class='INFO': print(msg))
+    try:
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        category_manager.init_category_manager(project_root, "config", lambda msg, style_class='INFO': print(msg))
+    except Exception as e:
+        print(f"❌ Error initializing category manager: {e}", file=sys.stderr)
+        sys.exit(1)
 
     parser = argparse.ArgumentParser(
         description="Manage command categorizations for micro_X.",

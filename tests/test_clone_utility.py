@@ -30,3 +30,63 @@ def test_get_next_version_name_invalid_json():
     with patch("builtins.open", mock_open(read_data="{invalid_json")):
         name = clone.get_next_version_name("/dummy/root")
         assert name is None
+
+# --- New Expansion Tests ---
+
+def test_parse_gitignore(tmp_path):
+    # Create dummy gitignore
+    gitignore = tmp_path / ".gitignore"
+    gitignore.write_text("*.log\n# comment\ndist/\n")
+    
+    patterns = clone.parse_gitignore(str(tmp_path))
+    
+    assert "*.log" in patterns
+    assert "dist/" in patterns
+    assert "# comment" not in patterns
+    # Core ignores
+    assert ".git" in patterns
+    assert "clones" in patterns
+
+def test_should_ignore():
+    root = "/root"
+    patterns = ["*.log", "dist/", "secret.txt"]
+    
+    # Ignore file by pattern
+    assert "file.log" in clone.should_ignore("/root", ["file.log", "main.py"], root, patterns)
+    
+    # Ignore dir by pattern
+    assert "dist" in clone.should_ignore("/root", ["dist", "src"], root, patterns)
+    
+    # Ignore file in subdir
+    assert "secret.txt" in clone.should_ignore("/root/subdir", ["secret.txt", "readme.md"], root, patterns)
+    
+    # Don't ignore normal files
+    assert not clone.should_ignore("/root", ["main.py"], root, patterns)
+
+@patch("utils.clone.find_micro_x_root", return_value="/mock")
+@patch("os.path.isdir", return_value=True)
+@patch("os.path.exists", return_value=False) # Destination doesn't exist
+@patch("shutil.copytree")
+@patch("os.makedirs")
+@patch("builtins.print")
+def test_main_success(mock_print, mock_makedirs, mock_copytree, mock_exists, mock_isdir, mock_root):
+    with patch("sys.argv", ["clone.py", "myclone"]):
+        clone.main()
+        
+    mock_copytree.assert_called_once()
+    # Check destination path
+    assert "myclone" in mock_copytree.call_args[0][1]
+    assert any("Clone created successfully" in str(c) for c in mock_print.call_args_list)
+
+@patch("utils.clone.find_micro_x_root", return_value="/mock")
+@patch("os.path.isdir", return_value=True)
+@patch("os.path.exists", return_value=True) # Destination ALREADY exists
+@patch("builtins.print")
+def test_main_already_exists(mock_print, mock_exists, mock_isdir, mock_root):
+    with patch("sys.argv", ["clone.py", "existing"]):
+        with pytest.raises(SystemExit) as e:
+            clone.main()
+        assert e.value.code == 1
+    
+    assert any("already exists" in str(c) for c in mock_print.call_args_list)
+

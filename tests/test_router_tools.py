@@ -68,3 +68,42 @@ def test_get_all_tools_returns_list():
     assert len(tools) > 0
     # Check if a known tool is in the list
     assert router_tools.run_tests in tools
+
+# --- New Expansion Tests ---
+
+def test_tool_metadata():
+    """Verify that tools have required metadata for LangChain."""
+    for tool in router_tools.get_all_tools():
+        assert hasattr(tool, "name")
+        assert hasattr(tool, "description")
+        assert tool.description.strip() != ""
+
+def test_run_tests_tool_edge_cases():
+    # Test unusual branch name (should still just append)
+    assert router_tools.run_tests.func("feature/test") == "/utils dev --run-tests-feature/test"
+
+def test_generate_snapshot_tool_complex_args():
+    res = router_tools.generate_snapshot.func(
+        branch="main", 
+        summary='Multiple "Quotes" Test', 
+        include_logs=True, 
+        summarize_modules=True
+    )
+    assert '/dev --snapshot-main' in res
+    assert '--summary "Multiple "Quotes" Test"' in res
+    assert '--include-logs' in res
+    assert '--summarize' in res
+
+def test_query_knowledge_base_unusual_query():
+    # Characters like $ or ` should be handled if the tool just strings them
+    assert 'query "find $HOME"' in router_tools.query_knowledge_base.func("find $HOME")
+
+def test_add_url_to_knowledge_base_depth():
+    # Test depth 0, 1, 5
+    assert '--depth 0' in router_tools.add_url_to_knowledge_base.func("url", depth=0, recursive=True)
+    assert '--depth 5' in router_tools.add_url_to_knowledge_base.func("url", depth=5, recursive=True)
+
+def test_add_alias_unusual_cmd():
+    # Command with pipes
+    assert 'alias --add /p "ls | grep x"' in router_tools.add_alias.func("/p", "ls | grep x")
+

@@ -5,6 +5,32 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1040] - 2026-01-26
+### Added
+- **Testing:** Massive expansion of test coverage, reaching **322 unit tests**.
+- **Testing:** Added `tests/test_startup_api_server.py` to verify the optional API server logic.
+- **Testing:** Significantly expanded coverage for `modules/shell_engine.py` (process management, script handling), `modules/textual_ui_manager.py` (modal interactions), `modules/git_context_manager.py` (offline fetch scenarios), and `modules/config_handler.py`.
+### Fixed
+- **UI Manager:** Fixed a bug in `modules/textual_ui_manager.py` where `last_output_was_separator` was being prematurely reset by subsequent output calls.
+
+## [0.0.1039] - 2026-01-26
+### Added
+- **Testing:** Massive expansion of the test suite (49 new tests), bringing the total to 296 tests.
+- **Testing:** Added comprehensive coverage for:
+    - **Startup:** `modules/startup/config_loader.py`, `modules/startup/integrity.py`.
+    - **Core:** `modules/embedding_manager.py` (enhanced).
+    - **Utilities:** `git_branch`, `logs`, `ollama_cli`, `generate_snapshot`, `setup_brew`, `run_tests`, and `command`.
+
+## [0.0.1038] - 2026-01-26
+### Added
+- **Testing:** Added new test suites: `tests/test_utils_knowledge.py` and `tests/test_utils_update.py`.
+- **Testing:** Overall test count increased to 247, adding coverage for the knowledge base CLI and the system update utility.
+
+## [0.0.1037] - 2026-01-26
+### Added
+- **Testing:** Added new test suites: `tests/test_utils_dev.py`, `tests/test_utils_help.py`, and `tests/test_utils_list_scripts.py`.
+- **Testing:** Expanded test count to 237, solidifying the reliability of the development workflow tools and the help system.
+
 ## [0.0.1036] - 2026-01-25
 ### Added
 - **Testing:** Added new test suites: `tests/test_utils_history.py`, `tests/test_utils_alias.py`, and `tests/test_query_engine.py`.
