@@ -39,7 +39,8 @@ def mock_config_for_engine():
         },
         "behavior": {
             "tui_detection_line_threshold_pct": 30.0,
-            "tui_detection_char_threshold_pct": 3.0
+            "tui_detection_char_threshold_pct": 3.0,
+            "default_category_for_unclassified": "simple"
         },
         "ui": {},
         "paths": {"tmux_log_base_path": "/tmp"},
@@ -618,4 +619,92 @@ async def test_submit_user_input_ollama_down_direct_exec(shell_engine):
         await shell_engine.submit_user_input("ls -l")
         # Should just run it as a direct command since AI is unavailable
         mock_process.assert_called_with("ls -l", "ls -l")
+
+def test_nested_config_helpers():
+    from modules.shell_engine import _get_nested_config, _set_nested_config
+    
+    config = {"a": {"b": {"c": 1}}}
+    assert _get_nested_config(config, "a.b.c") == 1
+    assert _get_nested_config(config, "a.b.x") is None
+    
+    success, err = _set_nested_config(config, "a.b.d", 2)
+    assert success is True
+    assert config["a"]["b"]["d"] == 2
+    
+    success, err = _set_nested_config(config, "a.b.c.e", 3) # Conflict: c is int
+    assert success is False
+    assert "Path conflict" in err
+
+@pytest.mark.asyncio
+async def test_get_user_input_from_api_no_ui(shell_engine):
+    shell_engine.ui_manager = None
+    res = await shell_engine.get_user_input_from_api("prompt")
+    assert res == ""
+
+@pytest.mark.asyncio
+async def test_handle_script_command_execution_success(shell_engine):
+    # Mock subprocess for script execution
+    mock_process = AsyncMock()
+    # We must ensure readline returns empty bytes eventually to break the loop
+    mock_process.stdout.readline = AsyncMock(side_effect=[b"Script output\n", b""])
+    mock_process.stderr.readline = AsyncMock(side_effect=[b"Script error\n", b""])
+    mock_process.wait.return_value = 0
+    mock_process.returncode = 0
+    
+    with patch("os.path.isfile", return_value=True), \
+         patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+        
+        # We need to wait for the background task created by _handle_script_command_async to finish.
+        # Since we can't easily await the internal task, we'll spy on ui_manager.append_output
+        # and wait until the success message is logged.
+        
+        await shell_engine._handle_script_command_async("/utils test_script arg1", "/path", "utils", "utils")
+        
+        # Wait for the async task to complete its work
+        # We can simulate the passage of time/event loop cycles
+        for _ in range(10):
+            await asyncio.sleep(0)
+            if any("completed successfully" in str(c) for c in shell_engine.ui_manager.append_output.call_args_list):
+                break
+        
+        mock_exec.assert_called_once()
+        shell_engine.ui_manager.append_output.assert_any_call("Script output\n", style_class='default')
+        shell_engine.ui_manager.append_output.assert_any_call("Script error\n", style_class='warning')
+        shell_engine.ui_manager.append_output.assert_any_call("✅ Script 'test_script.py' completed.", style_class='success')
+
+@pytest.mark.asyncio
+async def test_submit_user_input_intent_classification(shell_engine):
+    # Mock embedding manager
+    shell_engine.embedding_manager_instance = MagicMock()
+    shell_engine.embedding_manager_instance.classify_intent.return_value = ("show_help", 0.95)
+    
+    with patch.object(shell_engine, "handle_built_in_command", new_callable=AsyncMock) as mock_builtin:
+        await shell_engine.submit_user_input("help me")
+        mock_builtin.assert_called_with("/help")
+
+@pytest.mark.asyncio
+async def test_submit_user_input_intent_exit(shell_engine):
+    shell_engine.embedding_manager_instance = MagicMock()
+    shell_engine.embedding_manager_instance.classify_intent.return_value = ("exit_shell", 0.95)
+    
+    await shell_engine.submit_user_input("leave now")
+    shell_engine.ui_manager.get_app_instance().exit.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_process_command_categorization_flow_execute_once(shell_engine):
+    shell_engine.category_manager_module.classify_command.return_value = shell_engine.category_manager_module.UNKNOWN_CATEGORY_SENTINEL
+    shell_engine.ui_manager.start_categorization_flow = AsyncMock(return_value={'action': 'execute_once'})
+    
+    with patch.object(shell_engine, "execute_shell_command", new_callable=AsyncMock) as mock_exec:
+        await shell_engine.process_command("unknown_cmd", "unknown_cmd")
+        # Should execute as default category (likely 'simple')
+        mock_exec.assert_called()
+
+@pytest.mark.asyncio
+async def test_process_command_categorization_flow_cancel(shell_engine):
+    shell_engine.category_manager_module.classify_command.return_value = shell_engine.category_manager_module.UNKNOWN_CATEGORY_SENTINEL
+    shell_engine.ui_manager.start_categorization_flow = AsyncMock(return_value={'action': 'cancel_execution'})
+    
+    await shell_engine.process_command("unknown_cmd", "unknown_cmd")
+    shell_engine.ui_manager.append_output.assert_called_with("Execution of 'unknown_cmd' cancelled.", style_class='info')
 
