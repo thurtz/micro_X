@@ -77,6 +77,36 @@ def test_save_json_file_makedirs_fail(mock_makedirs):
     mock_makedirs.side_effect = OSError("Permission denied")
     assert config_handler.save_json_file("/root/out.json", {"a": 1}) is False
 
-def test_save_json_file_serialization_error():
-    # Sets are not serializable
-    assert config_handler.save_json_file("out.json", {1, 2, 3}) is False
+@patch("os.makedirs")
+
+@patch("builtins.open", new_callable=mock_open)
+
+def test_save_json_file_serialization_error(mock_file, mock_makedirs):
+
+    with patch("json.dump", side_effect=TypeError("Not serializable")):
+
+        assert config_handler.save_json_file("out.json", {"a": 1}) is False
+
+
+
+
+
+@patch("os.path.exists", return_value=True)
+
+def test_load_jsonc_unexpected_exception(mock_exists):
+
+    with patch("builtins.open", mock_open()) as m:
+
+        m.return_value.read.side_effect = Exception("Surprise!")
+
+        assert config_handler.load_jsonc_file("path.jsonc") is None
+
+
+
+@patch("os.makedirs")
+
+def test_save_json_file_io_error(mock_makedirs):
+
+    with patch("builtins.open", side_effect=IOError("Disk full")):
+
+        assert config_handler.save_json_file("out.json", {"a": 1}) is False
