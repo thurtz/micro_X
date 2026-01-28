@@ -58,19 +58,65 @@ async def test_process_intercepted_command_exit(processor):
         mock_write.assert_called_once_with(1, b"exit\n")
 
 @pytest.mark.asyncio
-async def test_process_intercepted_command_ai_suggests(processor, mock_deps):
+async def test_handle_ai_confirmation_modify(processor):
     mock_stdin = AsyncMock()
-    mock_stdin.read.return_value = b'y' # User confirms AI suggestion
+    mock_stdin.read.return_value = b'm'
     
-    # AI Handler returns a suggestion
-    mock_deps["ai_handler"].get_validated_ai_command = AsyncMock(return_value=("ls -l", "raw"))
-    # Ollama is running
-    mock_deps["ollama_manager"].is_ollama_server_running = AsyncMock(return_value=True)
-    
-    with patch("os.write") as mock_write, \
-         patch("sys.stdout.buffer.write"), \
+    with patch("sys.stdout.buffer.write"), \
          patch("sys.stdout.flush"):
-        await processor._process_intercepted_command("list files", 1, mock_stdin)
+        res = await processor._handle_ai_confirmation("ls -l", "ls", mock_stdin, 1)
+        assert res is None
+
+@pytest.mark.asyncio
+async def test_handle_ai_confirmation_explain(processor, mock_deps):
+    mock_stdin = AsyncMock()
+    # First 'e', then 'y'
+    mock_stdin.read.side_effect = [b'e', b'y']
+    
+    mock_deps["ai_handler"].explain_linux_command_with_ai = AsyncMock(return_value="It lists files.")
+    
+    with patch("sys.stdout.buffer.write") as mock_write, \
+         patch("sys.stdout.flush"):
+        res = await processor._handle_ai_confirmation("ls -l", "ls", mock_stdin, 1)
         
-        # Should execute the AI suggested command
-        mock_write.assert_called_with(1, b"ls -l\n")
+        mock_deps["ai_handler"].explain_linux_command_with_ai.assert_called_once()
+        assert res == "ls -l"
+        
+        # Check if explanation was written
+        written_data = b"".join(call[0][0] for call in mock_write.call_args_list)
+        assert b"--- AI Explanation ---" in written_data
+        assert b"It lists files." in written_data
+
+@pytest.mark.asyncio
+async def test_process_intercepted_command_ai_down(processor, mock_deps):
+    mock_deps["ollama_manager"].is_ollama_server_running = AsyncMock(return_value=False)
+    
+    with patch("os.write") as mock_write:
+        await processor._process_intercepted_command("cmd", 1, AsyncMock())
+        mock_write.assert_called_once_with(1, b"cmd\n")
+
+@pytest.mark.asyncio
+async def test_process_intercepted_command_no_suggestion(processor, mock_deps):
+    mock_deps["ollama_manager"].is_ollama_server_running = AsyncMock(return_value=True)
+    # AI returns same command or None
+    mock_deps["ai_handler"].get_validated_ai_command = AsyncMock(return_value=("cmd", "raw"))
+    
+    with patch("os.write") as mock_write:
+        await processor._process_intercepted_command("cmd", 1, AsyncMock())
+        # Should execute original since no change
+        mock_write.assert_called_once_with(1, b"cmd\n")
+
+@pytest.mark.asyncio
+async def test_process_intercepted_command_modify_flow(processor, mock_deps):
+    mock_deps["ollama_manager"].is_ollama_server_running = AsyncMock(return_value=True)
+    mock_deps["ai_handler"].get_validated_ai_command = AsyncMock(return_value=("ls -l", "raw"))
+    
+    # Mock confirmation to return None (Modify)
+    with patch.object(processor, '_handle_ai_confirmation', return_value=None) as mock_confirm, \
+         patch("os.write") as mock_write:
+        
+        await processor._process_intercepted_command("list files", 1, AsyncMock())
+        
+        mock_confirm.assert_awaited_once()
+        # Should just write newline to reset prompt, not execute anything
+        mock_write.assert_called_once_with(1, b'\n')
