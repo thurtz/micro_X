@@ -103,3 +103,45 @@ async def test_query_knowledge_base_rag_no_context(mock_rag_cls, mock_load_confi
     result = await query_engine.query_knowledge_base_rag("test_kb", "question")
     
     assert "could not find any relevant information" in result
+
+def test_merge_configs():
+    base = {"a": 1, "b": {"c": 2}}
+    override = {"b": {"d": 3}, "e": 4}
+    merged = query_engine.merge_configs(base, override)
+    
+    assert merged["a"] == 1
+    assert merged["b"]["c"] == 2
+    assert merged["b"]["d"] == 3
+    assert merged["e"] == 4
+
+@patch("modules.query_engine.config_handler.load_jsonc_file")
+def test_load_config_default_missing(mock_load):
+    mock_load.return_value = None
+    with pytest.raises(SystemExit):
+        query_engine.load_config()
+
+@patch("modules.query_engine.config_handler.load_jsonc_file")
+def test_load_config_success_with_override(mock_load):
+    # First call default, second call user
+    mock_load.side_effect = [{"default": True}, {"user": True}]
+    
+    config = query_engine.load_config()
+    assert config["default"] is True
+    assert config["user"] is True
+
+@patch("modules.query_engine.load_config")
+def test_query_knowledge_base_exception(mock_load):
+    mock_load.side_effect = Exception("Config Load Fail")
+    result = query_engine.query_knowledge_base("kb", "q")
+    assert "An error occurred" in result
+
+@pytest.mark.asyncio
+@patch("modules.query_engine.load_config")
+@patch("modules.query_engine.RAGManager")
+async def test_query_knowledge_base_rag_init_fail(mock_rag_cls, mock_load):
+    mock_load.return_value = {}
+    mock_rag = mock_rag_cls.return_value
+    mock_rag.vector_store = None # Fail init
+    
+    result = await query_engine.query_knowledge_base_rag("kb", "q")
+    assert "not found or failed to load" in result

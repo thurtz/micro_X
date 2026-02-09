@@ -5,6 +5,10 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1048] - 2026-01-28
+### Added
+- **Testing:** Reached 100% coverage for `modules/query_engine.py` and significantly improved `modules/rag_manager.py` (to 82%) with robust error handling and logic tests.
+
 ## [0.0.1047] - 2026-01-27
 ### Added
 - **Testing:** Created `tests/test_textual_app.py` achieving 67% coverage for the TUI application logic.
