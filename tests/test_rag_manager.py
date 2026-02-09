@@ -108,3 +108,71 @@ def test_query_success(rag_manager):
     
     assert results == ["Relevant content"]
     rag_manager.vector_store.similarity_search.assert_called_once_with("some query", k=5)
+
+def test_rag_manager_initialize_missing_config():
+    # Test initialization without embedding model
+    manager = RAGManager({}, name="test_kb")
+    manager.initialize()
+    assert manager.embeddings is None
+    assert manager.vector_store is None
+
+def test_rag_manager_initialize_exception(mocker, mock_config):
+    # Test initialization exception (e.g., Chroma init fail)
+    mocker.patch('modules.rag_manager.OllamaEmbeddings')
+    mocker.patch('modules.rag_manager.Chroma', side_effect=Exception("DB Error"))
+    manager = RAGManager(mock_config, name="test_kb")
+    manager.initialize()
+    assert manager.vector_store is None
+
+def test_add_file_exception(rag_manager):
+    with patch("modules.rag_manager.TextLoader", side_effect=Exception("Load Error")):
+        # Should catch exception and log error, not crash
+        rag_manager.add_file("test.txt")
+
+def test_add_directory_exception(rag_manager):
+    with patch("os.walk", side_effect=Exception("Walk Error")):
+        rag_manager.add_directory("/root")
+
+def test_add_url_recursion_and_filtering(rag_manager, mocker):
+    # Mock requests
+    mock_response_html = MagicMock()
+    mock_response_html.headers = {'Content-Type': 'text/html'}
+    mock_response_html.text = '<html><a href="/page2">Link</a></html>'
+    mock_response_html.raise_for_status = MagicMock()
+
+    mock_response_page2 = MagicMock()
+    mock_response_page2.headers = {'Content-Type': 'text/html'}
+    mock_response_page2.text = '<html>Content Page 2</html>'
+    
+    mock_response_image = MagicMock()
+    mock_response_image.headers = {'Content-Type': 'image/png'}
+
+    def side_effect_head(url, **kwargs):
+        if "image" in url: return mock_response_image
+        return mock_response_html # Default to HTML for HEAD check
+
+    def side_effect_get(url, **kwargs):
+        if url.endswith("/page2"): return mock_response_page2
+        return mock_response_html
+
+    mocker.patch('requests.head', side_effect=side_effect_head)
+    mocker.patch('requests.get', side_effect=side_effect_get)
+    
+    mock_add_texts = mocker.patch.object(rag_manager.vector_store, 'add_texts')
+
+    # Add URL with recursion depth 2
+    rag_manager.add_url("http://example.com", recursive=True, depth=2)
+
+    # Should have processed example.com and example.com/page2
+    assert mock_add_texts.call_count >= 2
+    
+    # Check that image was skipped (if we had one in the list, but our mock logic is simple)
+    # Let's test the filtering explicitly
+    mock_add_texts.reset_mock()
+    rag_manager.add_url("http://example.com/image.png")
+    mock_add_texts.assert_not_called()
+
+def test_query_exception(rag_manager):
+    rag_manager.vector_store.similarity_search.side_effect = Exception("Search Fail")
+    results = rag_manager.query("query")
+    assert results == []
