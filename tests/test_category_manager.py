@@ -267,6 +267,27 @@ def test_handle_command_subsystem_input_unknown_subcommand(monkeypatch):
     mock_append.assert_called()
     assert "Unknown /command subcommand" in mock_append.call_args[0][0]
 
+def test_handle_command_subsystem_usage_errors(monkeypatch):
+    """Test various usage errors in the subsystem."""
+    mock_append = MagicMock()
+    monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    
+    # remove needs 3 parts
+    category_manager.handle_command_subsystem_input("/command remove")
+    assert "Usage: /command remove" in mock_append.call_args[0][0]
+    
+    # list needs exactly 2 parts
+    category_manager.handle_command_subsystem_input("/command list extra")
+    assert "Usage: /command list" in mock_append.call_args[0][0]
+    
+    # move needs 4 parts
+    category_manager.handle_command_subsystem_input("/command move cmd")
+    assert "Usage: /command move" in mock_append.call_args[0][0]
+    
+    # run needs 4 parts
+    category_manager.handle_command_subsystem_input("/command run cat")
+    assert "Usage: /command run" in mock_append.call_args[0][0]
+
 def test_handle_command_subsystem_input_invalid_structure(monkeypatch):
     mock_append = MagicMock()
     monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
@@ -277,6 +298,53 @@ def test_handle_command_subsystem_input_invalid_structure(monkeypatch):
     assert "Invalid /command structure" in mock_append.call_args[0][0]
 
 # --- Tests for Listing ---
+
+def test_init_category_manager(monkeypatch):
+    """Test initialization and path construction."""
+    mock_append = MagicMock()
+    with patch("modules.category_manager.load_and_merge_command_categories") as mock_load:
+        category_manager.init_category_manager("/base", "cfg", mock_append)
+        
+        assert category_manager._SCRIPT_DIR_PATH == "/base"
+        assert category_manager._CONFIG_DIR_NAME_CONST == "cfg"
+        assert category_manager._append_output_func_ref == mock_append
+        assert category_manager.DEFAULT_CATEGORY_FILE_PATH == "/base/cfg/default_command_categories.json"
+        assert category_manager.USER_CATEGORY_FILE_PATH == "/base/cfg/user_command_categories.json"
+        mock_load.assert_called_once()
+
+@patch("modules.category_manager._load_single_category_file")
+def test_load_and_merge_full_logic(mock_load_single, monkeypatch):
+    """Test merging default and user categories with overrides and de-duplication."""
+    # Setup paths so it doesn't error
+    monkeypatch.setattr(category_manager, 'DEFAULT_CATEGORY_FILE_PATH', '/d')
+    monkeypatch.setattr(category_manager, 'USER_CATEGORY_FILE_PATH', '/u')
+    
+    # Defaults: cmd1 is simple, cmd2 is semi
+    default_data = {
+        "simple": ["cmd1"],
+        "semi_interactive": ["cmd2"],
+        "interactive_tui": []
+    }
+    # User: Move cmd1 to interactive_tui, add cmd3 to simple
+    user_data = {
+        "simple": ["cmd3"],
+        "semi_interactive": [],
+        "interactive_tui": ["cmd1"]
+    }
+    
+    mock_load_single.side_effect = [default_data, user_data]
+    
+    with patch("os.path.exists", return_value=True):
+        category_manager.load_and_merge_command_categories()
+        
+    merged = category_manager._CURRENTLY_LOADED_CATEGORIES
+    # cmd1 should be REMOVED from simple and ADDED to interactive_tui
+    assert "cmd1" not in merged["simple"]
+    assert "cmd1" in merged["interactive_tui"]
+    # cmd2 remains in semi
+    assert "cmd2" in merged["semi_interactive"]
+    # cmd3 added to simple
+    assert "cmd3" in merged["simple"]
 
 def test_list_categorized_commands(monkeypatch):
     mock_append = MagicMock()
@@ -293,6 +361,71 @@ def test_list_categorized_commands(monkeypatch):
     # Subheader for interactive_tui
     # Note: Description might vary, check basic presence
     assert any("interactive_tui" in str(arg) for call in mock_append.call_args_list for arg in call[0])
+
+def test_list_categorized_commands_no_callback(monkeypatch, caplog):
+    """Test error when callback is missing."""
+    monkeypatch.setattr(category_manager, '_append_output_func_ref', None)
+    category_manager.list_categorized_commands()
+    assert "append_output function not available" in caplog.text
+
+@patch("modules.category_manager.load_and_merge_command_categories")
+def test_list_categorized_commands_load_fail(mock_load, monkeypatch):
+    """Test error when loading fails during list."""
+    mock_append = MagicMock()
+    monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    monkeypatch.setattr(category_manager, '_CURRENTLY_LOADED_CATEGORIES', {})
+    
+    # Simulate load failure by keeping categories empty
+    category_manager.list_categorized_commands()
+    mock_append.assert_any_call("❌ Error: Categories could not be loaded for listing.", style_class='error')
+
+def test_move_command_category(monkeypatch):
+    """Test move is an alias for add."""
+    mock_add = MagicMock()
+    monkeypatch.setattr(category_manager, 'add_command_to_category', mock_add)
+    category_manager.move_command_category("cmd", "2")
+    mock_add.assert_called_once_with("cmd", "2")
+
+def test_save_user_categories_no_path(monkeypatch, caplog):
+    """Test save error when path is missing."""
+    monkeypatch.setattr(category_manager, 'USER_CATEGORY_FILE_PATH', None)
+    mock_append = MagicMock()
+    monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    
+    category_manager._save_user_command_categories({})
+    assert "User category path not initialized" in caplog.text
+    mock_append.assert_called_with("❌ Error: User category path not configured.", style_class='error')
+
+@patch("modules.config_handler.save_json_file", return_value=False)
+def test_save_user_categories_fail(mock_save, monkeypatch, caplog):
+    """Test behavior when save fails."""
+    monkeypatch.setattr(category_manager, 'USER_CATEGORY_FILE_PATH', '/path')
+    mock_append = MagicMock()
+    monkeypatch.setattr(category_manager, '_append_output_func_ref', mock_append)
+    
+    category_manager._save_user_command_categories({})
+    assert "Failed to save user categories" in caplog.text
+    mock_append.assert_called_with("❌ Error saving user categories.", style_class='error')
+
+@patch("modules.category_manager.load_and_merge_command_categories")
+def test_classify_command_load_fail(mock_load, monkeypatch, caplog):
+    """Test classify when load fails to populate categories."""
+    monkeypatch.setattr(category_manager, '_CURRENTLY_LOADED_CATEGORIES', {})
+    res = category_manager.classify_command("cmd")
+    assert res == category_manager.UNKNOWN_CATEGORY_SENTINEL
+    assert "Cannot classify command: categories are not loaded" in caplog.text
+
+def test_add_command_no_callback(monkeypatch, caplog):
+    """Test add_command without UI callback."""
+    monkeypatch.setattr(category_manager, '_append_output_func_ref', None)
+    category_manager.add_command_to_category("cmd", "1")
+    assert "append_output function not available" in caplog.text
+
+def test_remove_command_no_callback(monkeypatch, caplog):
+    """Test remove_command without UI callback."""
+    monkeypatch.setattr(category_manager, '_append_output_func_ref', None)
+    category_manager.remove_command_from_category("cmd")
+    assert "append_output function not available" in caplog.text
     
     # --- New Tests for Enhanced Coverage ---
     
