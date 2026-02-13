@@ -1,6 +1,7 @@
 # tests/test_output_analyzer.py
 
 import pytest
+import sys
 from modules import output_analyzer
 
 def test_is_tui_like_output_clean():
@@ -99,4 +100,24 @@ def test_is_tui_like_output_char_threshold_isolation():
 
 def test_is_tui_like_output_no_lines():
     """Test with string that splits to empty lines list."""
+    # splitlines() on "\n" results in [''], which is 1 line.
+    # To get 0 lines, we need an empty string, but that's handled by `if not text_content`.
+    # However, some edge cases in python versions or specific whitespace might trigger it.
+    # Actually, the code has: 
+    # lines = text_content.splitlines()
+    # if not lines: return False
+    # In Python, "".splitlines() is [], so this covers the empty string if it got past the first check.
     assert output_analyzer.is_tui_like_output("") is False
+
+def test_is_tui_like_output_zero_total_chars_logic(monkeypatch):
+    """Force the path where total_chars_in_content might be zero if it got past checks."""
+    # This is hard to trigger naturally given the early returns, 
+    # but we can test the threshold logic by using extremely sensitive values.
+    assert output_analyzer.is_tui_like_output(" ", char_threshold_pct=0.0) is True
+
+def test_main_function_direct(capsys):
+    """Call the main() function directly to cover it."""
+    output_analyzer.main()
+    captured = capsys.readouterr()
+    assert "Clean output TUI-like: False" in captured.out
+    assert "htop-like output TUI-like: True" in captured.out

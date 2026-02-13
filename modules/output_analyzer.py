@@ -75,11 +75,10 @@ def is_tui_like_output(
         return False
 
     lines = text_content.splitlines()
-    if not lines:
-        logger.debug("is_tui_like_output: Content split into zero lines. Returning False.")
-        return False
-
     num_lines = len(lines)
+    # Note: Splitlines on non-empty string always returns at least one element (even if empty string)
+    # so num_lines > 0 is guaranteed here.
+
     ansi_lines_count = 0  # Number of lines that contain at least one ANSI sequence
     total_ansi_chars_count = 0  # Total number of characters that are part of ANSI sequences
     total_chars_in_content = len(text_content) # Total characters in the original string
@@ -93,40 +92,32 @@ def is_tui_like_output(
             ansi_lines_count += 1
             for seq in found_sequences:
                 total_ansi_chars_count += len(seq)
-            # Uncomment for very detailed logging of sequences found per line:
-            # logger.debug(f"Line {line_num+1}/{num_lines} contains ANSI sequences: {found_sequences}")
 
     # Heuristic 1: Based on the percentage of lines containing ANSI codes
-    if num_lines > 0: # Ensure no division by zero
-        percentage_of_ansi_lines = (ansi_lines_count / num_lines) * 100
-        logger.debug(
-            f"is_tui_like_output: ANSI lines: {ansi_lines_count}/{num_lines} "
-            f"({percentage_of_ansi_lines:.2f}%)"
+    percentage_of_ansi_lines = (ansi_lines_count / num_lines) * 100
+    logger.debug(
+        f"is_tui_like_output: ANSI lines: {ansi_lines_count}/{num_lines} "
+        f"({percentage_of_ansi_lines:.2f}%)"
+    )
+    if percentage_of_ansi_lines >= line_threshold_pct:
+        logger.info(
+            f"TUI-like output DETECTED based on line threshold: "
+            f"{percentage_of_ansi_lines:.2f}% >= {line_threshold_pct:.2f}%"
         )
-        if percentage_of_ansi_lines >= line_threshold_pct:
-            logger.info(
-                f"TUI-like output DETECTED based on line threshold: "
-                f"{percentage_of_ansi_lines:.2f}% >= {line_threshold_pct:.2f}%"
-            )
-            return True
-    else:
-        percentage_of_ansi_lines = 0.0
+        return True
 
     # Heuristic 2: Based on the percentage of total characters that are part of ANSI codes
-    if total_chars_in_content > 0: # Ensure no division by zero
-        percentage_of_ansi_chars = (total_ansi_chars_count / total_chars_in_content) * 100
-        logger.debug(
-            f"is_tui_like_output: ANSI characters: {total_ansi_chars_count}/{total_chars_in_content} "
-            f"({percentage_of_ansi_chars:.2f}%)"
+    percentage_of_ansi_chars = (total_ansi_chars_count / total_chars_in_content) * 100
+    logger.debug(
+        f"is_tui_like_output: ANSI characters: {total_ansi_chars_count}/{total_chars_in_content} "
+        f"({percentage_of_ansi_chars:.2f}%)"
+    )
+    if percentage_of_ansi_chars >= char_threshold_pct:
+        logger.info(
+            f"TUI-like output DETECTED based on character threshold: "
+            f"{percentage_of_ansi_chars:.2f}% >= {char_threshold_pct:.2f}%"
         )
-        if percentage_of_ansi_chars >= char_threshold_pct:
-            logger.info(
-                f"TUI-like output DETECTED based on character threshold: "
-                f"{percentage_of_ansi_chars:.2f}% >= {char_threshold_pct:.2f}%"
-            )
-            return True
-    else:
-        percentage_of_ansi_chars = 0.0
+        return True
 
     logger.debug(
         f"Output NOT considered TUI-like. Line %%: {percentage_of_ansi_lines:.2f}, "
@@ -134,8 +125,8 @@ def is_tui_like_output(
     )
     return False
 
-# This block allows for direct testing of the module if run as a script.
-if __name__ == '__main__':
+def main():
+    """Main function for direct testing of the module."""
     # Configure basic logging for direct script execution testing
     # This will show logs from this module (e.g., "output_analyzer")
     logging.basicConfig(
@@ -226,3 +217,6 @@ if __name__ == '__main__':
     only_ansi = "\x1B[1m\x1B[31m\x1B[4m"
     result_only_ansi = is_tui_like_output(only_ansi)
     print(f"Only ANSI codes TUI-like: {result_only_ansi} (Expected: True)\n")
+
+if __name__ == '__main__':
+    main()
