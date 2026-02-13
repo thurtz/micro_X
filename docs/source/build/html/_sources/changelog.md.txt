@@ -5,6 +5,10 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1051] - 2026-02-11
+### Added
+- **Testing:** Improved test coverage for `modules/category_manager.py` (reached 86%), adding tests for initialization, complex category merging, and robust error handling for user configuration files.
+
 ## [0.0.1050] - 2026-02-11
 ### Added
 - **Testing:** Reached 99% test coverage for `modules/output_analyzer.py` with new tests for empty/mixed output and direct `main()` execution.
