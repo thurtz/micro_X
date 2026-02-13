@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>modules.output_analyzer &mdash; micro_X 0.0.1049 documentation</title>
+  <title>modules.output_analyzer &mdash; micro_X 0.0.1050 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=80554c5b"></script>
+      <script src="../../_static/documentation_options.js?v=63712b09"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -151,11 +151,10 @@
         <span class="k">return</span> <span class="kc">False</span>
 
     <span class="n">lines</span> <span class="o">=</span> <span class="n">text_content</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">lines</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;is_tui_like_output: Content split into zero lines. Returning False.&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="kc">False</span>
-
     <span class="n">num_lines</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span>
+    <span class="c1"># Note: Splitlines on non-empty string always returns at least one element (even if empty string)</span>
+    <span class="c1"># so num_lines &gt; 0 is guaranteed here.</span>
+
     <span class="n">ansi_lines_count</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># Number of lines that contain at least one ANSI sequence</span>
     <span class="n">total_ansi_chars_count</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># Total number of characters that are part of ANSI sequences</span>
     <span class="n">total_chars_in_content</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">text_content</span><span class="p">)</span> <span class="c1"># Total characters in the original string</span>
@@ -169,40 +168,32 @@
             <span class="n">ansi_lines_count</span> <span class="o">+=</span> <span class="mi">1</span>
             <span class="k">for</span> <span class="n">seq</span> <span class="ow">in</span> <span class="n">found_sequences</span><span class="p">:</span>
                 <span class="n">total_ansi_chars_count</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">seq</span><span class="p">)</span>
-            <span class="c1"># Uncomment for very detailed logging of sequences found per line:</span>
-            <span class="c1"># logger.debug(f&quot;Line {line_num+1}/{num_lines} contains ANSI sequences: {found_sequences}&quot;)</span>
 
     <span class="c1"># Heuristic 1: Based on the percentage of lines containing ANSI codes</span>
-    <span class="k">if</span> <span class="n">num_lines</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="c1"># Ensure no division by zero</span>
-        <span class="n">percentage_of_ansi_lines</span> <span class="o">=</span> <span class="p">(</span><span class="n">ansi_lines_count</span> <span class="o">/</span> <span class="n">num_lines</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;is_tui_like_output: ANSI lines: </span><span class="si">{</span><span class="n">ansi_lines_count</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">num_lines</span><span class="si">}</span><span class="s2"> &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">percentage_of_ansi_lines</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%)&quot;</span>
+    <span class="n">percentage_of_ansi_lines</span> <span class="o">=</span> <span class="p">(</span><span class="n">ansi_lines_count</span> <span class="o">/</span> <span class="n">num_lines</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;is_tui_like_output: ANSI lines: </span><span class="si">{</span><span class="n">ansi_lines_count</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">num_lines</span><span class="si">}</span><span class="s2"> &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">percentage_of_ansi_lines</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%)&quot;</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">percentage_of_ansi_lines</span> <span class="o">&gt;=</span> <span class="n">line_threshold_pct</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;TUI-like output DETECTED based on line threshold: &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">percentage_of_ansi_lines</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% &gt;= </span><span class="si">{</span><span class="n">line_threshold_pct</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%&quot;</span>
         <span class="p">)</span>
-        <span class="k">if</span> <span class="n">percentage_of_ansi_lines</span> <span class="o">&gt;=</span> <span class="n">line_threshold_pct</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;TUI-like output DETECTED based on line threshold: &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">percentage_of_ansi_lines</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% &gt;= </span><span class="si">{</span><span class="n">line_threshold_pct</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%&quot;</span>
-            <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">True</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">percentage_of_ansi_lines</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">return</span> <span class="kc">True</span>
 
     <span class="c1"># Heuristic 2: Based on the percentage of total characters that are part of ANSI codes</span>
-    <span class="k">if</span> <span class="n">total_chars_in_content</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="c1"># Ensure no division by zero</span>
-        <span class="n">percentage_of_ansi_chars</span> <span class="o">=</span> <span class="p">(</span><span class="n">total_ansi_chars_count</span> <span class="o">/</span> <span class="n">total_chars_in_content</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;is_tui_like_output: ANSI characters: </span><span class="si">{</span><span class="n">total_ansi_chars_count</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total_chars_in_content</span><span class="si">}</span><span class="s2"> &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">percentage_of_ansi_chars</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%)&quot;</span>
+    <span class="n">percentage_of_ansi_chars</span> <span class="o">=</span> <span class="p">(</span><span class="n">total_ansi_chars_count</span> <span class="o">/</span> <span class="n">total_chars_in_content</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;is_tui_like_output: ANSI characters: </span><span class="si">{</span><span class="n">total_ansi_chars_count</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total_chars_in_content</span><span class="si">}</span><span class="s2"> &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">percentage_of_ansi_chars</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%)&quot;</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">percentage_of_ansi_chars</span> <span class="o">&gt;=</span> <span class="n">char_threshold_pct</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;TUI-like output DETECTED based on character threshold: &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">percentage_of_ansi_chars</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% &gt;= </span><span class="si">{</span><span class="n">char_threshold_pct</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%&quot;</span>
         <span class="p">)</span>
-        <span class="k">if</span> <span class="n">percentage_of_ansi_chars</span> <span class="o">&gt;=</span> <span class="n">char_threshold_pct</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;TUI-like output DETECTED based on character threshold: &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">percentage_of_ansi_chars</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% &gt;= </span><span class="si">{</span><span class="n">char_threshold_pct</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%&quot;</span>
-            <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">True</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">percentage_of_ansi_chars</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">return</span> <span class="kc">True</span>
 
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
         <span class="sa">f</span><span class="s2">&quot;Output NOT considered TUI-like. Line %%: </span><span class="si">{</span><span class="n">percentage_of_ansi_lines</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, &quot;</span>
@@ -211,8 +202,10 @@
     <span class="k">return</span> <span class="kc">False</span></div>
 
 
-<span class="c1"># This block allows for direct testing of the module if run as a script.</span>
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../api_reference.html#modules.output_analyzer.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Main function for direct testing of the module.&quot;&quot;&quot;</span>
     <span class="c1"># Configure basic logging for direct script execution testing</span>
     <span class="c1"># This will show logs from this module (e.g., &quot;output_analyzer&quot;)</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
@@ -302,7 +295,11 @@
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--- Testing with only ANSI codes ---&quot;</span><span class="p">)</span>
     <span class="n">only_ansi</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\x1B</span><span class="s2">[1m</span><span class="se">\x1B</span><span class="s2">[31m</span><span class="se">\x1B</span><span class="s2">[4m&quot;</span>
     <span class="n">result_only_ansi</span> <span class="o">=</span> <span class="n">is_tui_like_output</span><span class="p">(</span><span class="n">only_ansi</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Only ANSI codes TUI-like: </span><span class="si">{</span><span class="n">result_only_ansi</span><span class="si">}</span><span class="s2"> (Expected: True)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Only ANSI codes TUI-like: </span><span class="si">{</span><span class="n">result_only_ansi</span><span class="si">}</span><span class="s2"> (Expected: True)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
 </pre></div>
 
            </div>
