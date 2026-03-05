@@ -1,1 +1,15 @@
+# Set default behavior to LF for text files
 * text eol=lf
+
+# Explicitly mark binary files to prevent normalization
+*.ttf binary
+*.eot binary
+*.woff binary
+*.woff2 binary
+*.otf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
