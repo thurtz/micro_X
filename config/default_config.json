@@ -1,22 +1,22 @@
 {
   "application": {
-    "version": "0.0.1053"
+    "version": "0.0.1054"
   },
   "ai_models": {
     "primary_translator": {
-      "model": "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
+      "model": "granite4:7b-a1b-h"
     },
     "direct_translator": {
-      "model": "vitali87/shell-commands-qwen2-1.5b-q8_0-extended"
+      "model": "granite4:7b-a1b-h"
     },
     "validator": {
-      "model": "qwen3:0.6b"
+      "model": "granite4:7b-a1b-h"
     },
     "router": {
-      "model": "qwen3:0.6b"
+      "model": "granite4:7b-a1b-h"
     },
     "explainer": {
-      "model": "qwen3:0.6b"
+      "model": "granite4:7b-a1b-h"
     }
   },
   "timeouts": {
