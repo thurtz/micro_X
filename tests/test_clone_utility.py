@@ -2,7 +2,8 @@
 
 import pytest
 import json
-from unittest.mock import mock_open, patch
+import subprocess
+from unittest.mock import mock_open, patch, MagicMock
 from utils import clone
 
 def test_get_next_version_name_success():
@@ -31,51 +32,40 @@ def test_get_next_version_name_invalid_json():
         name = clone.get_next_version_name("/dummy/root")
         assert name is None
 
-# --- New Expansion Tests ---
+def test_run_command_success():
+    """Test successful execution of run_command helper."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(stdout="  output  ", check=True)
+        result = clone.run_command(["ls"])
+        assert result == "output"
+        mock_run.assert_called_once_with(["ls"], cwd=None, capture_output=True, text=True, check=True)
 
-def test_parse_gitignore(tmp_path):
-    # Create dummy gitignore
-    gitignore = tmp_path / ".gitignore"
-    gitignore.write_text("*.log\n# comment\ndist/\n")
-    
-    patterns = clone.parse_gitignore(str(tmp_path))
-    
-    assert "*.log" in patterns
-    assert "dist/" in patterns
-    assert "# comment" not in patterns
-    # Core ignores
-    assert ".git" in patterns
-    assert "clones" in patterns
-
-def test_should_ignore():
-    root = "/root"
-    patterns = ["*.log", "dist/", "secret.txt"]
-    
-    # Ignore file by pattern
-    assert "file.log" in clone.should_ignore("/root", ["file.log", "main.py"], root, patterns)
-    
-    # Ignore dir by pattern
-    assert "dist" in clone.should_ignore("/root", ["dist", "src"], root, patterns)
-    
-    # Ignore file in subdir
-    assert "secret.txt" in clone.should_ignore("/root/subdir", ["secret.txt", "readme.md"], root, patterns)
-    
-    # Don't ignore normal files
-    assert not clone.should_ignore("/root", ["main.py"], root, patterns)
+def test_run_command_failure():
+    """Test failure of run_command helper."""
+    with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "cmd", stderr="error")):
+        with pytest.raises(SystemExit) as e:
+            clone.run_command(["ls"])
+        assert e.value.code == 1
 
 @patch("utils.clone.find_micro_x_root", return_value="/mock")
 @patch("os.path.isdir", return_value=True)
 @patch("os.path.exists", return_value=False) # Destination doesn't exist
-@patch("shutil.copytree")
 @patch("os.makedirs")
+@patch("utils.clone.run_command")
 @patch("builtins.print")
-def test_main_success(mock_print, mock_makedirs, mock_copytree, mock_exists, mock_isdir, mock_root):
+def test_main_success_worktree(mock_print, mock_run, mock_makedirs, mock_exists, mock_isdir, mock_root):
+    """Test successful worktree creation."""
     with patch("sys.argv", ["clone.py", "myclone"]):
         clone.main()
         
-    mock_copytree.assert_called_once()
-    # Check destination path
-    assert "myclone" in mock_copytree.call_args[0][1]
+    # Check that git worktree add was called correctly
+    mock_run.assert_called_once()
+    args = mock_run.call_args[0][0]
+    assert "git" in args
+    assert "worktree" in args
+    assert "add" in args
+    assert "-b" in args
+    assert "myclone" in args
     assert any("Clone created successfully" in str(c) for c in mock_print.call_args_list)
 
 @patch("utils.clone.find_micro_x_root", return_value="/mock")
@@ -83,10 +73,10 @@ def test_main_success(mock_print, mock_makedirs, mock_copytree, mock_exists, moc
 @patch("os.path.exists", return_value=True) # Destination ALREADY exists
 @patch("builtins.print")
 def test_main_already_exists(mock_print, mock_exists, mock_isdir, mock_root):
+    """Test error when destination directory already exists."""
     with patch("sys.argv", ["clone.py", "existing"]):
         with pytest.raises(SystemExit) as e:
             clone.main()
         assert e.value.code == 1
     
     assert any("already exists" in str(c) for c in mock_print.call_args_list)
-

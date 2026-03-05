@@ -101,7 +101,7 @@ def main():
     )
     parser.add_argument('-h', '--help', action=HelpAction, help='show this help message and exit')
 
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument(
         '--add',
         nargs='+',
