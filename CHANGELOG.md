@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **AI Models:** Updated to use `granite4:7b-a1b-h` for better consistency with the production environment.
 - **Version:** Bumped application version to `0.0.1054`.
+### Removed
+- **Git Configuration:** Removed `.gitattributes` to resolve persistent line-ending normalization issues and integrity check failures in mixed Windows/WSL environments.
 
 ## [0.0.1053] - 2026-03-04
 ### Changed
