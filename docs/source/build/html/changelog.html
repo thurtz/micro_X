@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Changelog &mdash; micro_X 0.0.1055 documentation</title>
+  <title>Changelog &mdash; micro_X 0.0.1056 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=3b78b5b7"></script>
+      <script src="_static/documentation_options.js?v=0c803fdd"></script>
       <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
@@ -47,22 +47,26 @@
 <li class="toctree-l1"><a class="reference internal" href="developer/index.html">Developer Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Changelog</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#id1">[0.0.1055] - 2026-03-06</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id1">[0.0.1056] - 2026-03-07</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#fixed">Fixed</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id2">[0.0.1054] - 2026-03-05</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id2">[0.0.1055] - 2026-03-06</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id3">Fixed</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id4">[0.0.1054] - 2026-03-05</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#changed">Changed</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#removed">Removed</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id3">[0.0.1053] - 2026-03-04</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#id4">Changed</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id5">[0.0.1053] - 2026-03-04</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id6">Changed</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#added">Added</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id5">[0.0.1052] - 2026-02-27</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#id6">Added</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id7">[0.0.1052] - 2026-02-27</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id8">Added</a></li>
 </ul>
 </li>
 </ul>
@@ -99,16 +103,25 @@
 <p>The format is based on <a class="reference external" href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a class="reference external" href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <section id="id1">
-<h2>[0.0.1055] - 2026-03-06<a class="headerlink" href="#id1" title="Link to this heading"></a></h2>
+<h2>[0.0.1056] - 2026-03-07<a class="headerlink" href="#id1" title="Link to this heading"></a></h2>
 <section id="fixed">
 <h3>Fixed<a class="headerlink" href="#fixed" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Clone Utility:</strong> Added automatic <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">worktree</span> <span class="pre">prune</span></code> to <code class="docutils literal notranslate"><span class="pre">utils/clone.py</span></code> before creating new clones. This prevents “branch already exists” errors when a clone’s directory was manually deleted without removing the worktree metadata.</p></li>
+</ul>
+</section>
+</section>
+<section id="id2">
+<h2>[0.0.1055] - 2026-03-06<a class="headerlink" href="#id2" title="Link to this heading"></a></h2>
+<section id="id3">
+<h3>Fixed<a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p><strong>Clone Utility:</strong> Improved <code class="docutils literal notranslate"><span class="pre">utils/clone.py</span></code> to correctly identify the <code class="docutils literal notranslate"><span class="pre">micro_X-dev</span></code> root directory regardless of which branch or clone it is executed from. This ensures that new clones are always sourced from the <code class="docutils literal notranslate"><span class="pre">dev</span></code> branch and created within the <code class="docutils literal notranslate"><span class="pre">micro_X-dev/clones/</span></code> directory as intended.</p></li>
 </ul>
 </section>
 </section>
-<section id="id2">
-<h2>[0.0.1054] - 2026-03-05<a class="headerlink" href="#id2" title="Link to this heading"></a></h2>
+<section id="id4">
+<h2>[0.0.1054] - 2026-03-05<a class="headerlink" href="#id4" title="Link to this heading"></a></h2>
 <section id="changed">
 <h3>Changed<a class="headerlink" href="#changed" title="Link to this heading"></a></h3>
 <ul class="simple">
@@ -123,10 +136,10 @@ and this project adheres to <a class="reference external" href="https://semver.o
 </ul>
 </section>
 </section>
-<section id="id3">
-<h2>[0.0.1053] - 2026-03-04<a class="headerlink" href="#id3" title="Link to this heading"></a></h2>
-<section id="id4">
-<h3>Changed<a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<section id="id5">
+<h2>[0.0.1053] - 2026-03-04<a class="headerlink" href="#id5" title="Link to this heading"></a></h2>
+<section id="id6">
+<h3>Changed<a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p><strong>Refactoring:</strong> Refactored <code class="docutils literal notranslate"><span class="pre">utils/clone.py</span></code> to use <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">worktree</span></code> instead of <code class="docutils literal notranslate"><span class="pre">shutil.copytree</span></code>. This transition provides full Git integration for clones, allowing for branch-based development and easier merging.</p></li>
 </ul>
@@ -138,10 +151,10 @@ and this project adheres to <a class="reference external" href="https://semver.o
 </ul>
 </section>
 </section>
-<section id="id5">
-<h2>[0.0.1052] - 2026-02-27<a class="headerlink" href="#id5" title="Link to this heading"></a></h2>
-<section id="id6">
-<h3>Added<a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<section id="id7">
+<h2>[0.0.1052] - 2026-02-27<a class="headerlink" href="#id7" title="Link to this heading"></a></h2>
+<section id="id8">
+<h3>Added<a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p><strong>Testing:</strong> Improved test coverage for <code class="docutils literal notranslate"><span class="pre">modules/git_context_manager.py</span></code> (reached 93%), <code class="docutils literal notranslate"><span class="pre">utils/alias.py</span></code> (reached 94%), and <code class="docutils literal notranslate"><span class="pre">utils/version_sync.py</span></code> (reached 97%), adding robust tests for edge cases, error handling, and CLI execution paths.
 …</p></li>

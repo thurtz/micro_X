@@ -5,6 +5,13 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1056] - 2026-03-07
+### Fixed
+- **Clone Utility:** Improved `utils/clone.py` to be much more robust against manual directory deletion. 
+    - Added automatic `git worktree prune` to clean up metadata.
+    - Added detection for existing branches, allowing the utility to reuse and reset orphaned branches (via `git worktree add -B`) that no longer have a directory.
+    - Added a safety check to ensure a branch is not already in use by another active worktree.
+
 ## [0.0.1055] - 2026-03-06
 ### Fixed
 - **Clone Utility:** Improved `utils/clone.py` to correctly identify the `micro_X-dev` root directory regardless of which branch or clone it is executed from. This ensures that new clones are always sourced from the `dev` branch and created within the `micro_X-dev/clones/` directory as intended.
