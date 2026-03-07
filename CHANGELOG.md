@@ -5,6 +5,13 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1057] - 2026-03-07
+### Changed
+- **Documentation:** Updated `development_directives.md` to reflect the refined multi-stage development workflow, ensuring `dev` is used as a final verification environment before promotion to `testing`.
+- **Whitepaper:** Updated `micro_X-A_Technical_Whitepaper.md` to reflect the new agentic architecture, including LangGraph-based translation and semantic intent classification.
+### Added
+- **Project Management:** Created a centralized `TODO.md` in the root directory to track development tasks, technical debt, and future ideas.
+
 ## [0.0.1056] - 2026-03-07
 ### Fixed
 - **Clone Utility:** Improved `utils/clone.py` to be much more robust against manual directory deletion. 
