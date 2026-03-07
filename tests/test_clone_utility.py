@@ -47,7 +47,7 @@ def test_run_command_failure():
             clone.run_command(["ls"])
         assert e.value.code == 1
 
-@patch("utils.clone.find_micro_x_root", return_value="/mock")
+@patch("utils.clone.find_dev_root", return_value="/mock")
 @patch("os.path.isdir", return_value=True)
 @patch("os.path.exists", return_value=False) # Destination doesn't exist
 @patch("os.makedirs")
@@ -68,7 +68,7 @@ def test_main_success_worktree(mock_print, mock_run, mock_makedirs, mock_exists,
     assert "myclone" in args
     assert any("Clone created successfully" in str(c) for c in mock_print.call_args_list)
 
-@patch("utils.clone.find_micro_x_root", return_value="/mock")
+@patch("utils.clone.find_dev_root", return_value="/mock")
 @patch("os.path.isdir", return_value=True)
 @patch("os.path.exists", return_value=True) # Destination ALREADY exists
 @patch("builtins.print")
