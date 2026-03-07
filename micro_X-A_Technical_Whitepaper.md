@@ -2,7 +2,7 @@
 
 ### **A Technical Whitepaper**
 
-Version: 0.0.1056 (Reflecting Deep Analysis of Snapshot 2025-08-20)  
+Version: 0.0.1057 (Reflecting Deep Analysis of Snapshot 2026-03-06)  
 Project Repository: https://github.com/thurtz/micro_X.git
 
 ### **Abstract**
@@ -28,24 +28,28 @@ A typical user interaction follows a refined, state-aware flow:
 4. **Security Pipeline (ShellEngine):**  
    * **Deny-List Check:** The command is first checked against a list of dangerous regex patterns in the configuration. A match immediately blocks execution.  
    * **Warn-List Check:** If not denied, the command is checked against a list of sensitive command names (e.g., fdisk, dd). A match triggers an additional "Are you sure?" confirmation prompt in the UI.  
-5. **AI Pipeline (ai\_handler):**  
-   * **AI Validation:** An AI validator model assesses if an unknown input is a plausible command or a natural language phrase.  
-   * **Translation & Cleaning:** Natural language queries are sent to a "translator" LLM. The raw AI output is sanitized using a robust regex and cleaning function to extract a pure command string.  
-   * **AI Command Confirmation:** All AI-generated commands are presented to the user with options to **\[E\]xplain**, **\[M\]odify**, **\[C\]ancel**, or **\[Y\]es** to execute. This is the final and most critical safety checkpoint.  
+5. **AI Pipeline (lc\_agent & router\_agent):**  
+   * **Semantic Intent Classification:** The input is first analyzed by the `embedding_manager` to determine the user's semantic intent and route it to the appropriate agent.
+   * **Router Agent:** A tool-based orchestrator (`router_agent.py`) attempts to fulfill the request using internal utilities (e.g., config management, logs) before falling back to general translation.
+   * **LangGraph Translation & Validation:** Natural language queries are processed by a sophisticated pipeline in `lc_agent.py`. A "translator" node generates the command, which is then immediately verified by a "validator" node for technical correctness and safety.
+   * **AI Command Confirmation:** All AI-generated commands are presented to the user with options to **\[E\]xplain**, **\[M\]odify**, **\[C\]ancel**, or **\[Y\]es** to execute. This remains the final and most critical safety checkpoint.  
 6. **Execution (ShellEngine & tmux):**  
    * simple commands are executed directly, with output captured in the UI.  
-   * semi\_interactive and interactive\_tui commands are delegated to new tmux windows. For semi\_interactive commands, output is logged to a temporary file and then analyzed by the output\_analyzer module to gracefully handle TUI-like content and prevent garbled display.
+   * semi\_interactive and interactive\_tui commands are delegated to new tmux windows. For semi\_interactive commands, output is logged to a temporary file and then analyzed by the `output_analyzer` module to gracefully handle TUI-like content and prevent garbled display.
 
 **2.2. Core Modules**
 
-* **main.py:** The application entry point. Handles startup, initialization of managers, and the main asyncio event loop. Features a robust lifecycle management system with comprehensive error handling for a clean startup and shutdown.  
-* **shell\_engine.py:** The central orchestrator. Manages application state, handles the multi-layered security pipeline, and dispatches commands to the correct execution backend (subprocess or tmux).  
-* **ui\_manager.py & curses\_ui\_manager.py:** These modules manage the TUI. ui\_manager.py masterfully handles the prompt\_toolkit interface, using asyncio.Future objects to implement complex, stateful asynchronous flows that allow the engine to await user decisions.  
-* **ai\_handler.py:** Encapsulates all logic for interacting with Ollama LLMs. It uses a multi-model strategy and features sophisticated regex-based parsing to reliably extract commands from varied AI outputs.  
+* **main.py:** The application entry point. Handles startup, manager initialization, and the main asyncio event loop. Supports multiple UI backends (Textual, Curses, Prompt-toolkit).
+* **shell\_engine.py:** The central orchestrator. Manages application state, handles the multi-layered security pipeline, and dispatches commands to the correct execution backend.
+* **lc\_agent.py:** Implements the LangGraph-based AI translation and validation logic, ensuring high-quality and safe command generation.
+* **router\_agent.py:** Coordinates tool-based execution, allowing the AI to interact with the system via predefined utilities.
+* **embedding\_manager.py:** Provides semantic search and intent classification capabilities using vector embeddings.
+* **ui\_manager.py:** Masterfully handles the TUI interfaces, using asyncio.Future objects to implement complex, stateful asynchronous flows that allow the engine to await user decisions.  
+* **ai\_handler.py:** Encapsulates the low-level logic for interacting with Ollama LLMs.
 * **category\_manager.py:** Manages the classification of commands by merging default and user-defined configurations.  
-* **ollama\_manager.py:** A utility module that abstracts the management of the ollama serve process, including starting, stopping, and status checking within a dedicated tmux session.  
-* **git\_context\_manager.py:** Provides a clean, asynchronous interface for Git commands, used exclusively for the startup integrity checks.  
-* **output\_analyzer.py:** A specialized module that heuristically detects TUI screen control codes in command output, enabling intelligent handling of semi\_interactive commands.
+* **git\_context\_manager.py:** Provides a clean, asynchronous interface for Git commands, used for the startup integrity checks.  
+* **output\_analyzer.py:** A specialized module that heuristically detects TUI screen control codes in command output.
+
 
 ### **3\. Key Features in Detail**
 

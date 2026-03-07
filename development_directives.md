@@ -59,12 +59,33 @@ Before committing significant changes or releases to the `dev` branch, follow th
 
 For significant features, refactoring, or risky changes, use the following workflow to ensure stability:
 
-1.  **Create a Clone**: Use the `/clone` utility (or `utils/clone.py`) to create an isolated copy of the current environment.
-    *   Example: `/clone create clone_v0.0.1021`
-2.  **Develop in Clone**: Make all code changes, configuration updates, and tests *within* the clone directory (e.g., `clones/clone_v0.0.1021/`).
+1.  **Create a Clone**: Use the `/clone` utility (or `utils/clone.py`) to create an isolated copy of the current environment. 
+    *   Example: `/clone --bump` (Auto-names based on version)
+    *   *Note*: Clones are created as Git worktrees within the `clones/` directory of the `micro_X-dev` root.
+2.  **Develop in Clone**: Make all code changes, configuration updates, and tests *within* the clone directory (e.g., `clones/clone_v0.0.1057/`).
 3.  **Test in Clone**: Run the application and unit tests (`pytest`) inside the clone to verify functionality.
-    *   Example: `cd clones/clone_v0.0.1021 && ./micro_X.sh`
-    *   Example: `cd clones/clone_v0.0.1021 && pytest`
-4.  **Merge to Dev**: Once verified, copy the modified files from the clone back to the `dev` branch root and commit them.
-    *   *Note*: Ensure you update version numbers, documentation, and the changelog within the clone *before* merging.
-5.  **Commit**: Commit the changes to the `dev` branch as usual.
+    *   Example: `cd clones/clone_v0.0.1057 && ./micro_X.sh`
+    *   Example: `cd clones/clone_v0.0.1057 && pytest`
+4.  **Sync and Documentation**: Before merging, ensure the following are updated *within the clone*:
+    *   Bump version in `config/default_config.json`.
+    *   Run `/version_sync` to propagate the version.
+    *   Add entry to `CHANGELOG.md`.
+    *   Run `/dev --update-docs` to rebuild documentation.
+5.  **Merge to Local Dev**: Copy the modified files from the clone back to the `dev` branch root.
+    *   *Note*: Use `cp` or similar to move files; ensure you are in the `micro_X-dev` root.
+6.  **Verify in Dev**: Run tests and perform manual verification in the `dev` root environment to ensure the merge was successful and no regressions were introduced.
+7.  **Commit and Push**: Once verified in the local `dev` environment, commit the changes and push to the remote.
+    *   Example: `git commit -m "feat: New feature" && git push origin dev`
+
+## 9. Promotion and Release Workflow (dev -> testing)
+
+After changes have been pushed to `origin/dev` and have undergone additional verification if necessary, they are promoted to the `testing` branch:
+
+1.  **Create Promotion PR**: Use the GitHub CLI (`gh`) to create a pull request from `dev` to `testing`. This allows for a final review of the diff on GitHub.
+    *   Example: `gh pr create --base testing --head dev --title "chore: Promote dev to testing (v0.0.1057)" --body "Summary of changes..."`
+2.  **Merge PR**: Merge the PR on GitHub to update the remote `testing` branch.
+    *   Example: `gh pr merge --merge --delete-branch=false`
+3.  **Sync Local Testing**: Switch to the local `micro_X-testing` directory and pull the latest changes to ensure the local testing environment is current.
+    *   Example: `cd ../micro_X-testing && git pull origin testing`
+
+
