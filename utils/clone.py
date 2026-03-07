@@ -30,25 +30,23 @@ Notes:
   - To remove a clone: 'git worktree remove clones/[name]' and 'git branch -d [name]'.
 """
 
-def find_micro_x_root():
-    """Finds the absolute path of the 'micro_X' (main) root directory by looking for .git."""
+def find_dev_root():
+    """Finds the absolute path of the 'micro_X-dev' directory."""
     current = os.path.abspath(__file__)
     while current != os.path.dirname(current):
         current = os.path.dirname(current)
-        if os.path.isdir(os.path.join(current, ".git")):
-            # If we are in the root that contains .git, but that root is micro_X-dev, 
-            # the 'main' root is one level up.
-            if os.path.basename(current) == "micro_X-dev":
-                return os.path.dirname(current)
+        # Case 1: We are inside 'micro_X-dev' (or one of its clones/worktrees)
+        if os.path.basename(current) == "micro_X-dev":
             return current
+        # Case 2: We are in the parent directory of 'micro_X-dev'
+        potential_dev_path = os.path.join(current, "micro_X-dev")
+        if os.path.isdir(potential_dev_path):
+            # Verify it's the actual git repo (or has the .git file for a worktree)
+            if os.path.exists(os.path.join(potential_dev_path, ".git")):
+                return potential_dev_path
     
-    # Fallback to the old logic if .git isn't found (though it should be)
-    current = os.path.abspath(__file__)
-    current = os.path.dirname(os.path.dirname(current))
-    folder_name = os.path.basename(current)
-    if folder_name in ["micro_X-dev", "micro_X-testing"]:
-        current = os.path.dirname(current)
-    return current
+    # Fallback to current directory if discovery fails
+    return os.getcwd()
 
 def get_next_version_name(source_dir):
     """Reads config/default_config.json and calculates the next patch version."""
@@ -85,11 +83,11 @@ def main():
     parser.add_argument("--bump", action="store_true", help="Auto-name clone by incrementing the current version.")
     args = parser.parse_args()
 
-    main_root = find_micro_x_root()
-    source_dir = os.path.join(main_root, "micro_X-dev")
+    # Always target micro_X-dev as the source for clones
+    source_dir = find_dev_root()
 
     if not os.path.isdir(source_dir):
-        print(f"Error: Could not locate 'micro_X-dev' directory at '{source_dir}'.")
+        print(f"Error: Could not locate 'micro_X-dev' directory.")
         sys.exit(1)
 
     # Handle --bump logic
@@ -108,7 +106,7 @@ def main():
         args.name = f"clone_{timestamp}"
         print(f"ℹ️  No name provided. Using auto-generated name: '{args.name}'")
 
-    # Determine Destination
+    # Determine Destination - always within micro_X-dev/clones/
     clones_dir = os.path.join(source_dir, "clones")
     dest_dir = os.path.join(clones_dir, args.name)
 
@@ -116,15 +114,17 @@ def main():
         print(f"Error: Destination '{dest_dir}' already exists.")
         sys.exit(1)
 
-    print(f"Branch Name: {args.name}")
-    print(f"Destination: {dest_dir}")
+    print(f"Source Directory: {source_dir}")
+    print(f"Clone Name:       {args.name}")
+    print(f"Destination:      {dest_dir}")
     print("Creating Git worktree...")
 
     # Ensure clones directory exists
     os.makedirs(clones_dir, exist_ok=True)
     
-    # Create the worktree and branch in one go from the current 'dev' branch
+    # Create the worktree and branch in one go from the 'dev' branch
     run_command(["git", "worktree", "add", "-b", args.name, dest_dir, "dev"], cwd=source_dir)
+
 
     print(f"\n✅ Clone created successfully using Git worktree!")
     print(f"   Location: {dest_dir}")
