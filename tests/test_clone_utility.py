@@ -59,21 +59,13 @@ def test_main_success_worktree(mock_print, mock_run, mock_makedirs, mock_exists,
         clone.main()
         
     # Check that git worktree add was called correctly
-    assert mock_run.call_count == 2
-    
-    # First call should be prune
-    prune_args = mock_run.call_args_list[0][0][0]
-    assert "git" in prune_args
-    assert "worktree" in prune_args
-    assert "prune" in prune_args
-    
-    # Second call should be add
-    add_args = mock_run.call_args_list[1][0][0]
-    assert "git" in add_args
-    assert "worktree" in add_args
-    assert "add" in add_args
-    assert "-b" in add_args
-    assert "myclone" in add_args
+    mock_run.assert_called_once()
+    args = mock_run.call_args[0][0]
+    assert "git" in args
+    assert "worktree" in args
+    assert "add" in args
+    assert "-b" in args
+    assert "myclone" in args
     assert any("Clone created successfully" in str(c) for c in mock_print.call_args_list)
 
 @patch("utils.clone.find_dev_root", return_value="/mock")

@@ -122,9 +122,6 @@ def main():
     # Ensure clones directory exists
     os.makedirs(clones_dir, exist_ok=True)
     
-    # Prune any dead worktree references before creating a new one
-    run_command(["git", "worktree", "prune"], cwd=source_dir)
-    
     # Create the worktree and branch in one go from the 'dev' branch
     run_command(["git", "worktree", "add", "-b", args.name, dest_dir, "dev"], cwd=source_dir)
 
