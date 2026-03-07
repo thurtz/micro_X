@@ -52,21 +52,62 @@ def test_run_command_failure():
 @patch("os.path.exists", return_value=False) # Destination doesn't exist
 @patch("os.makedirs")
 @patch("utils.clone.run_command")
+@patch("subprocess.run")
 @patch("builtins.print")
-def test_main_success_worktree(mock_print, mock_run, mock_makedirs, mock_exists, mock_isdir, mock_root):
-    """Test successful worktree creation."""
+def test_main_success_worktree(mock_print, mock_subprocess_run, mock_run, mock_makedirs, mock_exists, mock_isdir, mock_root):
+    """Test successful worktree creation with new branch."""
+    # mock_run is for clone.run_command
+    # mock_subprocess_run is for the direct subprocess.run call in main
+    
+    # 1. Prune
+    # 2. git worktree list
+    # 3. git worktree add
+    mock_run.side_effect = ["", "existing worktrees", ""] 
+    
+    # Branch doesn't exist (rev-parse fails)
+    mock_subprocess_run.side_effect = subprocess.CalledProcessError(1, "rev-parse")
+
     with patch("sys.argv", ["clone.py", "myclone"]):
         clone.main()
         
     # Check that git worktree add was called correctly
-    mock_run.assert_called_once()
-    args = mock_run.call_args[0][0]
-    assert "git" in args
-    assert "worktree" in args
-    assert "add" in args
-    assert "-b" in args
-    assert "myclone" in args
-    assert any("Clone created successfully" in str(c) for c in mock_print.call_args_list)
+    # 1. prune
+    # 2. list
+    # 3. add
+    assert mock_run.call_count == 3
+    
+    # The last call should be the 'add' with -b
+    add_args = mock_run.call_args_list[-1][0][0]
+    assert "add" in add_args
+    assert "-b" in add_args
+    assert "myclone" in add_args
+
+@patch("utils.clone.find_dev_root", return_value="/mock")
+@patch("os.path.isdir", return_value=True)
+@patch("os.path.exists", return_value=False) # Destination doesn't exist
+@patch("os.makedirs")
+@patch("utils.clone.run_command")
+@patch("subprocess.run")
+@patch("builtins.print")
+def test_main_reuse_branch(mock_print, mock_subprocess_run, mock_run, mock_makedirs, mock_exists, mock_isdir, mock_root):
+    """Test successful worktree creation with EXISTING branch."""
+    # 1. Prune
+    # 2. git worktree list
+    # 3. git worktree add
+    mock_run.side_effect = ["", "existing worktrees", ""] 
+    
+    # Branch EXISTS (rev-parse succeeds)
+    mock_subprocess_run.return_value = MagicMock()
+
+    with patch("sys.argv", ["clone.py", "existing_branch"]):
+        clone.main()
+        
+    # The last call should be the 'add' with -B
+    add_args = mock_run.call_args_list[-1][0][0]
+    assert "add" in add_args
+    assert "-B" in add_args
+    assert "existing_branch" in add_args
+    assert any("already exists. Reusing it" in str(c) for c in mock_print.call_args_list)
 
 @patch("utils.clone.find_dev_root", return_value="/mock")
 @patch("os.path.isdir", return_value=True)

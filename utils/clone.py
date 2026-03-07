@@ -122,8 +122,31 @@ def main():
     # Ensure clones directory exists
     os.makedirs(clones_dir, exist_ok=True)
     
-    # Create the worktree and branch in one go from the 'dev' branch
-    run_command(["git", "worktree", "add", "-b", args.name, dest_dir, "dev"], cwd=source_dir)
+    # Prune any dead worktree references before creating a new one
+    run_command(["git", "worktree", "prune"], cwd=source_dir)
+
+    # Check if the branch already exists
+    branch_exists = False
+    try:
+        subprocess.run(["git", "rev-parse", "--verify", args.name], cwd=source_dir, check=True, capture_output=True)
+        branch_exists = True
+    except subprocess.CalledProcessError:
+        branch_exists = False
+
+    # Check if the branch is already checked out in another worktree
+    worktree_list = run_command(["git", "worktree", "list"], cwd=source_dir)
+    if f"[{args.name}]" in worktree_list:
+        print(f"Error: Branch '{args.name}' is already checked out in another worktree.")
+        sys.exit(1)
+    
+    # Create the worktree
+    if branch_exists:
+        print(f"ℹ️  Branch '{args.name}' already exists. Reusing it and resetting to 'dev'.")
+        # Use -B to reset the existing branch to the current 'dev' HEAD
+        run_command(["git", "worktree", "add", "-B", args.name, dest_dir, "dev"], cwd=source_dir)
+    else:
+        # Create a new branch and the worktree in one go
+        run_command(["git", "worktree", "add", "-b", args.name, dest_dir, "dev"], cwd=source_dir)
 
 
     print(f"\n✅ Clone created successfully using Git worktree!")
