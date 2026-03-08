@@ -30,3 +30,33 @@ micro_X uses a hierarchical configuration system located in the config/ director
 * config/user_config.json: Your personal configuration file. Any setting you place here will **override** the default. This is the correct place to customize AI models, timeouts, and other behaviors.  
 * config/default_command_categories.json: A list of pre-categorized common commands.  
 * config/user_command_categories.json: Your personal command categorizations, managed via the /command subsystem.
+
+## **Clone-Based Development (/clone)**
+
+For developers and contributors, micro_X provides a powerful cloning utility to create isolated environments for testing new features or performing refactoring without affecting your primary development branch.
+
+### **How it Works**
+
+The `/clone` utility leverages `git worktree` to create a lightweight, independent copy of the micro_X repository within a `clones/` directory. Each clone has its own:
+- Dedicated Git branch.
+- Isolated filesystem directory.
+- Separate virtual environment (requires initialization).
+
+### **Basic Usage**
+
+*   **/clone --bump**: Automatically creates a new clone named based on the next version (e.g., `clone_v0.0.1059`). This is the recommended way to start a new task.
+*   **/clone <name>**: Creates a clone with a specific name.
+*   **/clone**: If no name is provided, a timestamp-based name will be generated.
+
+### **Working in a Clone**
+
+1.  **Navigate**: `cd clones/clone_name`
+2.  **Initialize**: Run `./setup.sh` to create the local virtual environment for that clone.
+3.  **Execute**: Run `./micro_X.sh` to start the shell within the isolated environment.
+
+### **Cleaning Up**
+
+To remove a clone when you are finished:
+1.  Navigate back to the `micro_X-dev` root.
+2.  Run `git worktree remove clones/clone_name`.
+3.  Delete the associated branch if no longer needed: `git branch -d clone_name`.

@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>7. Advanced Topics &mdash; micro_X 0.0.1057 documentation</title>
+  <title>7. Advanced Topics &mdash; micro_X 0.0.1058 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=a8f8bbc4"></script>
+      <script src="../_static/documentation_options.js?v=40e21806"></script>
       <script src="../_static/doctools.js?v=9bcbadda"></script>
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
@@ -55,6 +55,13 @@
 <li class="toctree-l3"><a class="reference internal" href="#working-with-tmux"><strong>Working with tmux</strong></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#security-considerations"><strong>Security Considerations</strong></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuration-files"><strong>Configuration Files</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#clone-based-development-clone"><strong>Clone-Based Development (/clone)</strong></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#how-it-works"><strong>How it Works</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#basic-usage"><strong>Basic Usage</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#working-in-a-clone"><strong>Working in a Clone</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cleaning-up"><strong>Cleaning Up</strong></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="08_troubleshooting.html"><strong>8. Troubleshooting</strong></a></li>
@@ -134,6 +141,44 @@
 <li><p>config/default_command_categories.json: A list of pre-categorized common commands.</p></li>
 <li><p>config/user_command_categories.json: Your personal command categorizations, managed via the /command subsystem.</p></li>
 </ul>
+</section>
+<section id="clone-based-development-clone">
+<h2><strong>Clone-Based Development (/clone)</strong><a class="headerlink" href="#clone-based-development-clone" title="Link to this heading"></a></h2>
+<p>For developers and contributors, micro_X provides a powerful cloning utility to create isolated environments for testing new features or performing refactoring without affecting your primary development branch.</p>
+<section id="how-it-works">
+<h3><strong>How it Works</strong><a class="headerlink" href="#how-it-works" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">/clone</span></code> utility leverages <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">worktree</span></code> to create a lightweight, independent copy of the micro_X repository within a <code class="docutils literal notranslate"><span class="pre">clones/</span></code> directory. Each clone has its own:</p>
+<ul class="simple">
+<li><p>Dedicated Git branch.</p></li>
+<li><p>Isolated filesystem directory.</p></li>
+<li><p>Separate virtual environment (requires initialization).</p></li>
+</ul>
+</section>
+<section id="basic-usage">
+<h3><strong>Basic Usage</strong><a class="headerlink" href="#basic-usage" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>/clone –bump</strong>: Automatically creates a new clone named based on the next version (e.g., <code class="docutils literal notranslate"><span class="pre">clone_v0.0.1059</span></code>). This is the recommended way to start a new task.</p></li>
+<li><p><strong>/clone <name></strong>: Creates a clone with a specific name.</p></li>
+<li><p><strong>/clone</strong>: If no name is provided, a timestamp-based name will be generated.</p></li>
+</ul>
+</section>
+<section id="working-in-a-clone">
+<h3><strong>Working in a Clone</strong><a class="headerlink" href="#working-in-a-clone" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Navigate</strong>: <code class="docutils literal notranslate"><span class="pre">cd</span> <span class="pre">clones/clone_name</span></code></p></li>
+<li><p><strong>Initialize</strong>: Run <code class="docutils literal notranslate"><span class="pre">./setup.sh</span></code> to create the local virtual environment for that clone.</p></li>
+<li><p><strong>Execute</strong>: Run <code class="docutils literal notranslate"><span class="pre">./micro_X.sh</span></code> to start the shell within the isolated environment.</p></li>
+</ol>
+</section>
+<section id="cleaning-up">
+<h3><strong>Cleaning Up</strong><a class="headerlink" href="#cleaning-up" title="Link to this heading"></a></h3>
+<p>To remove a clone when you are finished:</p>
+<ol class="arabic simple">
+<li><p>Navigate back to the <code class="docutils literal notranslate"><span class="pre">micro_X-dev</span></code> root.</p></li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">worktree</span> <span class="pre">remove</span> <span class="pre">clones/clone_name</span></code>.</p></li>
+<li><p>Delete the associated branch if no longer needed: <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">branch</span> <span class="pre">-d</span> <span class="pre">clone_name</span></code>.</p></li>
+</ol>
+</section>
 </section>
 </section>
 

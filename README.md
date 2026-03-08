@@ -54,6 +54,7 @@ micro_X provides a modern text-based user interface (TUI) where you can:
 *   Control the underlying Ollama service directly from within the shell.
 *   **Branch-Aware Integrity & Developer Mode:** Automatically enables a permissive 'Developer Mode' when running off the dev branch. Performs startup integrity checks on main and testing branches.
 *   **Web-Based Configuration Manager:** An integrated tool to easily view and edit user configurations and command categorizations via a web interface (launched with the `/config --start` command).
+*   **Clone-Based Development Workflow:** Use the `/clone --bump` utility to create isolated development environments (Git worktrees) for safe testing and refactoring.
 
 ## **Key Features**
 
@@ -101,6 +102,9 @@ micro_X provides a modern text-based user interface (TUI) where you can:
 *   **Logging & Configuration:** Detailed logging and persistent configuration.
 
 *   **Web-Based Configuration Manager:** Launch with the `/config --start` command to easily manage `user_config.json` and `user_command_categories.json` via a web UI.
+
+*   **Clone-Based Development:** Powerful `/clone` utility using `git worktree` for creating isolated, versioned development environments.
+
 
 ## **Usage**
 

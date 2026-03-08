@@ -73,9 +73,10 @@ For significant features, refactoring, or risky changes, use the following workf
     *   Run `/dev --update-docs` to rebuild documentation.
 5.  **Merge to Local Dev**: Copy the modified files from the clone back to the `dev` branch root.
     *   *Note*: Use `cp` or similar to move files; ensure you are in the `micro_X-dev` root.
-6.  **Verify in Dev**: Run tests and perform manual verification in the `dev` root environment to ensure the merge was successful and no regressions were introduced.
-7.  **Commit and Push**: Once verified in the local `dev` environment, commit the changes and push to the remote.
+6.  **Verify in Dev**: Perform final tests and manual verification in the local `dev` environment to ensure the merge was successful. **Do not commit yet.**
+7.  **Commit and Push**: Once (and only once) you have verified the changes in the local `dev` environment, commit them and push to the remote.
     *   Example: `git commit -m "feat: New feature" && git push origin dev`
+
 
 ## 9. Promotion and Release Workflow (dev -> testing)
 
