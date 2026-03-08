@@ -5,6 +5,11 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1058] - 2026-03-07
+### Changed
+- **Documentation:** Extensively audited the user guide and README.md to ensure all instructions reflect the new `git worktree`-based cloning system.
+- **Project Management:** Refined `TODO.md` based on a deep architectural analysis, identifying key areas for performance optimization and hardening.
+
 ## [0.0.1057] - 2026-03-07
 ### Changed
 - **Documentation:** Updated `development_directives.md` to reflect the refined multi-stage development workflow, ensuring `dev` is used as a final verification environment before promotion to `testing`.
