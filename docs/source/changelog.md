@@ -5,6 +5,12 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1060] - 2026-03-09
+### Fixed
+- **Docker UI Aesthetics:** Updated `Dockerfile` to generate and configure UTF-8 locales and enable TrueColor support, ensuring UI parity between containerized and native execution.
+- **Dynamic Container Naming:** Improved `docker-micro_X.sh` to name containers and tag images based on the current Git branch (e.g., `micro_x_dev_timestamp`), providing better clarity across different environments.
+- **Script Permissions:** Updated `setup.sh` to explicitly enforce executable permissions on `docker-micro_X.sh` and core project scripts.
+
 ## [0.0.1059] - 2026-03-08
 ### Added
 - **Dockerized Distribution:** Introduced a production-ready Docker deployment system.

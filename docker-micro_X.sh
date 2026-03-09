@@ -3,18 +3,30 @@
 # Portability-focused wrapper for micro_X in Docker.
 # Supports Host Breakout (chroot) and host-gateway AI connectivity.
 
-IMAGE_NAME="micro_x:latest"
-CONTAINER_NAME="micro_x_dev_$(date +%s)"
-
 # Determine the project root (where the Dockerfile is)
 PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+# Get current branch name for dynamic container and image naming
+BRANCH_NAME=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "none")
+TIMESTAMP=$(date +%s)
+SAFE_BRANCH=$(echo "$BRANCH_NAME" | tr '/' '_')
+
+# Image name is branch-specific to avoid conflicts between clones
+IMAGE_NAME="micro_x:${SAFE_BRANCH}"
+
+if [ "$BRANCH_NAME" == "main" ]; then
+    CONTAINER_NAME="micro_x_$TIMESTAMP"
+    IMAGE_NAME="micro_x:latest"
+else
+    CONTAINER_NAME="micro_x_${SAFE_BRANCH}_$TIMESTAMP"
+fi
 
 # 1. Detect Host TTY Group (for tmux permissions)
 TTY_GID=$(stat -c '%g' /dev/tty 2>/dev/null || echo "5")
 
-# 2. Build the image
+# 2. Build the image (always runs, Docker uses cache if no changes)
 build_image() {
-    echo "Building micro_X Docker image (Debian Trixie)..."
+    echo "Checking/Building Docker image: $IMAGE_NAME"
     if grep -q "desktop.exe" ~/.docker/config.json 2>/dev/null; then
         mv ~/.docker/config.json ~/.docker/config.json.bak
         docker build -t "$IMAGE_NAME" "$PROJECT_ROOT"
@@ -24,9 +36,7 @@ build_image() {
     fi
 }
 
-if [[ "$(docker images -q $IMAGE_NAME 2> /dev/null)" == "" ]]; then
-    build_image
-fi
+build_image
 
 # 3. Configure AI Connection
 OLLAMA_HOST_IP="host.docker.internal"

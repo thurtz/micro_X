@@ -185,6 +185,14 @@ if [[ -z "$SELECTED_SCRIPT" ]] && [[ -z "$OS_DETECTED" ]]; then # If auto-detect
     esac
 fi
 
+# --- Pre-Execution Permisssions ---
+# Ensure core scripts are executable regardless of how they were cloned
+chmod +x "$PROJECT_ROOT/micro_X.sh"
+chmod +x "$PROJECT_ROOT/main.py"
+if [ -f "$PROJECT_ROOT/docker-micro_X.sh" ]; then
+    chmod +x "$PROJECT_ROOT/docker-micro_X.sh"
+fi
+
 # --- Execute Selected Script ---
 if [[ -n "$SELECTED_SCRIPT" ]] && [[ -f "$SELECTED_SCRIPT" ]]; then
     echo_header "Launching Selected Setup Script"

@@ -22,21 +22,30 @@
     - [x] Update `README.md` and User Guide with Docker instructions.
     - [x] Add `tests/test_docker_integration.py` to verify breakout and environment logic.
 
-## Current Tasks (v0.0.1060)
-- [ ] Performance Optimization:
-    - [ ] Implement a persistent cache for intent embeddings in `EmbeddingManager` to improve startup time.
-- [ ] Hardening:
-    - [ ] Improve observability in `lc_agent.py` by logging node-level input/outputs and path decisions.
-    - [ ] Standardize UI state resets in `ShellEngine` using a centralized 'UI Guard' or decorator pattern for async methods.
-- [ ] Feature Parity:
-    - [ ] Audit `textual_ui_manager.py` and `curses_ui_manager.py` to ensure they support recent confirmation and categorization flows.
+## Completed (v0.0.1060)
+- [x] Docker Refinements:
+    - [x] **UI Aesthetics:** Fixed terminal color/encoding in Docker via UTF-8 locales and TrueColor support.
+    - [x] **Dynamic Naming:** Updated `docker-micro_X.sh` to name containers and tag images based on current branch.
+    - [x] **Permissions:** Enforced executable bit for core scripts in `setup.sh`.
+
+## Current Tasks (v0.0.1061)
+- [ ] Docker Hardening:
+    - [ ] **Non-Root Execution:** Refactor container to run as current host user while maintaining breakout via passwordless sudo.
+- [ ] AI & Reliability:
+    - [ ] **Ollama Detection:** Migrate to "API-First" detection (attempt curl/request to version endpoint).
+- [ ] Documentation:
+    - [ ] Update `README.md` and User Guide to state "Clone First" prerequisite for Docker.
+
+## Performance & Hardening (Carryover)
+- [ ] Implement persistent cache for intent embeddings in `EmbeddingManager`.
+- [ ] Improve observability in `lc_agent.py` (node-level logging).
+- [ ] Standardize UI state resets in `ShellEngine`.
 
 ## Technical Debt
-- [ ] **Agentic Tools:** Expand `router_agent.py` toolset to include safe git operations (status, commit) and interactive config management.
-- [ ] **ShellEngine:** Harden command escaping logic in `process_command` to handle complex nested quotes.
-- [ ] **GitContextManager:** Refine timeout logic and provide more granular error reporting for network-related failures.
+- [ ] **Agentic Tools:** Expand `router_agent.py` toolset.
+- [ ] **ShellEngine:** Harden command escaping logic.
+- [ ] **GitContextManager:** Refine timeout logic.
 
 ## Future Ideas
-- [ ] **Configuration Migration:** Transition from JSON to TOML or JSONC to allow for inline documentation of settings.
-- [ ] **Dependency Injection:** Refactor `main.py` to use a formal DI pattern for manager initialization.
-- [ ] **Sandboxing:** Investigate lightweight containerization or restricted shells for executing AI-generated commands.
+- [ ] **Configuration Migration:** Transition from JSON to TOML or JSONC.
+- [ ] **Dependency Injection:** Refactor `main.py`.
