@@ -1,6 +1,7 @@
 # modules/lc_agent.py
 
 import logging
+import os
 import re
 from typing import TypedDict, Annotated, Sequence, Literal
 import asyncio # New import
@@ -108,7 +109,7 @@ async def primary_translator_node(state: AgentState) -> AgentState:
         ("system", system_prompt),
         ("user", user_template)
     ])
-    model = ChatOllama(model=model_name)
+    model = ChatOllama(model=model_name, base_url=os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
     chain = prompt | model | StrOutputParser()
 
     # 3. Invoke the chain with retry logic
@@ -165,7 +166,7 @@ async def validator_node(state: AgentState) -> AgentState:
         ("system", system_prompt),
         ("user", user_template)
     ])
-    model = ChatOllama(model=model_name)
+    model = ChatOllama(model=model_name, base_url=os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
     chain = prompt | model | StrOutputParser()
 
     # 3. Invoke the chain with retry logic
@@ -229,7 +230,7 @@ async def secondary_translator_node(state: AgentState) -> AgentState:
         ("system", system_prompt),
         ("user", user_template)
     ])
-    model = ChatOllama(model=model_name)
+    model = ChatOllama(model=model_name, base_url=os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
     chain = prompt | model | StrOutputParser()
 
     # 3. Invoke the chain with retry logic

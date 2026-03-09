@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>modules.ollama_manager &mdash; micro_X 0.0.1058 documentation</title>
+  <title>modules.ollama_manager &mdash; micro_X 0.0.1059 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=40e21806"></script>
+      <script src="../../_static/documentation_options.js?v=e49a9c1f"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -106,13 +106,18 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">set_ollama_host_from_config</span><span class="p">(</span><span class="n">config_obj</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Sets the OLLAMA_HOST environment variable from a given configuration object.</span>
-<span class="sd">    This should be called as early as possible during startup.</span>
+<span class="sd">    Does NOT overwrite if the variable is already set (e.g. via Docker).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">global</span> <span class="n">_config_cached</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">_config_cached</span><span class="p">:</span>
         <span class="n">_config_cached</span> <span class="o">=</span> <span class="n">config_obj</span> <span class="c1"># Cache the config for other functions in this module</span>
     
-    <span class="c1"># Get the ollama_service sub-dictionary</span>
+    <span class="c1"># Priority 1: Existing Environment Variable</span>
+    <span class="k">if</span> <span class="s1">&#39;OLLAMA_HOST&#39;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;OLLAMA_HOST already set in environment: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;OLLAMA_HOST&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="c1"># Priority 2: Configuration file</span>
     <span class="n">ollama_service_config</span> <span class="o">=</span> <span class="n">config_obj</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ollama_service&#39;</span><span class="p">,</span> <span class="p">{})</span>
     
     <span class="c1"># Logic to determine and set OLLAMA_HOST</span>
@@ -123,11 +128,8 @@
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ollama_host</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">ollama_host</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s1">&#39;http://&#39;</span><span class="p">,</span> <span class="s1">&#39;https://&#39;</span><span class="p">)):</span>
         <span class="n">ollama_host</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;http://</span><span class="si">{</span><span class="n">ollama_host</span><span class="si">}</span><span class="s1">&#39;</span>
 
-    <span class="c1"># The ollama library uses the OLLAMA_HOST environment variable</span>
-    <span class="c1"># to determine the server address.</span>
-    <span class="c1"># It expects format like &quot;http://host:port&quot;</span>
     <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;OLLAMA_HOST&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ollama_host</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">ollama_port</span><span class="si">}</span><span class="s2">&quot;</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;OLLAMA_HOST environment variable set to: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;OLLAMA_HOST&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;OLLAMA_HOST environment variable set from config: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;OLLAMA_HOST&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
 
 
 

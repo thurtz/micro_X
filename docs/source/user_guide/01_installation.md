@@ -1,10 +1,22 @@
 # **1. Installation and Setup**
 
-Getting started with micro_X involves cloning the repository and running a unified setup script that handles dependencies for your specific operating system.
+micro_X can be run either through Docker (recommended for stability and ease of setup) or via a native installation.
 
-## **Step 1: General Setup (All Users)**
+## **Step 1: Docker Setup (Recommended)**
 
-For the best experience, all users should start by installing the main branch. This provides the most stable foundation for using micro_X and for activating the development environment if desired.
+The fastest way to get started with a perfectly stable environment is using Docker.
+
+1. **Launch the Docker Wrapper**:  
+   ./docker-micro_X.sh
+
+   The first time you run this, it will build a Debian Trixie image with all required dependencies (Python 3.13, Git, GitHub CLI, tmux).
+
+2. **Host System Control**:  
+   By default, micro_X in Docker is configured for **Host Breakout Mode**. Commands you run (including those from AI) will execute natively on your host system. Use the `!` prefix to force a host breakout for any manual command.
+
+## **Step 2: Native Setup (Alternative)**
+
+If you prefer to run micro_X directly on your operating system, follow these steps:
 
 1. **Clone the Repository**:  
    git clone https://github.com/thurtz/micro_X.git  

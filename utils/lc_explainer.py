@@ -1,6 +1,7 @@
 # utils/lc_explainer.py
 
 import logging
+import os
 import re
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -52,6 +53,9 @@ async def get_ai_explanation(command_to_explain: str, config_param: dict) -> str
         chat_model_args = {"model": model_name}
         if model_options:
             chat_model_args["options"] = model_options
+            
+        # Ensure we respect OLLAMA_HOST if set (critical for Docker)
+        chat_model_args["base_url"] = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
             
         model = ChatOllama(**chat_model_args)
         

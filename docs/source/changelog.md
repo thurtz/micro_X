@@ -5,9 +5,20 @@ All notable changes to the **micro_X** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1059] - 2026-03-08
+### Added
+- **Dockerized Distribution:** Introduced a production-ready Docker deployment system.
+    - **Self-Contained Image:** A Debian Trixie base with system dependencies, GitHub CLI (`gh`), and pre-configured internal virtual environment.
+    - **Host Breakout Mode:** High-power mode using `chroot` to allow the containerized shell to control the host system.
+    - **Refined Breakout Logic:** All commands breakout to the host by default, maintaining the correct working directory. Internal micro_X commands stay within the stable container environment.
+    - **Manual Breakout:** Use the standard `!` prefix to force any command to execute natively on the host.
+    - **AI Connectivity:** Fixed Ollama connectivity issues for containerized environments by respecting host-gateway networking.
+### Changed
+- **Documentation:** Updated README.md and User Guide to reflect Docker as the recommended installation and usage method.
+
 ## [0.0.1058] - 2026-03-07
 ### Changed
-- **Documentation:** Extensively audited the user guide and README.md to ensure all instructions reflect the new `git worktree`-based cloning system.
+- **Documentation:** Extensively audited the user guide and README.md to ensure all instructions reflect the new `git worktree`-based cloning system. Refined `development_directives.md` to explicitly separate the merge and commit steps for better final verification in the `dev` environment.
 - **Project Management:** Refined `TODO.md` based on a deep architectural analysis, identifying key areas for performance optimization and hardening.
 
 ## [0.0.1057] - 2026-03-07

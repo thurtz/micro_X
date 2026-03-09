@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>1. Installation and Setup &mdash; micro_X 0.0.1058 documentation</title>
+  <title>1. Installation and Setup &mdash; micro_X 0.0.1059 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=40e21806"></script>
+      <script src="../_static/documentation_options.js?v=e49a9c1f"></script>
       <script src="../_static/doctools.js?v=9bcbadda"></script>
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
@@ -46,7 +46,8 @@
 <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">User Guide</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="#"><strong>1. Installation and Setup</strong></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#step-1-general-setup-all-users"><strong>Step 1: General Setup (All Users)</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-1-docker-setup-recommended"><strong>Step 1: Docker Setup (Recommended)</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-2-native-setup-alternative"><strong>Step 2: Native Setup (Alternative)</strong></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#step-2-activating-the-development-environment-optional"><strong>Step 2: Activating the Development Environment (Optional)</strong></a></li>
 </ul>
 </li>
@@ -92,10 +93,22 @@
              
   <section id="installation-and-setup">
 <h1><strong>1. Installation and Setup</strong><a class="headerlink" href="#installation-and-setup" title="Link to this heading"></a></h1>
-<p>Getting started with micro_X involves cloning the repository and running a unified setup script that handles dependencies for your specific operating system.</p>
-<section id="step-1-general-setup-all-users">
-<h2><strong>Step 1: General Setup (All Users)</strong><a class="headerlink" href="#step-1-general-setup-all-users" title="Link to this heading"></a></h2>
-<p>For the best experience, all users should start by installing the main branch. This provides the most stable foundation for using micro_X and for activating the development environment if desired.</p>
+<p>micro_X can be run either through Docker (recommended for stability and ease of setup) or via a native installation.</p>
+<section id="step-1-docker-setup-recommended">
+<h2><strong>Step 1: Docker Setup (Recommended)</strong><a class="headerlink" href="#step-1-docker-setup-recommended" title="Link to this heading"></a></h2>
+<p>The fastest way to get started with a perfectly stable environment is using Docker.</p>
+<ol class="arabic">
+<li><p><strong>Launch the Docker Wrapper</strong>:<br />
+./docker-micro_X.sh</p>
+<p>The first time you run this, it will build a Debian Trixie image with all required dependencies (Python 3.13, Git, GitHub CLI, tmux).</p>
+</li>
+<li><p><strong>Host System Control</strong>:<br />
+By default, micro_X in Docker is configured for <strong>Host Breakout Mode</strong>. Commands you run (including those from AI) will execute natively on your host system. Use the <code class="docutils literal notranslate"><span class="pre">!</span></code> prefix to force a host breakout for any manual command.</p></li>
+</ol>
+</section>
+<section id="step-2-native-setup-alternative">
+<h2><strong>Step 2: Native Setup (Alternative)</strong><a class="headerlink" href="#step-2-native-setup-alternative" title="Link to this heading"></a></h2>
+<p>If you prefer to run micro_X directly on your operating system, follow these steps:</p>
 <ol class="arabic">
 <li><p><strong>Clone the Repository</strong>:<br />
 git clone https://github.com/thurtz/micro_X.git<br />

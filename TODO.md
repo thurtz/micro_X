@@ -6,17 +6,27 @@
 - [x] Update `CHANGELOG.md` and sync version to `0.0.1057`.
 - [x] Robust `utils/clone.py` fixes (git worktree prune, orphaned branch reuse).
 
-## Current Tasks (v0.0.1058)
+## Completed (v0.0.1058)
 - [x] Documentation Audit:
     - [x] Review `docs/source/user_guide/` for outdated setup/cloning instructions (transition from shutil to worktree).
     - [x] Update README.md if any quick-start instructions are stale.
+- [x] Refine `development_directives.md` multi-stage workflow.
+
+## Completed (v0.0.1059)
+- [x] Dockerized Distribution:
+    - [x] Create `Dockerfile` (Debian Trixie base) with system dependencies and `gh`.
+    - [x] Create `docker-micro_X.sh` wrapper with host-path mapping and user identity passthrough.
+    - [x] Implement Host Breakout Mode (privileged/chroot) via `!` command prefix.
+    - [x] Ensure path alignment between container and host for breakout commands.
+    - [x] Fix Ollama AI connectivity for containerized environments.
+    - [x] Update `README.md` and User Guide with Docker instructions.
+    - [x] Add `tests/test_docker_integration.py` to verify breakout and environment logic.
+
+## Current Tasks (v0.0.1060)
 - [ ] Performance Optimization:
-    - [x] (Investigated) Embedding regeneration issue.
     - [ ] Implement a persistent cache for intent embeddings in `EmbeddingManager` to improve startup time.
 - [ ] Hardening:
-    - [x] (Verified) `ShellEngine` uses unique tempfiles via `NamedTemporaryFile`.
     - [ ] Improve observability in `lc_agent.py` by logging node-level input/outputs and path decisions.
-
     - [ ] Standardize UI state resets in `ShellEngine` using a centralized 'UI Guard' or decorator pattern for async methods.
 - [ ] Feature Parity:
     - [ ] Audit `textual_ui_manager.py` and `curses_ui_manager.py` to ensure they support recent confirmation and categorization flows.

@@ -101,6 +101,10 @@ class ShellEngine:
         self.embedding_manager_instance = None
         self.router_agent_instance = create_router_agent(self.config)
 
+        self._is_in_docker_breakout = os.environ.get("DOCKER_BREAKOUT", "false").lower() == "true"
+        # Using chroot /host is more robust for simple shell commands than nsenter
+        self._host_breakout_base = "chroot /host"
+
         self.current_directory = os.getcwd()
         
         # --- Process Management State ---
@@ -244,9 +248,49 @@ class ShellEngine:
             if self.main_restore_normal_input_ref:
                 self.main_restore_normal_input_ref()
 
+    def _apply_host_breakout(self, command: str, original_input: str = "") -> str:
+        """
+        Determines if a command should execute on the host system via chroot.
+        """
+        if not self._is_in_docker_breakout:
+            return command
+        
+        stripped_cmd = command.strip()
+        if not stripped_cmd: return command
+        
+        # Build the dynamic command: cd to dir, then run command
+        # Inside chroot /host, the paths remain identical because we mapped them that way
+        wrapped_cmd = f"cd {self.current_directory} && {stripped_cmd}"
+        breakout_cmd = f"{self._host_breakout_base} /bin/bash -c {shlex.quote(wrapped_cmd)}"
+
+        # Rule 1: Manual force via '!' prefix ALWAYS breaks out
+        if original_input.strip().startswith('!') or stripped_cmd.startswith('!'):
+            clean_cmd = stripped_cmd.lstrip('!').strip()
+            logger.info(f"Host Breakout: Forced via '!' prefix.")
+            wrapped_manual = f"cd {self.current_directory} && {clean_cmd}"
+            return f"{self._host_breakout_base} /bin/bash -c {shlex.quote(wrapped_manual)}"
+
+        # Rule 2: Internal micro_X commands (starting with /) stay in container
+        if stripped_cmd.startswith("/"):
+            return stripped_cmd
+
+        # Rule 3: Project-specific execution stays in container
+        project_indicators = ["main.py", "utils/", "setup.sh", "micro_X.sh", "pytest"]
+        for indicator in project_indicators:
+            if indicator in stripped_cmd:
+                return stripped_cmd
+
+        # Rule 4: Everything else breaks out to the host
+        logger.info(f"Host Breakout: Routing command to host system: {stripped_cmd.split()[0]}")
+        return breakout_cmd
+
     async def execute_shell_command(self, command_to_execute: str, original_user_input_display: str):
         """Executes a simple shell command directly."""
         if not self.ui_manager: logger.error("ShellEngine.execute_shell_command: UIManager not available."); return
+        
+        # Apply host breakout logic
+        command_to_execute = self._apply_host_breakout(command_to_execute, original_user_input_display)
+
         append_output_func = self.ui_manager.append_output
         logger.info(f"Executing simple command: '{command_to_execute}' in '{self.current_directory}'")
         
@@ -307,6 +351,10 @@ class ShellEngine:
     async def execute_command_in_tmux(self, command_to_execute: str, original_user_input_display: str, category: str):
         """Executes a command in a new tmux window, based on category."""
         if not self.ui_manager: logger.error("ShellEngine.execute_command_in_tmux: UIManager not available."); return
+        
+        # Apply host breakout logic
+        command_to_execute = self._apply_host_breakout(command_to_execute, original_user_input_display)
+
         append_output_func = self.ui_manager.append_output
         logger.info(f"Executing tmux command ({category}): '{command_to_execute}' in '{self.current_directory}'")
         

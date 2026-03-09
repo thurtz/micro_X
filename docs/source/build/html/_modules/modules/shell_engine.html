@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>modules.shell_engine &mdash; micro_X 0.0.1058 documentation</title>
+  <title>modules.shell_engine &mdash; micro_X 0.0.1059 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=40e21806"></script>
+      <script src="../../_static/documentation_options.js?v=e49a9c1f"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -180,6 +180,10 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">embedding_manager_instance</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">router_agent_instance</span> <span class="o">=</span> <span class="n">create_router_agent</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">)</span>
 
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_in_docker_breakout</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;DOCKER_BREAKOUT&quot;</span><span class="p">,</span> <span class="s2">&quot;false&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;true&quot;</span>
+        <span class="c1"># Using chroot /host is more robust for simple shell commands than nsenter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_host_breakout_base</span> <span class="o">=</span> <span class="s2">&quot;chroot /host&quot;</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">current_directory</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
         
         <span class="c1"># --- Process Management State ---</span>
@@ -332,11 +336,51 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">main_restore_normal_input_ref</span><span class="p">()</span></div>
 
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_host_breakout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">original_input</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Determines if a command should execute on the host system via chroot.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_in_docker_breakout</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">command</span>
+        
+        <span class="n">stripped_cmd</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">stripped_cmd</span><span class="p">:</span> <span class="k">return</span> <span class="n">command</span>
+        
+        <span class="c1"># Build the dynamic command: cd to dir, then run command</span>
+        <span class="c1"># Inside chroot /host, the paths remain identical because we mapped them that way</span>
+        <span class="n">wrapped_cmd</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;cd </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">current_directory</span><span class="si">}</span><span class="s2"> &amp;&amp; </span><span class="si">{</span><span class="n">stripped_cmd</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">breakout_cmd</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_host_breakout_base</span><span class="si">}</span><span class="s2"> /bin/bash -c </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">wrapped_cmd</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="c1"># Rule 1: Manual force via &#39;!&#39; prefix ALWAYS breaks out</span>
+        <span class="k">if</span> <span class="n">original_input</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;!&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">stripped_cmd</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;!&#39;</span><span class="p">):</span>
+            <span class="n">clean_cmd</span> <span class="o">=</span> <span class="n">stripped_cmd</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s1">&#39;!&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Host Breakout: Forced via &#39;!&#39; prefix.&quot;</span><span class="p">)</span>
+            <span class="n">wrapped_manual</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;cd </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">current_directory</span><span class="si">}</span><span class="s2"> &amp;&amp; </span><span class="si">{</span><span class="n">clean_cmd</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_host_breakout_base</span><span class="si">}</span><span class="s2"> /bin/bash -c </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">wrapped_manual</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="c1"># Rule 2: Internal micro_X commands (starting with /) stay in container</span>
+        <span class="k">if</span> <span class="n">stripped_cmd</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">stripped_cmd</span>
+
+        <span class="c1"># Rule 3: Project-specific execution stays in container</span>
+        <span class="n">project_indicators</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;main.py&quot;</span><span class="p">,</span> <span class="s2">&quot;utils/&quot;</span><span class="p">,</span> <span class="s2">&quot;setup.sh&quot;</span><span class="p">,</span> <span class="s2">&quot;micro_X.sh&quot;</span><span class="p">,</span> <span class="s2">&quot;pytest&quot;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">indicator</span> <span class="ow">in</span> <span class="n">project_indicators</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">indicator</span> <span class="ow">in</span> <span class="n">stripped_cmd</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">stripped_cmd</span>
+
+        <span class="c1"># Rule 4: Everything else breaks out to the host</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Host Breakout: Routing command to host system: </span><span class="si">{</span><span class="n">stripped_cmd</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">breakout_cmd</span>
+
 <div class="viewcode-block" id="ShellEngine.execute_shell_command">
 <a class="viewcode-back" href="../../api_reference.html#modules.shell_engine.ShellEngine.execute_shell_command">[docs]</a>
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">execute_shell_command</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command_to_execute</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">original_user_input_display</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Executes a simple shell command directly.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">ui_manager</span><span class="p">:</span> <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;ShellEngine.execute_shell_command: UIManager not available.&quot;</span><span class="p">);</span> <span class="k">return</span>
+        
+        <span class="c1"># Apply host breakout logic</span>
+        <span class="n">command_to_execute</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_host_breakout</span><span class="p">(</span><span class="n">command_to_execute</span><span class="p">,</span> <span class="n">original_user_input_display</span><span class="p">)</span>
+
         <span class="n">append_output_func</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ui_manager</span><span class="o">.</span><span class="n">append_output</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Executing simple command: &#39;</span><span class="si">{</span><span class="n">command_to_execute</span><span class="si">}</span><span class="s2">&#39; in &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">current_directory</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
         
@@ -400,6 +444,10 @@
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">execute_command_in_tmux</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command_to_execute</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">original_user_input_display</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Executes a command in a new tmux window, based on category.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">ui_manager</span><span class="p">:</span> <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;ShellEngine.execute_command_in_tmux: UIManager not available.&quot;</span><span class="p">);</span> <span class="k">return</span>
+        
+        <span class="c1"># Apply host breakout logic</span>
+        <span class="n">command_to_execute</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_host_breakout</span><span class="p">(</span><span class="n">command_to_execute</span><span class="p">,</span> <span class="n">original_user_input_display</span><span class="p">)</span>
+
         <span class="n">append_output_func</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ui_manager</span><span class="o">.</span><span class="n">append_output</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Executing tmux command (</span><span class="si">{</span><span class="n">category</span><span class="si">}</span><span class="s2">): &#39;</span><span class="si">{</span><span class="n">command_to_execute</span><span class="si">}</span><span class="s2">&#39; in &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">current_directory</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
         

@@ -47,15 +47,20 @@ import modules.config_handler
 config = load_configuration_early(SCRIPT_DIR, CONFIG_DIR)
 
 # Set OLLAMA_HOST immediately
-ollama_host = config.get('ollama_service', {}).get('ollama_host', 'http://localhost')
-ollama_port = config.get('ollama_service', {}).get('ollama_port', 11434)
+# Priority 1: Environment Variable
+if 'OLLAMA_HOST' in os.environ:
+    logger.info(f"Using existing OLLAMA_HOST from environment: {os.environ['OLLAMA_HOST']}")
+else:
+    # Priority 2: Configuration file
+    ollama_host = config.get('ollama_service', {}).get('ollama_host', 'http://localhost')
+    ollama_port = config.get('ollama_service', {}).get('ollama_port', 11434)
 
-# Ensure protocol is present
-if not str(ollama_host).startswith(('http://', 'https://')):
-    ollama_host = f'http://{ollama_host}'
+    # Ensure protocol is present
+    if not str(ollama_host).startswith(('http://', 'https://')):
+        ollama_host = f'http://{ollama_host}'
 
-os.environ['OLLAMA_HOST'] = f"{ollama_host}:{ollama_port}"
-logger.info(f"Initialized OLLAMA_HOST={os.environ['OLLAMA_HOST']}")
+    os.environ['OLLAMA_HOST'] = f"{ollama_host}:{ollama_port}"
+    logger.info(f"Initialized OLLAMA_HOST={os.environ['OLLAMA_HOST']}")
 
 # --- Now Import the rest of the application ---
 from prompt_toolkit import Application

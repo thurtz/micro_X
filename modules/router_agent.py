@@ -1,6 +1,7 @@
 # modules/router_agent.py
 
 import logging
+import os
 import contextlib
 import io
 from langchain.agents import AgentExecutor, create_tool_calling_agent
@@ -37,7 +38,7 @@ def create_router_agent(config: dict):
         return None
 
     # Llama 3 models are particularly good at tool calling.
-    llm = ChatOllama(model=model_name, temperature=0)
+    llm = ChatOllama(model=model_name, temperature=0, base_url=os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
     tools = get_all_tools()
     
     # This agent is designed to work with models that support native tool calling.

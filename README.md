@@ -1,15 +1,25 @@
 # **micro_X: The AI-Enhanced Shell**
 
 micro_X is an intelligent, interactive shell environment designed to bridge the gap between natural language and executable Linux commands. It leverages local large language models (LLMs) via Ollama to translate your queries, validate commands, explain their functionality, and streamline your command-line workflow. It also features branch-aware integrity checks to ensure code reliability when running on stable or testing branches.
+
 GitHub Repository: https://github.com/thurtz/micro_X.git
 Detailed User Guide: docs/user_guide/index.md
 Changelog: CHANGELOG.md
 
 ## **Quick Start / Installation**
 
-### **Step 1: General Setup**
+### **Option 1: Docker (Recommended for Stability)**
 
-It is recommended that all users start by cloning and setting up the main branch for the most stable experience.
+The fastest way to get a perfectly stable environment is using Docker.
+
+1.  **Run the Docker Wrapper:**
+    ```bash
+    ./docker-micro_X.sh
+    ```
+    *   This will build a Debian Trixie image with all dependencies (Python 3.13, Git, GitHub CLI) pre-installed.
+    *   **Host Control:** Use the `!` prefix (e.g., `!apt update`) to execute commands directly on your host system from within the container.
+
+### **Option 2: Native Setup**
 
 1.  **Clone the Repository:**
     ```bash
@@ -20,22 +30,7 @@ It is recommended that all users start by cloning and setting up the main branch
     ```bash
     ./setup.sh
     ```
-    *   The script will guide you through installing dependencies, setting up the Python environment, and pulling the necessary Ollama models. Follow the on-screen prompts.
-
-### **Step 2 (Optional): For Developers and Testers**
-
-If you wish to contribute to development or test new features, you can activate the development environment from your stable main branch installation.
-
-1.  **Launch micro_X from your main branch installation:**
-    ```bash
-    ./micro_X.sh
-    ```
-2.  **Run the Activation Utility:** Inside micro_X, run the following command:
-    ```bash
-    /dev --activate
-    ```
-    *   This command will clone the testing and dev branches into new subdirectories (micro_X-testing/ and micro_X-dev/) and run the setup process for each of them.
-    *   You will then have three separate, managed installations of micro_X.
+    *   The script will guide you through installing dependencies and setting up the Python environment.
 
 ## **Overview**
 
@@ -43,111 +38,26 @@ micro_X provides a modern text-based user interface (TUI) where you can:
 
 *   Type standard Linux commands with **syntax highlighting** in the input field.
 *   Enter natural language queries and have them automatically translated into shell commands.
-*   Force a query to be treated as a natural language command by prefixing it with `/translate`.
+*   **Host Access from Docker:** When running in a container, all standard commands and AI-generated commands execute on the host by default.
+*   **Manual Shell Escape (`!`):** Prefix any command with `!` to force it to run natively on your host system.
 *   **Query Documentation:** Ask questions about the project's documentation in natural language using the `/docs --query` command.
-*   **Confirm AI-Generated Commands:** Review, get explanations, modify, or cancel commands suggested by the AI before execution via an interactive menu.
-*   **Run Once:** Execute commands immediately without permanent categorization.
-*   Categorize commands (simple, semi_interactive, interactive_tui) for appropriate execution, including running interactive commands in tmux.
-*   **Run Custom Scripts:** Add your own Python scripts to a dedicated `user_scripts/` directory and run them with the `/run` command.
-*   **Create Command Aliases:** Use the built-in alias utility to create shortcuts for your favorite or frequently used commands.
-*   Manage command history and categorizations.
-*   Control the underlying Ollama service directly from within the shell.
-*   **Branch-Aware Integrity & Developer Mode:** Automatically enables a permissive 'Developer Mode' when running off the dev branch. Performs startup integrity checks on main and testing branches.
 *   **Web-Based Configuration Manager:** An integrated tool to easily view and edit user configurations and command categorizations via a web interface (launched with the `/config --start` command).
 *   **Clone-Based Development Workflow:** Use the `/clone --bump` utility to create isolated development environments (Git worktrees) for safe testing and refactoring.
 
 ## **Key Features**
 
-*   **AI-Powered Command Generation & Validation:**
-    *   **Natural Language to Command Translation:** Uses configurable Ollama models for initial translation. Any unrecognized input is automatically treated as a natural language query.
-    *   **AI-Powered Command Validation:** Employs a configurable Ollama model to assess command validity.
-    *   **AI-Powered Command Explanation:** Request an explanation for AI-generated commands to understand their purpose and potential impact.
-    *   **Interactive Command Confirmation:** For AI-generated commands, micro_X prompts for user action:
-        *   **Run Once**: Execute immediately without saving categorization.
-        *   **Simple / Semi-Interactive / TUI**: Execute and save to the respective category.
-        *   **Explain**: Ask AI to explain the command before deciding.
-        *   **Modify**: Load the command into the input field for editing.
-        *   **Cancel**: Do not execute.
-
-*   **Modern TUI Experience (Textual):**
-    *   **Interactive Top Bar**: Quick access to Help, Docs, and Quit.
-    *   **Syntax Highlighting**: Real-time highlighting for shell commands as you type.
-    *   **Markdown Rendering**: Rich formatting for welcome messages and execution feedback.
-    *   **Global Shortcuts**:
-        *   `F1`: Help.
-        *   `Ctrl+D`: Documentation (in browser).
-        *   `Ctrl+T`: Spawn new shell session.
-        *   `Ctrl+R`: Search command history.
-        *   `Ctrl+Q`: Quit.
-
-*   **Command Categorization & Execution:**
-    *   `simple`: Direct execution, output captured in micro_X.
-    *   `semi_interactive`: Runs in a new tmux window. Output typically captured after completion.
-    *   `interactive_tui`: Runs fully interactively in a new tmux window.
-    *   Users manage categories via the `/command` alias.
-
-*   **Ollama Service Management:** Control the Ollama service directly from micro_X using the `/ollama` command (subcommands: `start`, `stop`, `restart`, `status`, `help`).
-
-*   **Branch-Aware Integrity & Developer Mode:**
-    *   **Developer Mode:** Activated on the `dev` branch or if integrity checks cannot be performed. Integrity checks are informational, allowing development without interruption.
-    *   **Protected Mode:** Active on `main` or `testing` branches. Performs strict startup integrity checks (clean working directory, sync with remote). Failure halts execution to prevent running unstable code.
-
-*   **Multi-Layered Security:**
-    *   Configurable **deny-list** in `config/default_config.json` blocks dangerous command patterns.
-    *   **Warn-list** triggers extra confirmation for sensitive commands.
-    *   Primary defense: interactive **user confirmation flow** for all AI-generated commands.
-
-*   **Shell-like Functionality:** Supports `cd`, history, and shell variable expansion.
-
-*   **Logging & Configuration:** Detailed logging and persistent configuration.
-
-*   **Web-Based Configuration Manager:** Launch with the `/config --start` command to easily manage `user_config.json` and `user_command_categories.json` via a web UI.
-
-*   **Clone-Based Development:** Powerful `/clone` utility using `git worktree` for creating isolated, versioned development environments.
-
+*   **AI-Powered Command Generation & Validation:** Natural language translation, validation, and explanation powered by local Ollama models.
+*   **Dockerized Distribution:** Run in a guaranteed Debian environment while maintaining complete system control.
+*   **Modern TUI Experience:** Interactive top bar, syntax highlighting, and rich Markdown rendering.
+*   **Command Categorization:** Handles `simple`, `semi_interactive`, and `interactive_tui` commands with intelligent tmux integration.
+*   **Multi-Layered Security:** Configurable deny-lists, warn-lists, and a mandatory user confirmation flow for all AI actions.
 
 ## **Usage**
 
-1.  **Ensure Ollama is Running** (use `/ollama status` within micro_X or check externally).
-2.  **Launch micro_X:**
-    *   From your `micro_X` (main) directory, run: `./micro_X.sh`
-    *   To run the dev version, navigate to its directory and run its launch script: `cd micro_X-dev && ./micro_X.sh`
+1.  **Launch micro_X:** `./micro_X.sh` (Native) or `./docker-micro_X.sh` (Docker).
+2.  **Direct Commands:** Type any Linux command (e.g., `ls -l`).
+3.  **AI Translation:** Type a query (e.g., `find my large videos`).
+4.  **Host Breakout (Docker only):** Prefix with `!` to escape the container (e.g., `!reboot`).
 
-### **Operational Modes (Based on Git Branch)**
-
-micro_X's behavior at startup is influenced by the current Git branch:
-
-*   **Developer Mode:** Automatically active if you are on the `dev` branch. In this mode, startup integrity checks are informational and do not halt execution, allowing for local code changes.
-*   **Protected Mode:** Active if you are on the `main` or `testing` branches. micro_X performs strict integrity checks to ensure the code is clean and synced with the remote repository. If these checks fail, the application will halt to prevent running on potentially unstable code.
-
-### **Interacting with micro_X**
-
-*   **Direct Commands:** Type any Linux command and press Enter (e.g., `ls -l`).
-*   **Automatic AI Translation:** Enter any natural language query, and if it's not a known command, micro_X will attempt to translate it into a shell command.
-*   **Forced AI Translation (`/translate`):** Prefix your query with `/translate` to force it to be treated as a natural language command.
-    *   `(/~) > /translate list text files`
-*   **Query Documentation (`/docs`):** Ask questions about the project's documentation.
-    *   `(/~) > /docs --query "how do I use the snapshot command?" --rag`
-*   **User Scripts (`/run`):** Execute your own scripts from the `user_scripts/` directory.
-    *   `(/~) > /run my_script --with-args`
-*   **Aliases (`/alias`, `/command`, `/config`, etc.):** Use aliases for common utilities.
-    *   `(/~) > /alias --add /snap /snapshot`
-*   **Configuration Manager:**
-    *   `(/~) > /config --start`
-
-*   **Help (`/help`):** Displays the main help message.
-*   **Exit (`/exit` or `exit`):** Exits the micro_X shell.
-
-## **Troubleshooting**
-
-*   **Integrity Check Failed:** If micro_X halts on startup on the `main` or `testing` branch, it means your local code has uncommitted changes or is not synced with the official repository.
-    *   **Solution:** Open a standard terminal in the project directory. Use `git status` to see the changes. You can either discard them (`git reset --hard origin/main`) or commit them on a separate feature branch. For development, it's best to switch to the `dev` branch (`git checkout dev`).
-
-## **Future Ideas & Contributions**
-
-*   More sophisticated security sandboxing options.
-*   Plugin system for extending functionality.
-*   GPG signature verification for commits/tags on the main branch as part of integrity checks.
-
-Contributions, bug reports, and feature requests are welcome! Please open an issue or pull request on the GitHub repository.
-This README was drafted with the assistance of an AI and subsequently updated based on project evolution.
+---
+This README was updated to reflect the v0.0.1059 Dockerized deployment architecture.

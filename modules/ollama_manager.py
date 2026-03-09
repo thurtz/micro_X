@@ -30,13 +30,18 @@ _is_initialized = False # Flag to ensure config and callback are set
 def set_ollama_host_from_config(config_obj: dict):
     """
     Sets the OLLAMA_HOST environment variable from a given configuration object.
-    This should be called as early as possible during startup.
+    Does NOT overwrite if the variable is already set (e.g. via Docker).
     """
     global _config_cached
     if not _config_cached:
         _config_cached = config_obj # Cache the config for other functions in this module
     
-    # Get the ollama_service sub-dictionary
+    # Priority 1: Existing Environment Variable
+    if 'OLLAMA_HOST' in os.environ:
+        logger.info(f"OLLAMA_HOST already set in environment: {os.environ['OLLAMA_HOST']}")
+        return
+
+    # Priority 2: Configuration file
     ollama_service_config = config_obj.get('ollama_service', {})
     
     # Logic to determine and set OLLAMA_HOST
@@ -47,11 +52,8 @@ def set_ollama_host_from_config(config_obj: dict):
     if not isinstance(ollama_host, str) or not ollama_host.startswith(('http://', 'https://')):
         ollama_host = f'http://{ollama_host}'
 
-    # The ollama library uses the OLLAMA_HOST environment variable
-    # to determine the server address.
-    # It expects format like "http://host:port"
     os.environ['OLLAMA_HOST'] = f"{ollama_host}:{ollama_port}"
-    logger.info(f"OLLAMA_HOST environment variable set to: {os.environ['OLLAMA_HOST']}")
+    logger.info(f"OLLAMA_HOST environment variable set from config: {os.environ['OLLAMA_HOST']}")
 
 
 def _initialize_manager_if_needed(main_config=None, append_output_callback=None):

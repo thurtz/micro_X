@@ -1,17 +1,25 @@
 #!/bin/bash
 
-# Navigate to the directory where this script is located
-# This ensures that .venv and main.py are found correctly relative to the script.
-SCRIPT_DIR_INNER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR_INNER" || { echo "ERROR: Could not navigate to script directory: $SCRIPT_DIR_INNER"; exit 1; }
+# Navigate to the correct directory
+if [ -n "$HOST_PROJECT_ROOT" ] && [ -d "$HOST_PROJECT_ROOT" ]; then
+    # Docker breakout mode: Use the host-equivalent path
+    cd "$HOST_PROJECT_ROOT" || exit 1
+    SCRIPT_DIR_INNER="$HOST_PROJECT_ROOT"
+else
+    # Native mode: Use the directory where this script is located
+    SCRIPT_DIR_INNER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR_INNER" || { echo "ERROR: Could not navigate to script directory: $SCRIPT_DIR_INNER"; exit 1; }
+fi
 
 # Activate the virtual environment
 if [ -f ".venv/bin/activate" ]; then
     # shellcheck disable=SC1091
     source .venv/bin/activate
+elif [ -f "/opt/micro_x_venv/bin/activate" ]; then
+    # Docker breakout environment
+    source /opt/micro_x_venv/bin/activate
 else
-    echo "ERROR: Virtual environment '.venv' not found or activate script missing in $SCRIPT_DIR_INNER."
-    echo "Please run the setup script first."
+    echo "ERROR: Virtual environment not found."
     exit 1
 fi
 
